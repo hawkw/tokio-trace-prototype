@@ -2,13 +2,13 @@ use super::{Event, StaticMeta};
 use ::log;
 
 pub trait Subscriber {
-    fn consume<'event>(&self, event: &'event Event<'event>);
+    fn observe<'event>(&self, event: &'event Event<'event>);
 }
 
 pub struct LogSubscriber;
 
 impl Subscriber for LogSubscriber {
-    fn consume<'event>(&self, event: &'event Event<'event>) {
+    fn observe<'event>(&self, event: &'event Event<'event>) {
         let fields = event.debug_fields();
         let meta = event.static_meta.into();
         let logger = log::logger();

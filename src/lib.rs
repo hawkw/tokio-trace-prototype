@@ -43,6 +43,7 @@ thread_local! {
 }
 
 pub mod subscriber;
+pub mod dispatcher;
 
 // XXX: im using fmt::Debug for prototyping purposes, it should probably leave.
 pub trait Value: fmt::Debug {
