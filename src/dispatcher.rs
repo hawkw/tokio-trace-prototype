@@ -32,7 +32,7 @@ impl Builder {
         Self::default()
     }
 
-    pub fn add_subscriber<T: Subscriber + 'static>(&mut self, subscriber: T) -> &mut Self {
+    pub fn add_subscriber<T: Subscriber + 'static>(mut self, subscriber: T) -> Self {
         self.subscribers.push(Box::new(subscriber));
         self
     }

@@ -6,3 +6,6 @@ authors = ["Eliza Weisman <eliza@buoyant.io>"]
 [dependencies]
 futures = "0.1"
 log = "0.4"
+
+[dev-dependencies]
+env_logger = "0.5"

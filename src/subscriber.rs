@@ -7,6 +7,12 @@ pub trait Subscriber {
 
 pub struct LogSubscriber;
 
+impl LogSubscriber {
+    pub fn new() -> Self {
+        LogSubscriber
+    }
+}
+
 impl Subscriber for LogSubscriber {
     fn observe<'event>(&self, event: &'event Event<'event>) {
         let fields = event.debug_fields();

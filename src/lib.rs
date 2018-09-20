@@ -11,14 +11,16 @@ use std::{
     slice,
 };
 
+#[doc(hidden)]
+#[macro_export]
 macro_rules! static_meta {
     ($($k:ident),*) => (
         static_meta!(@ None, $crate::Level::Trace, $($k),* )
     );
-    ($lvl:expr, $($k:ident),*) => (
+    (level: $lvl:expr, $($k:ident),*) => (
         static_meta!(@ None, $lvl, $($k),* )
     );
-    (target: $target:expr, $lvl:expr, $($k:ident),*) => (
+    (target: $target:expr, level: $lvl:expr, $($k:ident),*) => (
         static_meta!(@ Some($target), $lvl, $($k),* )
     );
     (target: $target:expr, $($k:ident),*) => (
@@ -39,30 +41,32 @@ macro_rules! static_meta {
 #[macro_export]
 macro_rules! span {
     ($name:expr, $($k:ident = $val:expr),*) => {
-        $crate::Span {
-            inner: ::std::sync::Arc::new($crate::SpanInner {
-                opened_at: ::std::time::Instant::now(),
-                parent: $crate::Span::current(),
-                static_meta: &static_meta!( $($k),* ),
-                field_values: vec![ $(Box::new($val)),* ], // todo: wish this wasn't double-boxed...
-                name: Some($name),
-            })
-        }
+        $crate::Span::new(
+            Some($name),
+            ::std::time::Instant::now(),
+            $crate::Span::current(),
+            &static_meta!( $($k),* ),
+            vec![ $(Box::new($val)),* ], // todo: wish this wasn't double-boxed...
+        )
     }
 }
 
 #[macro_export]
 macro_rules! event {
-    (target: $target:expr, $lvl:expr, $($arg:tt)+, $($k:ident = $val:expr),*) => ({
-        $crate::Event {
-            timestamp: ::std::time::Instant::now(),
-            parent: $crate::Span::current(),
-            follows_from: &[],
-            static_meta: &static_meta!(target: $target, $lvl, $($k),* ),
-            field_values: &[ $($val),* ]
+    (target: $target:expr, $lvl:expr, { $($k:ident = $val:expr),* }, $($arg:tt)+ ) => ({
+    {       let field_values: &[& dyn $crate::Value] = &[ $( & $val),* ];
+            $crate::Dispatcher::current().broadcast(&$crate::Event {
+                timestamp: ::std::time::Instant::now(),
+                parent: $crate::Span::current(),
+                follows_from: &[],
+                static_meta: &static_meta!(@ $target, $lvl, $($k),* ),
+                field_values: &[],
+                message: format_args!( $($arg)+ ),
+            });
         }
+
     });
-    ($lvl:expr, $($arg:tt)+, $($k:ident = $val:expr),*) => (event!(target: None, $lvl, $($arg)+, $($k = $val),*))
+    ($lvl:expr, { $($k:ident = $val:expr),* }, $($arg:tt)+ ) => (event!(target: None, $lvl, { $($k = $val),* }, $($arg)+))
 }
 
 thread_local! {
@@ -79,6 +83,8 @@ pub trait Value: fmt::Debug {
     // ... ?
 }
 
+impl<T> Value for T where T: fmt::Debug { }
+
 pub struct Event<'event> {
     pub timestamp: Instant,
 
@@ -86,6 +92,7 @@ pub struct Event<'event> {
     pub follows_from: &'event [Span],
 
     pub static_meta: &'event StaticMeta,
+    // TODO: agh box
     pub field_values: &'event [&'event dyn Value],
     pub message: fmt::Arguments<'event>,
 }
@@ -142,15 +149,26 @@ impl<'event> Event<'event> {
     }
 }
 
-impl<'event> Drop for Event<'event> {
-    fn drop(&mut self) {
-        Dispatcher::current().broadcast(self);
-    }
-}
-
 // ===== impl Span =====
 
 impl Span {
+    pub fn new(
+        name: Option<&'static str>,
+        opened_at: Instant,
+        parent: Span,
+        static_meta: &'static StaticMeta,
+        field_values: Vec<Box<dyn Value>>,
+    ) -> Self {
+        Span {
+            inner: Arc::new(SpanInner {
+                name,
+                opened_at,
+                parent,
+                static_meta,
+                field_values,
+            })
+        }
+    }
 
     pub fn current() -> Self {
         CURRENT_SPAN.with(|span| {
