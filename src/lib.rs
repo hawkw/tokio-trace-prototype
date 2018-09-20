@@ -57,14 +57,14 @@ macro_rules! span {
 macro_rules! event {
     (target: $target:expr, $lvl:expr, { $($k:ident = $val:expr),* }, $($arg:tt)+ ) => ({
     {       let field_values: &[& dyn $crate::Value] = &[ $( & $val),* ];
-            $crate::Dispatcher::current().broadcast(&$crate::Event {
+            $crate::Event {
                 timestamp: ::std::time::Instant::now(),
                 parent: $crate::Span::current(),
                 follows_from: &[],
                 static_meta: &static_meta!(@ $target, $lvl, $($k),* ),
                 field_values: &field_values[..],
                 message: format_args!( $($arg)+ ),
-            });
+            };
         }
 
     });
@@ -160,6 +160,12 @@ impl<'event> Event<'event> {
 
     pub fn debug_fields(&'event self) -> DebugFields<'event, Self> {
         DebugFields(self)
+    }
+}
+
+impl<'event> Drop for Event<'event> {
+    fn drop(&mut self) {
+        Dispatcher::current().broadcast(self);
     }
 }
 
