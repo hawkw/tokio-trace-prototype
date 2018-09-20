@@ -1,6 +1,8 @@
 extern crate futures;
 extern crate log;
 
+pub use log::Level;
+
 use std::{
     cell::RefCell,
     fmt,
@@ -10,17 +12,28 @@ use std::{
 };
 
 macro_rules! static_meta {
-    ($($k:ident),*) => {
+    ($($k:ident),*) => (
+        static_meta!(@ None, $crate::Level::Trace, $($k),* )
+    );
+    ($lvl:expr, $($k:ident),*) => (
+        static_meta!(@ None, $lvl, $($k),* )
+    );
+    (target: $target:expr, $lvl:expr, $($k:ident),*) => (
+        static_meta!(@ Some($target), $lvl, $($k),* )
+    );
+    (target: $target:expr, $($k:ident),*) => (
+        static_meta!(@ Some($target), $crate::Level::Trace, $($k),* )
+    );
+    (@ $target:expr, $lvl:expr, $($k:ident),*) => (
         $crate::StaticMeta {
-            target: None,
-            level: $crate::log::Level::Trace,
+            target: $target,
+            level: $lvl,
             module_path: module_path!(),
             file: file!(),
             line: line!(),
             field_names: &[ $(stringify!($k)),* ],
         }
-    }
-    // TODO: handle invocations with log levels or targets.
+    )
 }
 
 #[macro_export]
@@ -38,12 +51,28 @@ macro_rules! span {
     }
 }
 
+#[macro_export]
+macro_rules! event {
+    (target: $target:expr, $lvl:expr, $($arg:tt)+, $($k:ident = $val:expr),*) => ({
+        $crate::Event {
+            timestamp: ::std::time::Instant::now(),
+            parent: $crate::Span::current(),
+            follows_from: &[],
+            static_meta: &static_meta!(target: $target, $lvl, $($k),* ),
+            field_values: &[ $($val),* ]
+        }
+    });
+    ($lvl:expr, $($arg:tt)+, $($k:ident = $val:expr),*) => (event!(target: None, $lvl, $($arg)+, $($k = $val),*))
+}
+
 thread_local! {
     static CURRENT_SPAN: RefCell<Span> = RefCell::new(span!("root",));
 }
 
 pub mod subscriber;
-pub mod dispatcher;
+mod dispatcher;
+
+pub use dispatcher::{Dispatcher, Builder as DispatcherBuilder};
 
 // XXX: im using fmt::Debug for prototyping purposes, it should probably leave.
 pub trait Value: fmt::Debug {
@@ -110,6 +139,12 @@ impl<'event> Event<'event> {
 
     pub fn debug_fields(&'event self) -> DebugFields<'event, Self> {
         DebugFields(self)
+    }
+}
+
+impl<'event> Drop for Event<'event> {
+    fn drop(&mut self) {
+        Dispatcher::current().broadcast(self);
     }
 }
 

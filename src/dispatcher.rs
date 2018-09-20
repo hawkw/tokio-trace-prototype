@@ -70,10 +70,19 @@ impl Dispatch for Builder {
 pub struct Dispatcher(&'static Dispatch);
 
 impl Dispatcher {
-    pub fn current() -> Self {
+    pub fn current() -> Dispatcher {
         Dispatcher(unsafe { DISPATCHER })
     }
+
+    pub fn builder() -> Builder {
+        Builder::new()
+    }
+
+    pub fn broadcast<'event>(&self, event: &'event Event<'event>) {
+        self.0.broadcast(event)
+    }
 }
+
 
 impl Dispatch for Dispatcher {
     #[inline]
