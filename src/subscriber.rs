@@ -24,7 +24,7 @@ impl Subscriber for LogSubscriber {
                 .module_path(Some(event.static_meta.module_path))
                 .file(Some(event.static_meta.file))
                 .line(Some(event.static_meta.line))
-                .args(format_args!("{:?} {}", fields, event.message))
+                .args(format_args!("[{}] {:?} {}", event.parent.name().unwrap_or("???"), fields, event.message))
                 .build());
         }
     }
