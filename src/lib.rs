@@ -1,4 +1,6 @@
 extern crate futures;
+extern crate log;
+
 use std::{
     cell::RefCell,
     fmt,
@@ -10,12 +12,15 @@ use std::{
 macro_rules! static_meta {
     ($($k:ident),*) => {
         $crate::StaticMeta {
+            target: None,
+            level: $crate::log::Level::Trace,
             module_path: module_path!(),
             file: file!(),
             line: line!(),
             field_names: &[ $(stringify!($k)),* ],
         }
     }
+    // TODO: handle invocations with log levels or targets.
 }
 
 #[macro_export]
@@ -24,9 +29,7 @@ macro_rules! span {
         $crate::Span {
             inner: ::std::sync::Arc::new($crate::SpanInner {
                 opened_at: ::std::time::Instant::now(),
-                parent: CURRENT_SPAN.with(|span| {
-                    span.borrow().clone()
-                }),
+                parent: $crate::Span::current(),
                 static_meta: &static_meta!( $($k),* ),
                 field_values: vec![ $(Box::new($val)),* ], // todo: wish this wasn't double-boxed...
                 name: Some($name),
@@ -39,13 +42,11 @@ thread_local! {
     static CURRENT_SPAN: RefCell<Span> = RefCell::new(span!("root",));
 }
 
+pub mod subscriber;
+
 // XXX: im using fmt::Debug for prototyping purposes, it should probably leave.
 pub trait Value: fmt::Debug {
     // ... ?
-}
-
-pub trait Subscriber {
-    fn consume<'event>(&self, event: Event<'event>);
 }
 
 pub struct Event<'event> {
@@ -61,6 +62,9 @@ pub struct Event<'event> {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StaticMeta {
+    pub target: Option<&'static str>,
+    pub level: log::Level,
+
     pub module_path: &'static str,
     pub file: &'static str,
     pub line: u32,
@@ -87,9 +91,37 @@ struct SpanInner {
     // ...
 }
 
+// ===== impl Event =====
+
+impl<'event> Event<'event> {
+    pub fn field_names(&self) -> slice::Iter<&'static str> {
+        self.static_meta
+            .field_names
+            .iter()
+    }
+
+    pub fn fields(&'event self) -> impl Iterator<Item = (&'static str, &'event dyn Value)> {
+        self.field_names()
+            .enumerate()
+            .map(move |(idx, &name)| (name, self.field_values[idx]))
+            .chain(self.parent.fields())
+    }
+
+    pub fn debug_fields(&'event self) -> DebugFields<'event, Self> {
+        DebugFields(self)
+    }
+}
+
 // ===== impl Span =====
 
 impl Span {
+
+    pub fn current() -> Self {
+        CURRENT_SPAN.with(|span| {
+            span.borrow().clone()
+        })
+    }
+
     pub fn name(&self) -> Option<&'static str> {
         self.inner.name
     }
@@ -126,6 +158,10 @@ impl Span {
             result
         })
     }
+
+    pub fn debug_fields<'a>(&'a self) -> DebugFields<'a, Self> {
+        DebugFields(self)
+    }
 }
 
 impl<'a> IntoIterator for &'a Span {
@@ -134,14 +170,23 @@ impl<'a> IntoIterator for &'a Span {
     fn into_iter(self) -> Self::IntoIter {
         Box::new(self.fields())
     }
-
 }
 
-struct DebugKvs<'a, I: 'a>(&'a I)
-where &'a I: IntoIterator<Item = (&'static str, &'a dyn Value)>;
+impl<'a> IntoIterator for &'a Event<'a> {
+    type Item = (&'static str, &'a dyn Value);
+    type IntoIter = Box<Iterator<Item = (&'static str, &'a dyn Value)> +'a>; // TODO: unbox
+    fn into_iter(self) -> Self::IntoIter {
+        Box::new(self.fields())
+    }
+}
 
-impl<'a, I:'a > fmt::Debug for DebugKvs<'a, I>
-where &'a I: IntoIterator<Item = (&'static str, &'a dyn Value)>
+pub struct DebugFields<'a, I: 'a>(&'a I)
+where
+    &'a I: IntoIterator<Item = (&'static str, &'a dyn Value)>;
+
+impl<'a, I:'a > fmt::Debug for DebugFields<'a, I>
+where
+    &'a I: IntoIterator<Item = (&'static str, &'a dyn Value)>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_map().entries(self.0.into_iter()).finish()
@@ -154,7 +199,7 @@ impl fmt::Debug for Span {
             .field("name", &self.inner.name)
             .field("opened_at", &self.inner.opened_at)
             .field("parent", &self.inner.parent.name())
-            .field("fields", &DebugKvs(self))
+            .field("fields", &self.debug_fields())
             .field("meta", &self.meta())
             .finish()
     }
