@@ -8,7 +8,7 @@ fn main() {
     tokio_trace::Dispatcher::builder()
         .add_subscriber(tokio_trace::subscriber::LogSubscriber::new())
         .init();
-    env_logger::init();
+    env_logger::Builder::new().parse("info").init();
 
     let foo = 3;
     event!(Level::Info, { foo = foo, bar = "bar" }, "hello world");
