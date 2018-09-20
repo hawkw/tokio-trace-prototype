@@ -62,7 +62,7 @@ macro_rules! event {
                 parent: $crate::Span::current(),
                 follows_from: &[],
                 static_meta: &static_meta!(@ $target, $lvl, $($k),* ),
-                field_values: &[],
+                field_values: &field_values[..],
                 message: format_args!( $($arg)+ ),
             });
         }
@@ -154,7 +154,7 @@ impl<'event> Event<'event> {
     pub fn fields(&'event self) -> impl Iterator<Item = (&'static str, &'event dyn Value)> {
         self.field_names()
             .enumerate()
-            .map(move |(idx, &name)| (name, self.field_values[idx]))
+            .filter_map(move |(idx, &name)| self.field_values.get(idx).map(|&val| (name, val)))
             .chain(self.parent.fields())
     }
 
