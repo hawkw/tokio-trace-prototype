@@ -3,7 +3,7 @@ use std::{
     cell::RefCell,
     fmt,
     time::Instant,
-    ptr,
+    sync::Arc,
 };
 
 macro_rules! static_meta {
@@ -21,23 +21,21 @@ macro_rules! static_meta {
 macro_rules! span {
     ($name:expr, $($k:ident = $val:expr),*) => {
         $crate::Span {
-            opened_at: ::std::time::Instant::now(),
-            parent: CURRENT_SPAN.with(|spans| {
-                spans.borrow_mut()
-                    .last_mut()
-                    .and_then(|head| {
-                        ::std::ptr::NonNull::new( head as *mut _ )
-                    })
-            }),
-            static_meta: &static_meta!( $($k),* ),
-            field_values: Box::new([ $(Box::new($val)),* ]), // todo: wish this wasn't boxed
-            name: Some($name),
+            inner: ::std::sync::Arc::new($crate::SpanInner {
+                opened_at: ::std::time::Instant::now(),
+                parent: CURRENT_SPAN.with(|span| {
+                    span.borrow().clone()
+                }),
+                static_meta: &static_meta!( $($k),* ),
+                field_values: vec![ $(Box::new($val)),* ], // todo: wish this wasn't double-boxed...
+                name: Some($name),
+            })
         }
     }
 }
 
 thread_local! {
-    static CURRENT_SPAN: RefCell<Vec<Span>> = RefCell::new(vec![ span!("root",) ]);
+    static CURRENT_SPAN: RefCell<Span> = RefCell::new(span!("root",));
 }
 
 // XXX: im using fmt::Debug for prototyping purposes, it should probably leave.
@@ -52,8 +50,8 @@ pub trait Subscriber {
 pub struct Event<'event> {
     pub timestamp: Instant,
 
-    pub parent: &'event Span,
-    pub follows_from: &'event [&'event Span],
+    pub parent: Span,
+    pub follows_from: &'event [Span],
 
     pub static_meta: &'event StaticMeta,
     pub field_values: &'event [&'event dyn Value],
@@ -69,13 +67,20 @@ pub struct StaticMeta {
     pub field_names: &'static [&'static str],
 }
 
+#[derive(Clone)]
 pub struct Span {
+    inner: Arc<SpanInner>,
+}
+
+struct SpanInner {
     pub opened_at: Instant,
 
-    pub parent: Option<ptr::NonNull<Span>>,
+    pub parent: Span,
 
     pub static_meta: &'static StaticMeta,
-    pub field_values: Box<[Box<dyn Value>]>, // TODO: awful
     pub name: Option<&'static str>,
+
+    pub field_values: Vec<Box<dyn Value>>,
+
     // ...
 }
