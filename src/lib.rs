@@ -1,8 +1,44 @@
 extern crate futures;
 use std::{
+    cell::RefCell,
     fmt,
     time::Instant,
+    ptr,
 };
+
+macro_rules! static_meta {
+    ($($k:ident),*) => {
+        $crate::StaticMeta {
+            module_path: module_path!(),
+            file: file!(),
+            line: line!(),
+            field_names: &[ $(stringify!($k)),* ],
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! span {
+    ($name:expr, $($k:ident = $val:expr),*) => {
+        $crate::Span {
+            opened_at: ::std::time::Instant::now(),
+            parent: CURRENT_SPAN.with(|spans| {
+                spans.borrow_mut()
+                    .last_mut()
+                    .and_then(|head| {
+                        ::std::ptr::NonNull::new( head as *mut _ )
+                    })
+            }),
+            static_meta: &static_meta!( $($k),* ),
+            field_values: Box::new([ $(Box::new($val)),* ]), // todo: wish this wasn't boxed
+            name: Some($name),
+        }
+    }
+}
+
+thread_local! {
+    static CURRENT_SPAN: RefCell<Vec<Span>> = RefCell::new(vec![ span!("root",) ]);
+}
 
 // XXX: im using fmt::Debug for prototyping purposes, it should probably leave.
 pub trait Value: fmt::Debug {
@@ -16,8 +52,8 @@ pub trait Subscriber {
 pub struct Event<'event> {
     pub timestamp: Instant,
 
-    pub parent: &'event Span<'event>,
-    pub follows_from: &'event [&'event Span<'event>],
+    pub parent: &'event Span,
+    pub follows_from: &'event [&'event Span],
 
     pub static_meta: &'event StaticMeta,
     pub field_values: &'event [&'event dyn Value],
@@ -33,48 +69,13 @@ pub struct StaticMeta {
     pub field_names: &'static [&'static str],
 }
 
-pub struct Span<'span> {
+pub struct Span {
     pub opened_at: Instant,
 
-    pub parent: Option<&'span Span<'span>>,
+    pub parent: Option<ptr::NonNull<Span>>,
 
-    pub static_meta: &'span StaticMeta,
-    pub field_values: &'span[&'span dyn Value],
-    pub name: Option<&'span str>,
+    pub static_meta: &'static StaticMeta,
+    pub field_values: Box<[Box<dyn Value>]>, // TODO: awful
+    pub name: Option<&'static str>,
     // ...
 }
-
-macro_rules! static_meta {
-    ($($k:ident),*) => {
-        $crate::StaticMeta {
-            module_path: module_path!(),
-            file: file!(),
-            line: line!(),
-            field_values: &[ $(stringify!($k)),* ],
-        }
-    }
-}
-
-#[macro_export]
-macro_rules! span {
-    ($name:expr, $($k:ident = $val:expr),*) => {
-        $crate::Span {
-            opened_at: ::std::time::Instant::now(),
-            parent: None, // TODO: get currently-executing span from TLS.
-            static_meta: &static_meta!( $($k),* ),
-            field_values: &[ $($val),* ],
-
-        }
-    }
-}
-
-// pub struct OpenSpan<'span, T> {
-//     opened_at: Instant,
-//     fields: &'span [(&'span str, &'span T)],
-
-//     module_path: Option<&'span str>,
-//     file: Option<&'span str>,
-//     line: Option<u32>,
-
-//     parent: Option<&'span OpenSpan<'span, T>>,
-// }
