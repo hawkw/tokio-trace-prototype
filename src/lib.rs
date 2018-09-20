@@ -1,5 +1,7 @@
 extern crate futures;
 extern crate log;
+#[macro_use]
+extern crate lazy_static;
 
 pub use log::Level;
 
@@ -69,8 +71,20 @@ macro_rules! event {
     ($lvl:expr, { $($k:ident = $val:expr),* }, $($arg:tt)+ ) => (event!(target: None, $lvl, { $($k = $val),* }, $($arg)+))
 }
 
+lazy_static! {
+    static ref ROOT_SPAN: Span = Span {
+        inner: Arc::new(SpanInner {
+            name: Some("root"),
+            opened_at: Instant::now(),
+            parent: None,
+            static_meta: &static_meta!(),
+            field_values: Vec::new(),
+        })
+    };
+}
+
 thread_local! {
-    static CURRENT_SPAN: RefCell<Span> = RefCell::new(span!("root",));
+    static CURRENT_SPAN: RefCell<Span> = RefCell::new(ROOT_SPAN.clone());
 }
 
 pub mod subscriber;
@@ -79,11 +93,11 @@ mod dispatcher;
 pub use dispatcher::{Dispatcher, Builder as DispatcherBuilder};
 
 // XXX: im using fmt::Debug for prototyping purposes, it should probably leave.
-pub trait Value: fmt::Debug {
+pub trait Value: fmt::Debug + Send + Sync {
     // ... ?
 }
 
-impl<T> Value for T where T: fmt::Debug { }
+impl<T> Value for T where T: fmt::Debug + Send + Sync { }
 
 pub struct Event<'event> {
     pub timestamp: Instant,
@@ -119,7 +133,7 @@ struct SpanInner {
     pub name: Option<&'static str>,
     pub opened_at: Instant,
 
-    pub parent: Span,
+    pub parent: Option<Span>,
 
     pub static_meta: &'static StaticMeta,
 
@@ -163,7 +177,7 @@ impl Span {
             inner: Arc::new(SpanInner {
                 name,
                 opened_at,
-                parent,
+                parent: Some(parent),
                 static_meta,
                 field_values,
             })
@@ -181,7 +195,7 @@ impl Span {
     }
 
     pub fn parent(&self) -> &Span {
-        &self.inner.parent
+        self.inner.parent.as_ref().unwrap_or(self)
     }
 
     pub fn meta(&self) -> &'static StaticMeta {
@@ -252,7 +266,7 @@ impl fmt::Debug for Span {
         f.debug_struct("Span")
             .field("name", &self.inner.name)
             .field("opened_at", &self.inner.opened_at)
-            .field("parent", &self.inner.parent.name())
+            .field("parent", &self.parent().name())
             .field("fields", &self.debug_fields())
             .field("meta", &self.meta())
             .finish()
