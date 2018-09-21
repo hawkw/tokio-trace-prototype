@@ -142,6 +142,11 @@ struct SpanInner {
     // ...
 }
 
+/// Iterator over the parents of a span or event
+pub struct Parents<'a> {
+    next: Option<&'a Span>,
+}
+
 // ===== impl Event =====
 
 impl<'event> Event<'event> {
@@ -160,6 +165,12 @@ impl<'event> Event<'event> {
 
     pub fn debug_fields(&'event self) -> DebugFields<'event, Self> {
         DebugFields(self)
+    }
+
+    pub fn parents<'a>(&'a self) -> Parents<'a> {
+        Parents {
+            next: Some(&self.parent)
+        }
     }
 }
 
@@ -200,8 +211,8 @@ impl Span {
         self.inner.name
     }
 
-    pub fn parent(&self) -> &Span {
-        self.inner.parent.as_ref().unwrap_or(self)
+    pub fn parent(&self) -> Option<&Span> {
+        self.inner.parent.as_ref()
     }
 
     pub fn meta(&self) -> &'static StaticMeta {
@@ -227,7 +238,7 @@ impl Span {
 
             let result = f();
 
-            current_span.replace(self.parent().clone());
+            current_span.replace(self.parent().unwrap_or(self).clone());
 
             result
         })
@@ -235,6 +246,12 @@ impl Span {
 
     pub fn debug_fields<'a>(&'a self) -> DebugFields<'a, Self> {
         DebugFields(self)
+    }
+
+    pub fn parents<'a>(&'a self) -> Parents<'a> {
+        Parents {
+            next: Some(self)
+        }
     }
 }
 
@@ -272,9 +289,19 @@ impl fmt::Debug for Span {
         f.debug_struct("Span")
             .field("name", &self.inner.name)
             .field("opened_at", &self.inner.opened_at)
-            .field("parent", &self.parent().name())
+            .field("parent", &self.parent().unwrap_or(self).name())
             .field("fields", &self.debug_fields())
             .field("meta", &self.meta())
             .finish()
+    }
+}
+
+// ===== impl Parents =====
+
+impl<'a> Iterator for Parents<'a> {
+    type Item = &'a Span;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next = self.next.and_then(Span::parent);
+        self.next
     }
 }
