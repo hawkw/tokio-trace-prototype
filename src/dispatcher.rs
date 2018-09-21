@@ -1,16 +1,12 @@
 use ::{
-    Event,
-    subscriber::Subscriber
+    Event, Span,
+    subscriber::Subscriber,
 };
 
 use std::{
-    fmt,
+    time::Instant,
     sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT},
 };
-
-pub(crate) trait Dispatch {
-    fn broadcast<'event>(&self, event: &'event Event<'event>);
-}
 
 static STATE: AtomicUsize = ATOMIC_USIZE_INIT;
 
@@ -20,7 +16,7 @@ static STATE: AtomicUsize = ATOMIC_USIZE_INIT;
 const UNINITIALIZED: usize = 0;
 const INITIALIZING: usize = 1;
 const INITIALIZED: usize = 2;
-static mut DISPATCHER: &'static Dispatch = &NoDispatcher;
+static mut DISPATCHER: &'static Subscriber = &NoDispatcher;
 
 #[derive(Default)]
 pub struct Builder {
@@ -59,15 +55,29 @@ impl Builder {
     }
 }
 
-impl Dispatch for Builder {
-    fn broadcast<'event>(&self, event: &'event Event<'event>) {
+impl Subscriber for Builder {
+    fn observe_event<'event>(&self, event: &'event Event<'event>) {
         for subscriber in &self.subscribers {
-            subscriber.observe(event)
+            subscriber.observe_event(event)
+        }
+    }
+
+    #[inline]
+    fn enter(&self, span: &Span, at: Instant) {
+        for subscriber in &self.subscribers {
+            subscriber.enter(span, at)
+        }
+    }
+
+    #[inline]
+    fn exit(&self, span: &Span, at: Instant) {
+       for subscriber in &self.subscribers {
+            subscriber.exit(span, at)
         }
     }
 }
 
-pub struct Dispatcher(&'static Dispatch);
+pub struct Dispatcher(&'static Subscriber);
 
 impl Dispatcher {
     pub fn current() -> Dispatcher {
@@ -77,17 +87,23 @@ impl Dispatcher {
     pub fn builder() -> Builder {
         Builder::new()
     }
-
-    pub fn broadcast<'event>(&self, event: &'event Event<'event>) {
-        self.0.broadcast(event)
-    }
 }
 
 
-impl Dispatch for Dispatcher {
+impl Subscriber for Dispatcher {
     #[inline]
-    fn broadcast<'event>(&self, event: &'event Event<'event>) {
-        self.0.broadcast(event)
+    fn observe_event<'event>(&self, event: &'event Event<'event>) {
+        self.0.observe_event(event)
+    }
+
+    #[inline]
+    fn enter(&self, span: &Span, at: Instant) {
+        self.0.enter(span, at)
+    }
+
+    #[inline]
+    fn exit(&self, span: &Span, at: Instant) {
+        self.0.exit(span, at)
     }
 }
 
@@ -96,9 +112,13 @@ struct NoDispatcher;
 #[derive(Debug)]
 pub struct InitError;
 
-impl Dispatch for NoDispatcher {
-    fn broadcast<'event>(&self, _: &'event Event<'event>) {
+impl Subscriber for NoDispatcher {
+    fn observe_event<'event>(&self, _event: &'event Event<'event>) {
         // Do nothing.
         // TODO: should this panic instead?
     }
+
+    fn enter(&self, _span: &Span, _at: Instant) { }
+
+    fn exit(&self, _span: &Span, _at: Instant) { }
 }
