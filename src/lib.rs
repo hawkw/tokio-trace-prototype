@@ -4,8 +4,10 @@ extern crate log;
 extern crate lazy_static;
 
 pub use log::Level;
+pub use self::subscriber::Subscriber;
 
 use std::{
+    cmp,
     cell::RefCell,
     fmt,
     time::Instant,
@@ -123,7 +125,7 @@ pub struct StaticMeta {
     pub field_names: &'static [&'static str],
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Span {
     inner: Arc<SpanInner>,
 }
@@ -176,7 +178,7 @@ impl<'event> Event<'event> {
 
 impl<'event> Drop for Event<'event> {
     fn drop(&mut self) {
-        Dispatcher::current().broadcast(self);
+        Dispatcher::current().observe_event(self);
     }
 }
 
@@ -235,10 +237,14 @@ impl Span {
     pub fn enter<F: FnOnce() -> T, T>(&self, f: F) -> T {
         CURRENT_SPAN.with(|current_span| {
             current_span.replace(self.clone());
+            Dispatcher::current().enter(&self, Instant::now());
 
             let result = f();
 
-            current_span.replace(self.parent().unwrap_or(self).clone());
+            if *self != *current_span.borrow() {
+                current_span.replace(self.parent().unwrap_or(self).clone());
+                Dispatcher::current().exit(&self, Instant::now());
+            }
 
             result
         })
@@ -252,6 +258,14 @@ impl Span {
         Parents {
             next: Some(self)
         }
+    }
+}
+
+impl cmp::PartialEq for SpanInner {
+    fn eq(&self, other: &SpanInner) -> bool {
+        self.opened_at == other.opened_at &&
+        self.name == other.name &&
+        self.static_meta == other.static_meta
     }
 }
 
