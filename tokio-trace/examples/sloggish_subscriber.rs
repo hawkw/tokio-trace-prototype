@@ -114,7 +114,7 @@ impl SloggishSubscriber {
 
 impl tokio_trace::Subscriber for SloggishSubscriber {
     #[inline]
-    fn observe_event<'event>(&self, event: &'event tokio_trace::Event<'event>) {
+    fn observe_event<'event, 'meta: 'event>(&self, event: &'event tokio_trace::Event<'event, 'meta>) {
         let mut stderr = self.stderr.lock();
         let parent_hash = self.hash_span(&event.parent);
 
