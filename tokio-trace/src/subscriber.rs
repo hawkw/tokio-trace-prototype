@@ -3,6 +3,8 @@ use log;
 use std::time::Instant;
 
 pub trait Subscriber {
+    /// Note that this function is generic over a pair of lifetimes because the
+    /// `Event` type is. See the documentation for [`Event`] for details.
     fn observe_event<'event, 'meta: 'event>(&self, event: &'event Event<'event, 'meta>);
     fn enter(&self, span: &Span, at: Instant);
     fn exit(&self, span: &Span, at: Instant);

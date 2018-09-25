@@ -98,6 +98,14 @@ pub trait Value: fmt::Debug + Send + Sync {
 
 impl<T> Value for T where T: fmt::Debug + Send + Sync {}
 
+/// **Note**: `Event` must be generic over two lifetimes, that of `Event` itself
+/// (the `'event` lifetime) *and* the lifetime of the event's metadata (the
+/// `'meta` lifetime), which must be at least as long as the event's lifetime.
+/// This is because the metadata may live as long as the lifetime, or it may be
+/// `'static` and reused for all `Event`s generated from a particular source
+/// code location (as is the case when the event is produced by the `event!`
+/// macro). Consumers of `Event` probably do not need to actually care about
+/// these lifetimes, however.
 pub struct Event<'event, 'meta> {
     pub timestamp: Instant,
 
