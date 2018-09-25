@@ -3,21 +3,6 @@ name = "tokio-trace-log"
 version = "0.1.0"
 authors = ["Eliza Weisman <eliza@buoyant.io>"]
 
-[features]
-
-default = ["env"]
-env = ["env_logger"]
-
 [dependencies]
 tokio-trace = { path = "../tokio-trace" }
 log = "0.4"
-
-[dependencies.env_logger]
-version = "0.5"
-optional = true
-
-[dev-dependencies]
-hyper = "0.12"
-futures = "0.1"
-ansi_term = "0.11"
-humantime = "1.1.1"
