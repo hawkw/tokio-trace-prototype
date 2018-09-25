@@ -1,10 +1,10 @@
-
+extern crate tokio_trace_log;
 extern crate env_logger;
-use log;
+extern crate log;
 
 pub fn try_init() -> Result<(), log::SetLoggerError> {
     env_logger::Builder::from_default_env()
-        .format(|_, record| ::format_trace(record))
+        .format(|_, record| tokio_trace_log::format_trace(record))
         .try_init()
 }
 

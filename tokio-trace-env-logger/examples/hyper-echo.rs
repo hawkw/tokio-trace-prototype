@@ -2,7 +2,7 @@ extern crate futures;
 extern crate hyper;
 #[macro_use]
 extern crate tokio_trace;
-extern crate tokio_trace_log;
+extern crate tokio_trace_env_logger;
 
 use futures::future;
 use hyper::rt::{Future, Stream};
@@ -95,7 +95,7 @@ fn main() {
     tokio_trace::Dispatcher::builder()
         .add_subscriber(SloggishSubscriber::new(2))
         .init();
-    tokio_trace_log::env_logger::try_init().expect("init log adapter");
+    tokio_trace_env_logger::try_init().expect("init log adapter");
 
     let addr: ::std::net::SocketAddr = ([127, 0, 0, 1], 3000).into();
     let server_span = span!(

@@ -2,20 +2,9 @@
 //! the `tokio_trace` ecosystem.
 extern crate tokio_trace;
 extern crate log;
-extern crate env_logger;
 
 use std::{io, time::Instant};
-use tokio_trace::subscriber::Subscriber;
-
-pub fn try_init() -> Result<(), log::SetLoggerError> {
-    env_logger::Builder::from_default_env()
-        .format(|_, record| format_trace(record))
-        .try_init()
-}
-
-pub fn init() {
-    try_init().unwrap()
-}
+use tokio_trace::Subscriber;
 
 pub fn format_trace(record: &log::Record) -> io::Result<()> {
     let parent = tokio_trace::Span::current();
