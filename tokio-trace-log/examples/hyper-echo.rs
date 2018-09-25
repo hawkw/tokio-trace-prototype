@@ -95,7 +95,7 @@ fn main() {
     tokio_trace::Dispatcher::builder()
         .add_subscriber(SloggishSubscriber::new(2))
         .init();
-    tokio_trace_log::try_init().expect("init log adapter");
+    tokio_trace_log::env_logger::try_init().expect("init log adapter");
 
     let addr: ::std::net::SocketAddr = ([127, 0, 0, 1], 3000).into();
     let server_span = span!(
