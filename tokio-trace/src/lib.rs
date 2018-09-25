@@ -1,8 +1,8 @@
 //!
 //! # Core Concepts
 //!
-//! Central to understanding `tokio-trace` are the core concepts of `Event`s,
-//! `Span`s, and `Subscriber`s.
+//! The core of `tokio-trace`'s API is composed of `Events`, `Spans`, and
+//! `Subscribers`. We'll cover these in turn.
 //!
 //! # Spans
 //!
