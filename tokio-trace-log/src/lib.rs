@@ -1,3 +1,5 @@
+//! Adapters for connecting unstructured log records from the `log` crate into
+//! the `tokio_trace` ecosystem.
 extern crate tokio_trace;
 extern crate log;
 extern crate env_logger;
