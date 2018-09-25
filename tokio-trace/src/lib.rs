@@ -80,7 +80,7 @@ extern crate log;
 extern crate lazy_static;
 pub use log::Level;
 
-use std::{cell::RefCell, fmt, slice, sync::Arc, time::Instant};
+use std::{fmt, slice, time::Instant};
 
 use self::dedup::IteratorDedup;
 

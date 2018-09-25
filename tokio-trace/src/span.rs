@@ -4,7 +4,10 @@ use std::{
     cmp, fmt,
     hash::{Hash, Hasher},
     slice,
-    sync::Arc,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
     time::Instant,
 };
 
@@ -16,6 +19,7 @@ lazy_static! {
             parent: None,
             static_meta: &static_meta!(),
             field_values: Vec::new(),
+            state: AtomicUsize::new(State::Running as usize),
         })
     };
 }
@@ -30,7 +34,7 @@ pub struct Span {
 }
 
 #[derive(Debug)]
-pub(crate) struct SpanInner {
+struct SpanInner {
     pub name: Option<&'static str>,
     pub opened_at: Instant,
 
@@ -39,7 +43,26 @@ pub(crate) struct SpanInner {
     pub static_meta: &'static StaticMeta,
 
     pub field_values: Vec<Box<dyn Value>>,
+
+    pub state: AtomicUsize,
     // ...
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[repr(usize)]
+pub enum State {
+    /// The span has been created but has yet to be entered.
+    Unentered,
+    /// A thread is currently executing inside the span or one of its children.
+    Running,
+    /// The span has previously been entered, but is not currently
+    /// executing. However, it is not done and may be entered again.
+    Idle,
+    /// The span has completed.
+    ///
+    /// It will *not* be entered again (and may be dropped once all
+    /// subscribers have finished processing it).
+    Done,
 }
 
 // ===== impl Span =====
@@ -59,6 +82,7 @@ impl Span {
                 parent: Some(parent),
                 static_meta,
                 field_values,
+                state: AtomicUsize::new(State::Unentered as usize),
             }),
         }
     }
@@ -89,27 +113,51 @@ impl Span {
             .map(move |(idx, &name)| (name, self.inner.field_values[idx].as_ref()))
     }
 
+    pub fn state(&self) -> State {
+        match self.inner.state.load(Ordering::Acquire) {
+            s if s == State::Unentered as usize => State::Unentered,
+            s if s == State::Running as usize => State::Running,
+            s if s == State::Idle as usize => State::Idle,
+            s if s == State::Done as usize => State::Done,
+            invalid => panic!("invalid state: {:?}", invalid),
+        }
+    }
+
     pub fn enter<F: FnOnce() -> T, T>(&self, f: F) -> T {
-        let result = CURRENT_SPAN.with(|current_span| {
-            if *current_span.borrow() == *self
-                || current_span.borrow().parents().any(|span| span == self)
-            {
-                return f();
+        let initial_state = self.state();
+        match initial_state {
+            // The span has been marked as done; it may not be reentered again.
+            // TODO: maybe this should not crash the thread?
+            State::Done => panic!("cannot re-enter completed span!"),
+            // The span has already been entered, so we don't need to enter it
+            // again. Just run the body and return the result.
+            State::Running => f(),
+            _ => {
+                let result = CURRENT_SPAN.with(|current_span| {
+                    current_span.replace(self.clone());
+                    self.inner.state.compare_and_swap(
+                        initial_state as usize,
+                        State::Running as usize,
+                        Ordering::Release,
+                    );
+                    Dispatcher::current().enter(&self, Instant::now());
+                    f()
+                });
+
+                CURRENT_SPAN.with(|current_span| {
+                    if let Some(parent) = self.parent() {
+                        current_span.replace(parent.clone());
+                        Dispatcher::current().exit(&self, Instant::now());
+                        self.inner.state.compare_and_swap(
+                            State::Running as usize,
+                            State::Idle as usize,
+                            Ordering::Release,
+                        );
+                    }
+                });
+                result
             }
-
-            current_span.replace(self.clone());
-            Dispatcher::current().enter(&self, Instant::now());
-            f()
-        });
-
-        CURRENT_SPAN.with(|current_span| {
-            if let Some(parent) = self.parent() {
-                current_span.replace(parent.clone());
-                Dispatcher::current().exit(&self, Instant::now());
-            }
-        });
-
-        result
+        }
     }
 
     pub fn debug_fields<'a>(&'a self) -> DebugFields<'a, Self> {
