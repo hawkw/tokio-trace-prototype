@@ -6,21 +6,26 @@ use std::{
     slice,
     sync::{
         atomic::{AtomicUsize, Ordering},
-        Arc,
+        Arc, Weak, Mutex,
     },
     time::Instant,
 };
 
 lazy_static! {
-    static ref ROOT_SPAN: Span = Span {
-        inner: Arc::new(SpanInner {
-            name: Some("root"),
-            opened_at: Instant::now(),
-            parent: None,
-            static_meta: &static_meta!(),
-            field_values: Vec::new(),
-            state: AtomicUsize::new(State::Running as usize),
-        })
+    static ref ROOT_SPAN: Span = {
+        let enter_count = Arc::new(());
+        let can_enter = Arc::downgrade(&enter_count);
+        Span {
+            inner: Arc::new(SpanInner {
+                name: Some("root"),
+                opened_at: Instant::now(),
+                parent: None,
+                static_meta: &static_meta!(),
+                field_values: Vec::new(),
+                state: AtomicUsize::new(State::Running as usize),
+                can_enter_parent: Mutex::new(None),
+            })
+        }
     };
 }
 
@@ -28,8 +33,19 @@ thread_local! {
     static CURRENT_SPAN: RefCell<Span> = RefCell::new(ROOT_SPAN.clone());
 }
 
+/// A handle on a `Span` that allows access to the span's data and may be used
+/// to enter the span.
 #[derive(Clone, PartialEq, Hash)]
 pub struct Span {
+    inner: Arc<SpanInner>,
+    can_enter: Weak<()>,
+}
+
+/// A handle on the data associated with a span.
+///
+/// This may be used to access the span but may *not* be used to enter the span.
+#[derive(Clone, PartialEq, Hash)]
+pub struct Data {
     inner: Arc<SpanInner>,
 }
 
@@ -38,14 +54,20 @@ struct SpanInner {
     pub name: Option<&'static str>,
     pub opened_at: Instant,
 
-    pub parent: Option<Span>,
+    pub parent: Option<Data>,
 
     pub static_meta: &'static StaticMeta,
 
     pub field_values: Vec<Box<dyn Value>>,
 
     pub state: AtomicUsize,
-    // ...
+
+    /// Used for counting the number of currently-live `Span` references that
+    /// may enter this span.
+    enter_count: Arc<()>,
+
+    // TODO: ag i hate this
+    can_enter_parent: Mutex<Option<Weak<()>>>,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
@@ -75,6 +97,10 @@ impl Span {
         static_meta: &'static StaticMeta,
         field_values: Vec<Box<dyn Value>>,
     ) -> Self {
+        let enter_count = Arc::new(());
+        let (parent, can_enter_parent) = parent.split();
+        let can_enter_parent = RefCell::new(Some(can_enter_parent));
+        let can_enter = Arc::downgrade(&enter_count);
         Span {
             inner: Arc::new(SpanInner {
                 name,
@@ -83,7 +109,10 @@ impl Span {
                 static_meta,
                 field_values,
                 state: AtomicUsize::new(State::Unentered as usize),
+                enter_count,
+                can_enter,
             }),
+            can_enter,
         }
     }
 
@@ -95,7 +124,7 @@ impl Span {
         self.inner.name
     }
 
-    pub fn parent(&self) -> Option<&Span> {
+    pub fn parent(&self) -> Option<&Data> {
         self.inner.parent.as_ref()
     }
 
@@ -123,7 +152,7 @@ impl Span {
         }
     }
 
-    pub fn enter<F: FnOnce() -> T, T>(&self, f: F) -> T {
+    pub fn enter<F: FnOnce() -> T, T>(self, f: F) -> T {
         let initial_state = self.state();
         match initial_state {
             // The span has been marked as done; it may not be reentered again.
@@ -146,11 +175,27 @@ impl Span {
 
                 CURRENT_SPAN.with(|current_span| {
                     if let Some(parent) = self.parent() {
-                        current_span.replace(parent.clone());
-                        Dispatcher::current().exit(&self, Instant::now());
+                        current_span.replace(parent.clone().upgrade());
+                        Dispatcher::current().exit(&self.clone.downgrade(), Instant::now());
+
+                        // If we are the only remaining enter handle to this
+                        // span, it can now transition to Done. Otherwise, it
+                        // transitions to Idle.
+                        let next_state = if self.inner.remaining_enters() <= 1 {
+                            // This span can no longer enter its parent, so
+                            // drop the can_enter_parent marker.
+                            drop(self.inner
+                                .can_enter_parent
+                                .lock().expect("poisoned lock")
+                                .take()
+                            );
+                            State::Done
+                        } else {
+                            State::Idle
+                        };
                         self.inner.state.compare_and_swap(
                             State::Running as usize,
-                            State::Idle as usize,
+                            next_state as usize,
                             Ordering::Release,
                         );
                     }
@@ -167,7 +212,67 @@ impl Span {
     pub fn parents<'a>(&'a self) -> Parents<'a> {
         Parents { next: Some(self) }
     }
+
+    pub fn downgrade(self) -> Data {
+        Data {
+            inner: self.inner,
+        }
+    }
+
+    fn split(self) -> (Data, Weak<()>) {
+        let data = Data {
+            inner: self.inner,
+        };
+        (data, self.can_enter)
+    }
 }
+
+// ===== impl Data =====
+
+impl Data {
+    fn upgrade(self) -> Span {
+        let can_enter = Arc::downgrade(&self.inner.enter_count);
+        Span {
+            inner: self.inner,
+            can_enter,
+        }
+    }
+
+
+    pub fn name(&self) -> Option<&'static str> {
+        self.inner.name
+    }
+
+    pub fn parent(&self) -> Option<&Data> {
+        self.inner.parent.as_ref()
+    }
+
+    pub fn meta(&self) -> &'static StaticMeta {
+        self.inner.static_meta
+    }
+
+    pub fn field_names(&self) -> slice::Iter<&'static str> {
+        self.inner.static_meta.field_names.iter()
+    }
+
+    pub fn fields<'a>(&'a self) -> impl Iterator<Item = (&'static str, &'a dyn Value)> {
+        self.field_names()
+            .enumerate()
+            .map(move |(idx, &name)| (name, self.inner.field_values[idx].as_ref()))
+    }
+
+    pub fn state(&self) -> State {
+        match self.inner.state.load(Ordering::Acquire) {
+            s if s == State::Unentered as usize => State::Unentered,
+            s if s == State::Running as usize => State::Running,
+            s if s == State::Idle as usize => State::Idle,
+            s if s == State::Done as usize => State::Done,
+            invalid => panic!("invalid state: {:?}", invalid),
+        }
+    }
+}
+
+// ===== impl SpanInner =====
 
 impl cmp::PartialEq for SpanInner {
     fn eq(&self, other: &SpanInner) -> bool {
@@ -182,6 +287,12 @@ impl Hash for SpanInner {
         self.opened_at.hash(state);
         self.name.hash(state);
         self.static_meta.hash(state);
+    }
+}
+
+impl SpanInner {
+    fn remaining_enters(&self) -> usize {
+        Arc::weak_count(self.enter_count)
     }
 }
 

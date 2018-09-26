@@ -131,7 +131,7 @@ macro_rules! event {
             use $crate::Subscriber;
             $crate::Dispatcher::current().observe_event(&$crate::Event {
                 timestamp: ::std::time::Instant::now(),
-                parent: $crate::Span::current(),
+                parent: $crate::Span::current().downgrade(),
                 follows_from: &[],
                 meta: &static_meta!(@ $target, $lvl, $($k),* ),
                 field_values: &field_values[..],
@@ -151,7 +151,7 @@ pub mod subscriber;
 
 pub use self::{
     dispatcher::{Builder as DispatcherBuilder, Dispatcher},
-    span::Span,
+    span::{Data as SpanData, Span},
     subscriber::Subscriber,
 };
 
@@ -173,8 +173,8 @@ impl<T> Value for T where T: fmt::Debug + Send + Sync {}
 pub struct Event<'event, 'meta> {
     pub timestamp: Instant,
 
-    pub parent: Span,
-    pub follows_from: &'event [Span],
+    pub parent: SpanData,
+    pub follows_from: &'event [SpanData],
 
     pub meta: &'meta Meta<'meta>,
     // TODO: agh box
@@ -198,7 +198,7 @@ type StaticMeta = Meta<'static>;
 
 /// Iterator over the parents of a span or event
 pub struct Parents<'a> {
-    next: Option<&'a Span>,
+    next: Option<&'a SpanData>,
 }
 
 // ===== impl Event =====
@@ -255,9 +255,9 @@ where
 // ===== impl Parents =====
 
 impl<'a> Iterator for Parents<'a> {
-    type Item = &'a Span;
+    type Item = &'a SpanData;
     fn next(&mut self) -> Option<Self::Item> {
-        self.next = self.next.and_then(Span::parent);
+        self.next = self.next.and_then(SpanData::parent);
         self.next
     }
 }

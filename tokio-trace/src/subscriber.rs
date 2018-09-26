@@ -1,4 +1,4 @@
-use super::{Event, Span, Meta};
+use super::{Event, SpanData, Meta};
 use log;
 use std::time::Instant;
 
@@ -6,8 +6,8 @@ pub trait Subscriber {
     /// Note that this function is generic over a pair of lifetimes because the
     /// `Event` type is. See the documentation for [`Event`] for details.
     fn observe_event<'event, 'meta: 'event>(&self, event: &'event Event<'event, 'meta>);
-    fn enter(&self, span: &Span, at: Instant);
-    fn exit(&self, span: &Span, at: Instant);
+    fn enter(&self, span: &SpanData, at: Instant);
+    fn exit(&self, span: &SpanData, at: Instant);
 }
 
 pub struct LogSubscriber;
@@ -23,7 +23,7 @@ impl Subscriber for LogSubscriber {
         let fields = event.debug_fields();
         let meta = event.meta.into();
         let logger = log::logger();
-        let parents = event.parents().filter_map(Span::name).collect::<Vec<_>>();
+        let parents = event.parents().filter_map(SpanData::name).collect::<Vec<_>>();
         if logger.enabled(&meta) {
             logger.log(
                 &log::Record::builder()
@@ -41,14 +41,14 @@ impl Subscriber for LogSubscriber {
         }
     }
 
-    fn enter(&self, span: &Span, _at: Instant) {
+    fn enter(&self, span: &SpanData, _at: Instant) {
         let logger = log::logger();
         logger.log(&log::Record::builder()
             .args(format_args!("-> {:?}", span.name()))
             .build()
         )
     }
-    fn exit(&self, span: &Span, _at: Instant) {
+    fn exit(&self, span: &SpanData, _at: Instant) {
         let logger = log::logger();
         logger.log(&log::Record::builder().args(format_args!("<- {:?}", span.name())).build())
     }
