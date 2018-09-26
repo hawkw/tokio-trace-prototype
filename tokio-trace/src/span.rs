@@ -356,3 +356,39 @@ impl SpanInner {
         Arc::weak_count(&self.enter_count)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use ::subscriber::test_support::*;
+    use super::*;
+
+    #[test]
+    fn exit_doesnt_finish_while_handles_still_exist() {
+        let mut subscriber = mock();
+        subscriber
+            .enter(span().named(Some("foo")))
+            .enter(span().named(Some("bar")))
+            .exit(span().named(Some("bar"))
+                .with_state(State::Idle))
+            .enter(span().named(Some("bar")))
+            .exit(span().named(Some("bar"))
+                .with_state(State::Done)
+            )
+            .exit(span().named(Some("foo"))
+                .with_state(State::Done)
+            );
+        subscriber.set();
+
+        span!("foo",).enter(|| {
+            let bar = span!("bar",);
+            bar.clone().enter(|| {
+                // do nothing. exiting bar should leave it idle.
+            });
+            bar.enter(|| {
+                // enter bar again. this time, the last handle is used, so bar
+                // should be marked as done.
+            });
+        });
+    }
+
+}
