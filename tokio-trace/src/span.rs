@@ -211,8 +211,9 @@ impl Span {
         DebugFields(self)
     }
 
-    pub fn parents<'a>(&self) -> Parents<'a> {
-        Parents { next: Some(&self.clone().downgrade()) }
+    pub fn parents<'a>(&'a self) -> Parents<'a> {
+        // agh fix
+        unimplemented!()
     }
 
     pub fn downgrade(self) -> Data {
@@ -228,6 +229,7 @@ impl Span {
         (data, self.can_enter)
     }
 }
+
 
 impl cmp::PartialEq for Span {
     fn eq(&self, other: &Span) -> bool {

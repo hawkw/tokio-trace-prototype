@@ -24,9 +24,9 @@ impl<T: Future> Future for Instrumented<T> {
     type Error = T::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        let span = &self.span;
+        let span = self.span.clone();
         let inner = &mut self.inner;
-        span.enter(move || {
+        span.clone().enter(move || {
             inner.poll()
         })
     }
@@ -37,7 +37,7 @@ impl<T: Stream> Stream for Instrumented<T> {
     type Error = T::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        let span = &self.span;
+        let span = self.span.clone();
         let inner = &mut self.inner;
         span.enter(move || {
             inner.poll()
@@ -53,7 +53,7 @@ impl<T: Sink> Sink for Instrumented<T> {
         &mut self,
         item: Self::SinkItem
     ) -> StartSend<Self::SinkItem, Self::SinkError> {
-        let span = &self.span;
+        let span = self.span.clone();
         let inner = &mut self.inner;
         span.enter(move || {
             inner.start_send(item)
@@ -61,7 +61,7 @@ impl<T: Sink> Sink for Instrumented<T> {
     }
 
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        let span = &self.span;
+        let span = self.span.clone();
         let inner = &mut self.inner;
         span.enter(move || {
             inner.poll_complete()
