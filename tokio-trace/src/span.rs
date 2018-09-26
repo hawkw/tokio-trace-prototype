@@ -23,8 +23,10 @@ lazy_static! {
                 static_meta: &static_meta!(),
                 field_values: Vec::new(),
                 state: AtomicUsize::new(State::Running as usize),
+                enter_count,
                 can_enter_parent: Mutex::new(None),
-            })
+            }),
+            can_enter,
         }
     };
 }
@@ -35,7 +37,7 @@ thread_local! {
 
 /// A handle on a `Span` that allows access to the span's data and may be used
 /// to enter the span.
-#[derive(Clone, PartialEq, Hash)]
+#[derive(Clone)]
 pub struct Span {
     inner: Arc<SpanInner>,
     can_enter: Weak<()>,
@@ -99,7 +101,7 @@ impl Span {
     ) -> Self {
         let enter_count = Arc::new(());
         let (parent, can_enter_parent) = parent.split();
-        let can_enter_parent = RefCell::new(Some(can_enter_parent));
+        let can_enter_parent = Mutex::new(Some(can_enter_parent));
         let can_enter = Arc::downgrade(&enter_count);
         Span {
             inner: Arc::new(SpanInner {
@@ -110,7 +112,7 @@ impl Span {
                 field_values,
                 state: AtomicUsize::new(State::Unentered as usize),
                 enter_count,
-                can_enter,
+                can_enter_parent,
             }),
             can_enter,
         }
@@ -169,14 +171,14 @@ impl Span {
                         State::Running as usize,
                         Ordering::Release,
                     );
-                    Dispatcher::current().enter(&self, Instant::now());
+                    Dispatcher::current().enter(&self.clone().downgrade(), Instant::now());
                     f()
                 });
 
                 CURRENT_SPAN.with(|current_span| {
                     if let Some(parent) = self.parent() {
                         current_span.replace(parent.clone().upgrade());
-                        Dispatcher::current().exit(&self.clone.downgrade(), Instant::now());
+                        Dispatcher::current().exit(&self.clone().downgrade(), Instant::now());
 
                         // If we are the only remaining enter handle to this
                         // span, it can now transition to Done. Otherwise, it
@@ -209,8 +211,8 @@ impl Span {
         DebugFields(self)
     }
 
-    pub fn parents<'a>(&'a self) -> Parents<'a> {
-        Parents { next: Some(self) }
+    pub fn parents<'a>(&self) -> Parents<'a> {
+        Parents { next: Some(&self.clone().downgrade()) }
     }
 
     pub fn downgrade(self) -> Data {
@@ -226,6 +228,39 @@ impl Span {
         (data, self.can_enter)
     }
 }
+
+impl cmp::PartialEq for Span {
+    fn eq(&self, other: &Span) -> bool {
+        self.inner == other.inner
+    }
+}
+
+impl Hash for Span {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.inner.hash(state);
+    }
+}
+
+impl<'a> IntoIterator for &'a Span {
+    type Item = (&'static str, &'a dyn Value);
+    type IntoIter = Box<Iterator<Item = (&'static str, &'a dyn Value)> + 'a>; // TODO: unbox
+    fn into_iter(self) -> Self::IntoIter {
+        Box::new(self.fields())
+    }
+}
+
+impl fmt::Debug for Span {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Span")
+            .field("name", &self.inner.name)
+            .field("opened_at", &self.inner.opened_at)
+            .field("parent", &self.parent().map(Data::name).unwrap_or_else(|| self.name()))
+            .field("fields", &self.debug_fields())
+            .field("meta", &self.meta())
+            .finish()
+    }
+}
+
 
 // ===== impl Data =====
 
@@ -261,6 +296,10 @@ impl Data {
             .map(move |(idx, &name)| (name, self.inner.field_values[idx].as_ref()))
     }
 
+    pub fn debug_fields<'a>(&'a self) -> DebugFields<'a, Self> {
+        DebugFields(self)
+    }
+
     pub fn state(&self) -> State {
         match self.inner.state.load(Ordering::Acquire) {
             s if s == State::Unentered as usize => State::Unentered,
@@ -269,6 +308,26 @@ impl Data {
             s if s == State::Done as usize => State::Done,
             invalid => panic!("invalid state: {:?}", invalid),
         }
+    }
+}
+
+impl<'a> IntoIterator for &'a Data {
+    type Item = (&'static str, &'a dyn Value);
+    type IntoIter = Box<Iterator<Item = (&'static str, &'a dyn Value)> + 'a>; // TODO: unbox
+    fn into_iter(self) -> Self::IntoIter {
+        Box::new(self.fields())
+    }
+}
+
+impl fmt::Debug for Data {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Span")
+            .field("name", &self.inner.name)
+            .field("opened_at", &self.inner.opened_at)
+            .field("parent", &self.parent().unwrap_or(self).name())
+            .field("fields", &self.debug_fields())
+            .field("meta", &self.meta())
+            .finish()
     }
 }
 
@@ -292,26 +351,6 @@ impl Hash for SpanInner {
 
 impl SpanInner {
     fn remaining_enters(&self) -> usize {
-        Arc::weak_count(self.enter_count)
-    }
-}
-
-impl<'a> IntoIterator for &'a Span {
-    type Item = (&'a str, &'a dyn Value);
-    type IntoIter = Box<Iterator<Item = (&'a str, &'a dyn Value)> + 'a>; // TODO: unbox
-    fn into_iter(self) -> Self::IntoIter {
-        Box::new(self.fields())
-    }
-}
-
-impl fmt::Debug for Span {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Span")
-            .field("name", &self.inner.name)
-            .field("opened_at", &self.inner.opened_at)
-            .field("parent", &self.parent().unwrap_or(self).name())
-            .field("fields", &self.debug_fields())
-            .field("meta", &self.meta())
-            .finish()
+        Arc::weak_count(&self.enter_count)
     }
 }
