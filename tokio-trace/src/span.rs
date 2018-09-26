@@ -404,7 +404,7 @@ mod tests {
     fn exit_doesnt_finish_while_handles_still_exist() {
         // Test that exiting a span only marks it as "done" when no handles
         // that can re-enter the span exist.
-        subscriber::mock()
+        let _running = subscriber::mock()
             .enter(span::mock().named(Some("foo")))
             .enter(span::mock().named(Some("bar")))
             // The first time we exit "bar", there will be another handle with

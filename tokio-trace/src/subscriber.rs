@@ -72,9 +72,11 @@ mod test_support {
     use ::span::MockSpan;
 
     use std::{
+        cell::RefCell,
         collections::VecDeque,
-        sync::{Arc, Mutex},
+        sync::{Arc,},
         time::Instant,
+        thread,
     };
 
     struct ExpectEvent {
@@ -88,7 +90,11 @@ mod test_support {
     }
 
     struct Running {
-        expected: Arc<Mutex<VecDeque<Expect>>>,
+        expected: RefCell<VecDeque<Expect>>,
+    }
+
+    pub struct RunningGuard {
+        dispatch: &'static MockDispatch,
     }
 
     pub struct MockSubscriber {
@@ -99,6 +105,14 @@ mod test_support {
         MockSubscriber {
             expected: VecDeque::new(),
         }
+    }
+
+    // hack so each test thread can run its own mock subscriber, even though the
+    // global dispatcher is static for the lifetime of the whole test binary.
+    struct MockDispatch {}
+
+    thread_local! {
+        static MOCK_SUBSCRIBER: RefCell<Option<Running>> = RefCell::new(None);
     }
 
     impl MockSubscriber {
@@ -114,16 +128,23 @@ mod test_support {
         }
 
         pub fn run(self) {
+            // don't care if this succeeds --- another test may have already
+            // installed the test dispatcher.
+            let _ = ::Dispatcher::builder()
+                .add_subscriber(MockDispatch {})
+                .try_init();
             let subscriber = Running {
-                expected: Arc::new(Mutex::new(self.expected)),
+                expected: RefCell::new(self.expected),
             };
-            ::Dispatcher::builder().add_subscriber(subscriber).init()
+            MOCK_SUBSCRIBER.with(move |mock| {
+                *mock.borrow_mut() = Some(subscriber);
+            })
         }
     }
 
     impl Subscriber for Running {
         fn observe_event<'event>(&self, event: &'event Event<'event>) {
-            match self.expected.lock().unwrap().pop_front() {
+            match self.expected.borrow_mut().pop_front() {
                 None => {}
                 Some(Expect::Event(_)) => unimplemented!(),
                 Some(Expect::Enter(expected_span)) => panic!("expected to enter span {:?}, but got an event", expected_span.name),
@@ -132,8 +153,8 @@ mod test_support {
         }
 
         fn enter(&self, span: &SpanData, _at: Instant) {
-            println!("+ {:?}", span);
-            match self.expected.lock().unwrap().pop_front() {
+            println!("+ {}: {:?}", thread::current().name().unwrap_or("unknown thread"), span);
+            match self.expected.borrow_mut().pop_front() {
                 None => {},
                 Some(Expect::Event(_)) => panic!("expected an event, but entered span {:?} instead", span.name()),
                 Some(Expect::Enter(expected_span)) => {
@@ -153,8 +174,8 @@ mod test_support {
         }
 
         fn exit(&self, span: &SpanData, _at: Instant) {
-            println!("- {:?}", span);
-            match self.expected.lock().unwrap().pop_front() {
+            println!("- {}: {:?}", thread::current().name().unwrap_or("unknown_thread"), span);
+            match self.expected.borrow_mut().pop_front() {
                 None => {},
                 Some(Expect::Event(_)) => panic!("expected an event, but exited span {:?} instead", span.name()),
                 Some(Expect::Enter(expected_span)) => panic!(
@@ -171,6 +192,34 @@ mod test_support {
                     // TODO: expect fields
                 }
             }
+        }
+    }
+
+    impl Subscriber for MockDispatch {
+        fn observe_event<'event>(&self, event: &'event Event<'event>) {
+            MOCK_SUBSCRIBER.with(|mock| {
+                if let Some(ref subscriber) = *mock.borrow() {
+                    subscriber.observe_event(event)
+                }
+            })
+        }
+
+        #[inline]
+        fn enter(&self, span: &SpanData, at: Instant) {
+            MOCK_SUBSCRIBER.with(|mock| {
+                if let Some(ref subscriber) = *mock.borrow() {
+                    subscriber.enter(span, at)
+                }
+            })
+        }
+
+        #[inline]
+        fn exit(&self, span: &SpanData, at: Instant) {
+            MOCK_SUBSCRIBER.with(|mock| {
+                if let Some(ref subscriber) = *mock.borrow() {
+                    subscriber.exit(span, at)
+                }
+            })
         }
     }
 }
