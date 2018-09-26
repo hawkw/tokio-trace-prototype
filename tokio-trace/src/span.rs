@@ -402,15 +402,24 @@ mod tests {
 
     #[test]
     fn exit_doesnt_finish_while_handles_still_exist() {
+        // Test that exiting a span only marks it as "done" when no handles
+        // that can re-enter the span exist.
         subscriber::mock()
             .enter(span::mock().named(Some("foo")))
             .enter(span::mock().named(Some("bar")))
+            // The first time we exit "bar", there will be another handle with
+            // which we could potentially re-enter bar.
             .exit(span::mock().named(Some("bar"))
                 .with_state(State::Idle))
+            // Re-enter "bar", using the cloned handle.
             .enter(span::mock().named(Some("bar")))
+            // Now, when we exit "bar", there is no handle to re-enter it, so
+            // it should become "done".
             .exit(span::mock().named(Some("bar"))
                 .with_state(State::Done)
             )
+            // "foo" never had more than one handle, so it should also become
+            // "done" when we exit it.
             .exit(span::mock().named(Some("foo"))
                 .with_state(State::Done)
             )
@@ -419,11 +428,12 @@ mod tests {
         span!("foo",).enter(|| {
             let bar = span!("bar",);
             bar.clone().enter(|| {
-                // do nothing. exiting bar should leave it idle.
+                // do nothing. exiting "bar" should leave it idle, since it can
+                // be re-entered.
             });
             bar.enter(|| {
-                // enter bar again. this time, the last handle is used, so bar
-                // should be marked as done.
+                // enter "bar" again. this time, the last handle is used, so
+                // "bar" should be marked as done.
             });
         });
     }
