@@ -1,4 +1,4 @@
-use super::{DebugFields, Dispatcher, Parents, StaticMeta, Subscriber, Value};
+use super::{DebugFields, Dispatcher, StaticMeta, Subscriber, Value};
 use std::{
     cell::RefCell,
     cmp, fmt,
@@ -7,7 +7,7 @@ use std::{
     slice,
     sync::{
         atomic::{AtomicUsize, Ordering},
-        Arc, Weak, Mutex,
+        Arc,
     },
     time::Instant,
 };

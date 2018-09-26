@@ -1,5 +1,5 @@
 use super::Span;
-use futures::{future, stream, Async, Future, Sink, Stream, Poll, StartSend};
+use futures::{Async, Future, Sink, Stream, Poll, StartSend};
 
 // TODO: seal?
 pub trait Instrument: Sized {
@@ -91,7 +91,7 @@ impl<T: Sink> Sink for Instrumented<T> {
 
 #[cfg(test)]
 mod tests {
-    use futures::{prelude::*, task};
+    use futures::{prelude::*, task, future, stream};
     use ::{span, subscriber};
     use super::*;
 
@@ -232,7 +232,7 @@ mod tests {
                     .with_state(span::State::Done)
             )
             .run();
-        let stream = stream::iter_ok::<_, ()>(&[1, 2, 3])
+        stream::iter_ok::<_, ()>(&[1, 2, 3])
             .instrument(span!("foo",))
             .for_each(|_| { future::ok(()) })
             .wait().unwrap();

@@ -74,7 +74,6 @@ mod test_support {
     use std::{
         cell::RefCell,
         collections::VecDeque,
-        sync::{Arc,},
         time::Instant,
         thread,
     };
@@ -91,10 +90,6 @@ mod test_support {
 
     struct Running {
         expected: RefCell<VecDeque<Expect>>,
-    }
-
-    pub struct RunningGuard {
-        dispatch: &'static MockDispatch,
     }
 
     pub struct MockSubscriber {
@@ -143,7 +138,7 @@ mod test_support {
     }
 
     impl Subscriber for Running {
-        fn observe_event<'event>(&self, event: &'event Event<'event>) {
+        fn observe_event<'event>(&self, _event: &'event Event<'event>) {
             match self.expected.borrow_mut().pop_front() {
                 None => {}
                 Some(Expect::Event(_)) => unimplemented!(),
