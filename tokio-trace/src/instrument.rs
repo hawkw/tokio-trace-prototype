@@ -70,7 +70,8 @@ impl<T: Sink> Sink for Instrumented<T> {
         &mut self,
         item: Self::SinkItem
     ) -> StartSend<Self::SinkItem, Self::SinkError> {
-        let span = self.span.clone();
+        let span = self.span.as_ref().cloned()
+            .expect("span never goes away for Sinks");
         let inner = &mut self.inner;
         span.enter(move || {
             inner.start_send(item)
@@ -78,7 +79,8 @@ impl<T: Sink> Sink for Instrumented<T> {
     }
 
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        let span = self.span.clone();
+        let span = self.span.as_ref().cloned()
+            .expect("span never goes away for Sinks");
         let inner = &mut self.inner;
         span.enter(move || {
             inner.poll_complete()

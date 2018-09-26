@@ -117,7 +117,7 @@ macro_rules! span {
         $crate::Span::new(
             Some($name),
             ::std::time::Instant::now(),
-            $crate::Span::current(),
+            Some($crate::Span::current()),
             &static_meta!( $($k),* ),
             vec![ $(Box::new($val)),* ], // todo: wish this wasn't double-boxed...
         )
@@ -129,9 +129,10 @@ macro_rules! event {
     (target: $target:expr, $lvl:expr, { $($k:ident = $val:expr),* }, $($arg:tt)+ ) => ({
     {       let field_values: &[& dyn $crate::Value] = &[ $( & $val),* ];
             use $crate::Subscriber;
+            use std::ops::Deref;
             $crate::Dispatcher::current().observe_event(&$crate::Event {
                 timestamp: ::std::time::Instant::now(),
-                parent: $crate::Span::current().downgrade(),
+                parent: $crate::Span::current().deref().clone(),
                 follows_from: &[],
                 meta: &static_meta!(@ $target, $lvl, $($k),* ),
                 field_values: &field_values[..],
