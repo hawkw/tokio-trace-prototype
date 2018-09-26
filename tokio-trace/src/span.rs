@@ -162,14 +162,6 @@ impl Span {
     }
 }
 
-impl<'a> IntoIterator for &'a Span {
-    type Item = (&'static str, &'a dyn Value);
-    type IntoIter = Box<Iterator<Item = (&'static str, &'a dyn Value)> + 'a>; // TODO: unbox
-    fn into_iter(self) -> Self::IntoIter {
-        Box::new(self.fields())
-    }
-}
-
 impl fmt::Debug for Span {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Span")
@@ -223,7 +215,7 @@ impl Data {
         self.inner.static_meta
     }
 
-    pub fn field_names(&self) -> slice::Iter<&'static str> {
+    pub fn field_names<'a>(&self) -> slice::Iter<&'a str> {
         self.inner.static_meta.field_names.iter()
     }
 
@@ -231,7 +223,7 @@ impl Data {
         self.inner.opened_at
     }
 
-    pub fn fields<'a>(&'a self) -> impl Iterator<Item = (&'static str, &'a dyn Value)> {
+    pub fn fields<'a>(&'a self) -> impl Iterator<Item = (&'a str, &'a dyn Value)> {
         self.field_names()
             .enumerate()
             .map(move |(idx, &name)| (name, self.inner.field_values[idx].as_ref()))
@@ -261,8 +253,8 @@ impl Data {
 }
 
 impl<'a> IntoIterator for &'a Data {
-    type Item = (&'static str, &'a dyn Value);
-    type IntoIter = Box<Iterator<Item = (&'static str, &'a dyn Value)> + 'a>; // TODO: unbox
+    type Item = (&'a str, &'a dyn Value);
+    type IntoIter = Box<Iterator<Item = (&'a str, &'a dyn Value)> + 'a>; // TODO: unbox
     fn into_iter(self) -> Self::IntoIter {
         Box::new(self.fields())
     }

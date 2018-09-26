@@ -138,7 +138,7 @@ mod test_support {
     }
 
     impl Subscriber for Running {
-        fn observe_event<'event>(&self, _event: &'event Event<'event>) {
+        fn observe_event<'event, 'meta: 'event>(&self, _event: &'event Event<'event, 'meta>) {
             match self.expected.borrow_mut().pop_front() {
                 None => {}
                 Some(Expect::Event(_)) => unimplemented!(),
@@ -191,7 +191,7 @@ mod test_support {
     }
 
     impl Subscriber for MockDispatch {
-        fn observe_event<'event>(&self, event: &'event Event<'event>) {
+        fn observe_event<'event, 'meta: 'event>(&self, event: &'event Event<'event, 'meta>) {
             MOCK_SUBSCRIBER.with(|mock| {
                 if let Some(ref subscriber) = *mock.borrow() {
                     subscriber.observe_event(event)
