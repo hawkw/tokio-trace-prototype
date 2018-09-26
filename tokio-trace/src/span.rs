@@ -25,6 +25,7 @@ lazy_static! {
                 state: AtomicUsize::new(State::Running as usize),
                 enter_count,
                 can_enter_parent: Mutex::new(None),
+                currently_entered: AtomicUsize::new(0),
             }),
             can_enter,
         }
@@ -62,7 +63,7 @@ struct SpanInner {
 
     pub field_values: Vec<Box<dyn Value>>,
 
-    pub state: AtomicUsize,
+    state: AtomicUsize,
 
     /// Used for counting the number of currently-live `Span` references that
     /// may enter this span.
@@ -70,6 +71,11 @@ struct SpanInner {
 
     // TODO: ag i hate this
     can_enter_parent: Mutex<Option<Weak<()>>>,
+
+    /// The number of threads which have entered this span.
+    ///
+    /// Incremented on enter and decremented on exit.
+    currently_entered: AtomicUsize,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
@@ -113,6 +119,7 @@ impl Span {
                 state: AtomicUsize::new(State::Unentered as usize),
                 enter_count,
                 can_enter_parent,
+                currently_entered: AtomicUsize::new(0),
             }),
             can_enter,
         }
@@ -160,11 +167,11 @@ impl Span {
             // The span has been marked as done; it may not be reentered again.
             // TODO: maybe this should not crash the thread?
             State::Done => panic!("cannot re-enter completed span!"),
-            // The span has already been entered, so we don't need to enter it
-            // again. Just run the body and return the result.
-            State::Running => f(),
             _ => {
                 let result = CURRENT_SPAN.with(|current_span| {
+                    self.inner
+                        .currently_entered
+                        .fetch_add(1, Ordering::Release);
                     current_span.replace(self.clone());
                     self.inner.state.compare_and_swap(
                         initial_state as usize,
@@ -176,11 +183,19 @@ impl Span {
                 });
 
                 CURRENT_SPAN.with(|current_span| {
+                    // Welcome to the "state transition on exit" logic, likely the
+                    // most complex code in all of tokio-trace.
                     let timestamp = Instant::now();
                     if let Some(parent) = self.parent() {
                         current_span.replace(parent.clone().upgrade());
-
-                        // If we are the only remaining enter handle to this
+                    }
+                    let remaining_exits = self.inner
+                        .currently_entered
+                        .fetch_sub(1, Ordering::AcqRel);
+                    // Only advance the state if we are the last remaining
+                    // thread to exit the span.
+                    if remaining_exits == 1 {
+                         // If we are the only remaining enter handle to this
                         // span, it can now transition to Done. Otherwise, it
                         // transitions to Idle.
                         let next_state = if self.inner.remaining_enters() <= 1 {
