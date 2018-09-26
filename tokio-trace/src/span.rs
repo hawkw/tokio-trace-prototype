@@ -176,9 +176,9 @@ impl Span {
                 });
 
                 CURRENT_SPAN.with(|current_span| {
+                    let timestamp = Instant::now();
                     if let Some(parent) = self.parent() {
                         current_span.replace(parent.clone().upgrade());
-                        Dispatcher::current().exit(&self.clone().downgrade(), Instant::now());
 
                         // If we are the only remaining enter handle to this
                         // span, it can now transition to Done. Otherwise, it
@@ -201,6 +201,7 @@ impl Span {
                             Ordering::Release,
                         );
                     }
+                    Dispatcher::current().exit(&self.downgrade(), timestamp);
                 });
                 result
             }
