@@ -64,11 +64,15 @@ impl<'a, 'b> Into<log::Metadata<'a>> for &'b Meta<'a> {
 }
 
 #[cfg(test)]
-pub mod test_support {
+pub use self::test_support::*;
+#[cfg(test)]
+mod test_support {
     use super::Subscriber;
-    use ::{Event, SpanData, Value};
+    use ::{Event, SpanData};
+    use ::span::MockSpan;
+
     use std::{
-        collections::{VecDeque, HashMap},
+        collections::VecDeque,
         sync::{Arc, Mutex},
         time::Instant,
     };
@@ -77,74 +81,47 @@ pub mod test_support {
         // TODO: implement
     }
 
-    pub struct ExpectSpan {
-        name: Option<Option<&'static str>>,
-        state: Option<::span::State>,
-        fields: HashMap<String, Box<dyn Value>>,
-        // TODO: more
-    }
-
     enum Expect {
         Event(ExpectEvent),
-        Enter(ExpectSpan),
-        Exit(ExpectSpan),
+        Enter(MockSpan),
+        Exit(MockSpan),
     }
 
-    struct MockSubscriber {
+    struct Running {
         expected: Arc<Mutex<VecDeque<Expect>>>,
     }
 
-    pub struct MockSubscriberBuilder {
+    pub struct MockSubscriber {
         expected: VecDeque<Expect>,
     }
 
-    pub fn span() -> ExpectSpan {
-        ExpectSpan {
-            name: None,
-            state: None,
-            fields: HashMap::new(),
-        }
-    }
-
-    pub fn mock() -> MockSubscriberBuilder {
-        MockSubscriberBuilder {
+    pub fn mock() -> MockSubscriber {
+        MockSubscriber {
             expected: VecDeque::new(),
         }
     }
 
-    impl MockSubscriberBuilder {
-        pub fn enter(&mut self, span: ExpectSpan) -> &mut Self {
+    impl MockSubscriber {
+        pub fn enter(mut self, span: MockSpan) -> Self {
             self.expected.push_back(Expect::Enter(span
                 .with_state(::span::State::Running)));
             self
         }
 
-        pub fn exit(&mut self, span: ExpectSpan) -> &mut Self {
+        pub fn exit(mut self, span: MockSpan) -> Self {
             self.expected.push_back(Expect::Exit(span));
             self
         }
 
-        pub fn set(self) {
-            let subscriber = MockSubscriber {
+        pub fn run(self) {
+            let subscriber = Running {
                 expected: Arc::new(Mutex::new(self.expected)),
             };
             ::Dispatcher::builder().add_subscriber(subscriber).init()
         }
     }
 
-    impl ExpectSpan {
-        pub fn named(mut self, name: Option<&'static str>) -> Self {
-            self.name = Some(name);
-            self
-        }
-
-        pub fn with_state(mut self, state: ::span::State) -> Self {
-            self.state = Some(state);
-            self
-        }
-    }
-
-    impl Subscriber for MockSubscriber {
+    impl Subscriber for Running {
         fn observe_event<'event>(&self, event: &'event Event<'event>) {
             match self.expected.lock().unwrap().pop_front() {
                 None => {}

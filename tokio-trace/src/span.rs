@@ -359,26 +359,62 @@ impl SpanInner {
 }
 
 #[cfg(test)]
+pub use self::test_support::*;
+#[cfg(test)]
+mod test_support {
+    use ::{ Value, span::State };
+    use std::collections::HashMap;
+
+    pub struct MockSpan {
+        pub name: Option<Option<&'static str>>,
+        pub state: Option<State>,
+        pub fields: HashMap<String, Box<dyn Value>>,
+        // TODO: more
+    }
+
+    pub fn mock() -> MockSpan {
+        MockSpan {
+            name: None,
+            state: None,
+            fields: HashMap::new(),
+        }
+    }
+
+    impl MockSpan {
+        pub fn named(mut self, name: Option<&'static str>) -> Self {
+            self.name = Some(name);
+            self
+        }
+
+        pub fn with_state(mut self, state: State) -> Self {
+            self.state = Some(state);
+            self
+        }
+
+        // TODO: fields, etc
+    }
+}
+
+#[cfg(test)]
 mod tests {
-    use ::subscriber::test_support::*;
+    use ::{subscriber, span};
     use super::*;
 
     #[test]
     fn exit_doesnt_finish_while_handles_still_exist() {
-        let mut subscriber = mock();
-        subscriber
-            .enter(span().named(Some("foo")))
-            .enter(span().named(Some("bar")))
-            .exit(span().named(Some("bar"))
+        subscriber::mock()
+            .enter(span::mock().named(Some("foo")))
+            .enter(span::mock().named(Some("bar")))
+            .exit(span::mock().named(Some("bar"))
                 .with_state(State::Idle))
-            .enter(span().named(Some("bar")))
-            .exit(span().named(Some("bar"))
+            .enter(span::mock().named(Some("bar")))
+            .exit(span::mock().named(Some("bar"))
                 .with_state(State::Done)
             )
-            .exit(span().named(Some("foo"))
+            .exit(span::mock().named(Some("foo"))
                 .with_state(State::Done)
-            );
-        subscriber.set();
+            )
+            .run();
 
         span!("foo",).enter(|| {
             let bar = span!("bar",);
