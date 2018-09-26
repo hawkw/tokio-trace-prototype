@@ -62,29 +62,29 @@ impl<T: Stream> Stream for Instrumented<T> {
     }
 }
 
-// impl<T: Sink> Sink for Instrumented<T> {
-//     type SinkItem = T::SinkItem;
-//     type SinkError = T::SinkError;
+impl<T: Sink> Sink for Instrumented<T> {
+    type SinkItem = T::SinkItem;
+    type SinkError = T::SinkError;
 
-//     fn start_send(
-//         &mut self,
-//         item: Self::SinkItem
-//     ) -> StartSend<Self::SinkItem, Self::SinkError> {
-//         let span = self.span.clone();
-//         let inner = &mut self.inner;
-//         span.enter(move || {
-//             inner.start_send(item)
-//         })
-//     }
+    fn start_send(
+        &mut self,
+        item: Self::SinkItem
+    ) -> StartSend<Self::SinkItem, Self::SinkError> {
+        let span = self.span.clone();
+        let inner = &mut self.inner;
+        span.enter(move || {
+            inner.start_send(item)
+        })
+    }
 
-//     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-//         let span = self.span.clone();
-//         let inner = &mut self.inner;
-//         span.enter(move || {
-//             inner.poll_complete()
-//         })
-//     }
-// }
+    fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
+        let span = self.span.clone();
+        let inner = &mut self.inner;
+        span.enter(move || {
+            inner.poll_complete()
+        })
+    }
+}
 
 
 #[cfg(test)]
