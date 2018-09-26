@@ -358,6 +358,7 @@ impl SpanInner {
     }
 }
 
+
 #[cfg(test)]
 pub use self::test_support::*;
 #[cfg(test)]
@@ -435,6 +436,68 @@ mod tests {
                 // enter "bar" again. this time, the last handle is used, so
                 // "bar" should be marked as done.
             });
+        });
+    }
+
+    #[test]
+    fn exit_doesnt_finish_concurrently_executing_spans() {
+        // Test that exiting a span only marks it as "done" when no other
+        // threads are still executing inside that span.
+        use std::{thread, sync::{Arc, Barrier}};
+
+        let barrier1 = Arc::new(Barrier::new(2));
+        let barrier2 = Arc::new(Barrier::new(2));
+        // Make copies of the barriers for thread 2 to wait on.
+        let t2_barrier1 = barrier1.clone();
+        let t2_barrier2 = barrier2.clone();
+
+        subscriber::mock()
+            .enter(span::mock().named(Some("baz")))
+            .enter(span::mock().named(Some("quux")))
+            // When the main thread exits "quux", it will still be running in the
+            // spawned thread.
+            .exit(span::mock().named(Some("quux"))
+                .with_state(State::Running))
+            // "baz" never had more than one handle, so it should also become
+            // "done" when we exit it.
+            .exit(span::mock().named(Some("baz"))
+                .with_state(State::Done)
+            )
+            .run();
+
+        span!("baz",).enter(|| {
+            let quux = span!("quux",);
+            let quux2 = quux.clone();
+            let handle = thread::Builder::new()
+                .name("thread-2".to_string())
+                .spawn(move || {
+                    subscriber::mock()
+                        // Spawned thread also enters "quux".
+                        .enter(span::mock().named(Some("quux")))
+                        // Now, when this thread exits "quux", there is no handle to re-enter it, so
+                        // it should become "done".
+                        .exit(span::mock().named(Some("quux"))
+                            .with_state(State::Done)
+                        )
+                        .run();
+                    quux2.enter(|| {
+                        // Once this thread has entered "quux", allow thread 1
+                        // to exit.
+                        t2_barrier1.wait();
+                        // Wait for the main thread to allow us to exit.
+                        t2_barrier2.wait();
+                    })
+                })
+                .expect("spawn test thread");
+            quux.enter(|| {
+                // Wait for thread 2 to enter "quux". When we exit "quux", it
+                // should stay running, since it's running in the other thread.
+                barrier1.wait();
+            });
+            // After we exit "quux", wait for the second barrier, so the other
+            // thread unblocks and exits "quux".
+            barrier2.wait();
+            handle.join().unwrap();
         });
     }
 
