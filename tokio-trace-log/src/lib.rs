@@ -27,11 +27,11 @@ use tokio_trace::{Subscriber, Event};
 
 /// Format a log record as a trace event in the current span.
 pub fn format_trace(record: &log::Record) -> io::Result<()> {
-    let parent = tokio_trace::Span::current();
+    let parent: &tokio_trace::SpanData = &tokio_trace::Span::current();
     let meta: tokio_trace::Meta = record.into();
     let event = Event {
         timestamp: Instant::now(),
-        parent,
+        parent: parent.clone(),
         follows_from: &[],
         meta: &meta,
         field_values: &[],
