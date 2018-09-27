@@ -129,10 +129,9 @@ macro_rules! event {
     (target: $target:expr, $lvl:expr, { $($k:ident = $val:expr),* }, $($arg:tt)+ ) => ({
     {       let field_values: &[& dyn $crate::Value] = &[ $( & $val),* ];
             use $crate::Subscriber;
-            use std::ops::Deref;
             $crate::Dispatcher::current().observe_event(&$crate::Event {
                 timestamp: ::std::time::Instant::now(),
-                parent: $crate::Span::current().deref().clone(),
+                parent: $crate::Span::current().into(),
                 follows_from: &[],
                 meta: &static_meta!(@ $target, $lvl, $($k),* ),
                 field_values: &field_values[..],

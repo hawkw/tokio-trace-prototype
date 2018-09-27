@@ -252,7 +252,19 @@ impl fmt::Debug for Span {
 impl Deref for Span {
     type Target = Data;
     fn deref(&self) -> &Self::Target {
+        self.as_ref()
+    }
+}
+
+impl AsRef<Data> for Span {
+    fn as_ref(&self) -> &Data {
         &self.inner.as_ref().data
+    }
+}
+
+impl Into<Data> for Span {
+    fn into(self) -> Data {
+        self.as_ref().clone()
     }
 }
 
