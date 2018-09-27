@@ -101,7 +101,7 @@ thread_local! {
 /// all the [`Data`] handles have *also* been dropped.
 #[derive(Clone, PartialEq, Hash)]
 pub struct Span {
-    inner: Arc<Inner>,
+    inner: Arc<ActiveInner>,
 }
 
 /// A handle on the data associated with a span.
@@ -112,6 +112,15 @@ pub struct Data {
     inner: Arc<DataInner>,
 }
 
+/// Internal representation of the data associated with a span.
+///
+/// This has the potential to outlive the span itself, if a `Data` reference to
+/// it exists after the span completes executing --- such as if it is still
+/// being processed by a subscriber.
+///
+/// This type is purely internal to the `span` module and is not intended to be
+/// interacted with directly by downstream users of `tokio-trace`. Instead, all
+/// interaction with a span's data is carried out through `Data` references.
 #[derive(Debug)]
 struct DataInner {
     pub name: Option<&'static str>,
@@ -126,10 +135,36 @@ struct DataInner {
     state: AtomicUsize,
 }
 
+/// Internal representation of the inner state of a span which has not yet
+/// completed.
+///
+/// This is kept separate from the `DataInner`, which holds the data about the
+/// span, because this type is referenced only by *entering* (`Span`) handles.
+/// It is only necessary to track this state while the capacity still exists to
+/// re-enter the span; once it can no longer be re-entered, the `ActiveInner`
+/// can be dropped (and *should* be dropped, as this may allow the parent span
+/// to finish as well, if the `ActiveInner` holds the only remaining entering
+/// reference to the parent span).
+///
+/// The span's `DataInner` is reference-counted eparately, and may remain alive
+/// after the span has completed and the active span state has been dropped.
+/// For example, if a `Data` reference has been cloned by a subscriber to be
+/// processed later, the data must outlive the active span state.
+///
+/// This type is purely internal to the `span` module and is not intended to be
+/// interacted with directly by downstream users of `tokio-trace`. Instead, all
+/// interaction with an active span's state is carried out through `Span`
+/// references.
 #[derive(Debug)]
-struct Inner {
+struct ActiveInner {
+    /// A reference to the span's associated data.
     data: Data,
 
+    /// An entering reference to the span's parent, used to re-enter the parent
+    /// span upon exiting this span.
+    ///
+    /// Implicitly, this also keeps the parent span from becoming `Done` as long
+    /// as the child span's `Inner` remains alive.
     enter_parent: Option<Span>,
 
     /// The number of threads which have entered this span.
@@ -177,7 +212,7 @@ impl Span {
             static_meta,
             field_values,
         );
-        let inner = Inner::new(data, parent);
+        let inner = ActiveInner::new(data, parent);
         Span {
             inner,
         }
@@ -235,6 +270,10 @@ impl Span {
         }
     }
 
+    /// Returns true if this is the last remaining handle with the capacity to
+    /// enter the span.
+    ///
+    /// Used to determine when the span can be marked as completed.
     fn is_last_standing(&self) -> bool {
         Arc::strong_count(&self.inner) == 1
     }
@@ -362,9 +401,9 @@ impl fmt::Debug for Data {
     }
 }
 
-// ===== impl Inner =====
+// ===== impl ActiveInner =====
 
-impl Inner {
+impl ActiveInner {
     fn new(data: Data, enter_parent: Option<Span>) -> Arc<Self> {
         Arc::new(Inner {
             data,
