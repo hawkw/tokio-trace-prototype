@@ -41,6 +41,8 @@ thread_local! {
 /// it may be `clone`d inexpensively (span handles are atomically reference
 /// counted) in order to enter the span multiple times. For example:
 /// ```
+/// # #[macro_use] extern crate tokio_trace;
+/// # fn main() {
 /// let my_var = 5;
 /// let my_span = span!("my_span", my_var = my_var);
 ///
@@ -57,6 +59,7 @@ thread_local! {
 ///     // exist elsewhere). Thus, `my_span` is free to mark itself as "done"
 ///     // upon exiting.
 /// });
+/// # }
 /// ```
 ///
 /// # Span States
