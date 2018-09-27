@@ -396,7 +396,7 @@ impl fmt::Debug for Data {
 
 impl ActiveInner {
     fn new(data: Data, enter_parent: Option<Span>) -> Arc<Self> {
-        Arc::new(Inner {
+        Arc::new(ActiveInner {
             data,
             enter_parent,
             currently_entered: AtomicUsize::new(0)
@@ -423,13 +423,13 @@ impl ActiveInner {
     }
 }
 
-impl cmp::PartialEq for Inner {
-    fn eq(&self, other: &Inner) -> bool {
+impl cmp::PartialEq for ActiveInner {
+    fn eq(&self, other: &ActiveInner) -> bool {
         self.data == other.data
     }
 }
 
-impl Hash for Inner {
+impl Hash for ActiveInner {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.data.hash(state);
     }
