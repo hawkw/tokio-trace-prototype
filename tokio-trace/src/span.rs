@@ -26,8 +26,76 @@ thread_local! {
     static CURRENT_SPAN: RefCell<Span> = RefCell::new(ROOT_SPAN.clone());
 }
 
-/// A handle on a `Span` that allows access to the span's data and may be used
-/// to enter the span.
+/// A handle that represents a span in the process of executing.
+///
+/// # Entering a Span
+///
+/// A thread of execution is said to _enter_ a span when it begins executing,
+/// and _exit_ the span when it switches to another context. Spans may be
+/// entered through the [`Span::enter`] method, which enters the target span,
+/// performs a given function (either a closure or a function pointer), exits
+/// the span, and then returns the result.
+///
+/// Calling `enter` on a span handle consumes that handle (as the number of
+/// currently extant span handles is used for span completion bookkeeping), but
+/// it may be `clone`d inexpensively (span handles are atomically reference
+/// counted) in order to enter the span multiple times. For example:
+/// ```
+/// let my_var = 5;
+/// let my_span = span!("my_span", my_var = my_var);
+///
+/// my_span.clone().enter(|| {
+///     // {erform some work in the context of `my_span`...
+/// });
+///
+/// // Perform some work outside of the context of `my_span`...
+///
+/// my_span.enter(|| {
+///     // Perform some more work in the context of `my_span`.
+///     // Since this call to `enter` *consumes* rather than clones `my_span`,
+///     // it may not be entered again (unless any more clones of the handle
+///     // exist elsewhere). Thus, `my_span` is free to mark itself as "done"
+///     // upon exiting.
+/// });
+/// ```
+///
+/// # Span States
+///
+/// At any given point in time, a `Span` is in one of four [`State`]s:
+/// - `State::Unentered`: The span has been constructed but has not yet been
+///   entered for the first time.
+/// - `State::Running`: One or more threads are currently executing inside this
+///   span or one of its children.
+/// - `State::Idle`: The flow of execution has exited the span, but it may be
+///   entered again and resume execution.
+/// - `State::Done`: The span has completed execution and may not be entered
+///   again. When all subscribers have finished using its' [`Data`], it may be
+///   dropped.
+///
+/// Spans transition between these states when execution enters and exit them.
+/// Upon entry, if a span is not currently in the `Running` state, it will
+/// transition to the running state. Upon exit, a span checks if it is executing
+/// in any other threads, and if it is not, it transitions to either the `Idle`
+/// or `Done` state. The determination of which state to transition to is made
+/// based on whether or not the potential exists for the span to be entered
+/// again (i.e. whether any `Span` handles with that capability currently
+/// exist).
+///
+/// # Accessing a Span's Data
+///
+/// The [`Data`] type represents a *non-entering* reference to a `Span`'s data
+/// --- a set of key-value pairs (known as _fields_), a creation timestamp,
+/// a reference to the span's parent in the trace tree, and metadata describing
+/// the source code location where the span was created.
+///
+/// Since we may wish to view the data associated with a span *after* the span
+/// has finished executing, the `Data` handle is separated from the `Span`
+/// handle that permits entry into the span. However, `Span` handles can also be
+/// dereferenced to `Data` handles, if we wish to view the data while the span
+/// is still "alive". The data is reference-counted separately from the
+/// capability to enter the span, so once all the `Span` handles have been
+/// dropped and the span marks itself as completed, the data remains alive until
+/// all the [`Data`] handles have *also* been dropped.
 #[derive(Clone, PartialEq, Hash)]
 pub struct Span {
     inner: Arc<Inner>,
@@ -67,6 +135,7 @@ struct Inner {
     currently_entered: AtomicUsize,
 }
 
+/// Enumeration of the potential states of a [`Span`].
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 #[repr(usize)]
 pub enum State {
@@ -87,6 +156,10 @@ pub enum State {
 // ===== impl Span =====
 
 impl Span {
+    /// This is primarily used by the `span!` macro, so it has to be public,
+    /// but it's not intended for use by consumers of the tokio-trace API
+    /// directly.
+    #[doc(hidden)]
     pub fn new(
         name: Option<&'static str>,
         opened_at: Instant,
@@ -107,6 +180,8 @@ impl Span {
         }
     }
 
+    /// Returns a reference to the span that this thread is currently
+    /// executing.
     pub fn current() -> Self {
         CURRENT_SPAN.with(|span| span.borrow().clone())
     }
