@@ -232,37 +232,28 @@ impl Span {
             State::Done => panic!("cannot re-enter completed span!"),
             _ => {
                 let result = CURRENT_SPAN.with(|current_span| {
-                    self.inner.enter(prior_state);
+                    self.inner.transition_on_enter(prior_state);
                     current_span.replace(self.clone());
                     Dispatcher::current().enter(&self, Instant::now());
                     f()
                 });
 
                 CURRENT_SPAN.with(|current_span| {
-                    // Welcome to the "state transition on exit" logic, likely the
-                    // most complex code in all of tokio-trace.
                     let timestamp = Instant::now();
                     if let Some(ref parent) = self.inner.enter_parent {
                         current_span.replace(parent.clone());
                     }
-                    let remaining_exits = self.inner
-                        .currently_entered
-                        .fetch_sub(1, Ordering::AcqRel);
-                    // Only advance the state if we are the last remaining
-                    // thread to exit the span.
-                    if remaining_exits == 1 {
-                        // If we are the only remaining enter handle to this
-                        // span, it can now transition to Done. Otherwise, it
-                        // transitions to Idle.
-                        let next_state = if self.is_last_standing() {
-                            // Dropping this span handle will drop the enterable
-                            // reference to self.parent.
-                            State::Done
-                        } else {
-                            State::Idle
-                        };
-                        self.set_state(State::Running, next_state);
-                    }
+                    // If we are the only remaining enter handle to this
+                    // span, it can now transition to Done. Otherwise, it
+                    // transitions to Idle.
+                    let next_state = if self.is_last_standing() {
+                        // Dropping this span handle will drop the enterable
+                        // reference to self.parent.
+                        State::Done
+                    } else {
+                        State::Idle
+                    };
+                    self.inner.transition_on_exit(next_state);
                     Dispatcher::current().exit(&self, timestamp);
                 });
                 result
@@ -412,10 +403,23 @@ impl ActiveInner {
         })
     }
 
-    fn enter(&self, from_state: State) {
+    /// Performs the state transition when entering the span.
+    fn transition_on_enter(&self, from_state: State) {
         self.currently_entered
             .fetch_add(1, Ordering::Release);
         self.data.set_state(from_state, State::Running);
+    }
+
+    /// Performs the state transition when exiting the span.
+    fn transition_on_exit(&self, next_state: State) {
+        // Decrement the exit count
+        let remaining_exits = self.currently_entered
+            .fetch_sub(1, Ordering::AcqRel);
+        // Only advance the state if we are the last remaining
+        // thread to exit the span.
+        if remaining_exits == 1 {
+            self.data.set_state(State::Running, next_state);
+        }
     }
 }
 
