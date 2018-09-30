@@ -11,6 +11,8 @@ pub trait Subscriber {
 
     /// Note that this function is generic over a pair of lifetimes because the
     /// `Event` type is. See the documentation for [`Event`] for details.
+    ///
+    /// [`Event`]: ../struct.Event.html
     fn observe_event<'event, 'meta: 'event>(&self, event: &'event Event<'event, 'meta>);
     fn enter(&self, span: &SpanData, at: Instant);
     fn exit(&self, span: &SpanData, at: Instant);
@@ -52,7 +54,7 @@ pub trait Subscriber {
     /// # }
     /// ```
     ///
-    /// [`enabled`]: #fn.enabled
+    /// [`enabled`]: #tymethod.enabled
     fn with_filter<F>(self, filter: F) -> WithFilter<Self, F>
     where
         F: Fn(&Meta) -> bool,

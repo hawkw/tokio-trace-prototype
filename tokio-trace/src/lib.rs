@@ -1,12 +1,12 @@
 //!
 //! # Core Concepts
 //!
-//! The core of `tokio-trace`'s API is composed of `Events`, `Spans`, and
-//! `Subscribers`. We'll cover these in turn.
+//! The core of `tokio-trace`'s API is composed of `Event`s, `Span`s, and
+//! `Subscriber`s. We'll cover these in turn.
 //!
-//! # Spans
+//! # `Span`s
 //!
-//! A `Span` represents a _period of time_ during which a program was executing
+//! A [`Span`] represents a _period of time_ during which a program was executing
 //! in some context. A thread of execution is said to _enter_ a span when it
 //! begins executing in that context and _exit_s the span when switching to
 //! another context. The span in which a thread is currently executing is
@@ -59,7 +59,7 @@
 //!
 //! # Events
 //!
-//! An `Event` represents a _point_ in time. It signifies something that
+//! An [`Event`] represents a _point_ in time. It signifies something that
 //! happened while the trace was executing. `Event`s are comparable to the log
 //! records emitted by unstructured logging code, but unlike a typical log line,
 //! an `Event` always occurs within the context of a `Span`. Like a `Span`, it
@@ -73,8 +73,44 @@
 //! may be recorded at a number of levels, and can have unstructured,
 //! human-readable messages; however, they also carry key-value data and exist
 //! within the context of the tree of spans that comprise a trase. Thus,
-//! individual log record-like events can be pinpointed not only in time, but in
-//! the logical execution flow of the system.
+//! individual log record-like events can be pinpointed not only in time, but
+//! in the logical execution flow of the system.
+//!
+//! # `Subscriber`s
+//!
+//! As `Span`s and `Event`s occur, they are recorded or aggregated by
+//! implementations of the [`Subscriber`] trait. `Subscriber`s are notified
+//! when an `Event` takes place and when a `Span` is entered or exited. These
+//! notifications are represented by the following `Subscriber` trait methods:
+//! + [`observe_event`], called when an `Event` takes place,
+//! + [`enter`], called when execution enters a `Span`,
+//! + [`exit`], called when execution exits a `Span`
+//!
+//! In addition, subscribers may implement the [`enabled`] function to _filter_
+//! the notifications they receive based on [metadata] describing each `Span`
+//! or `Event`. If a call to `Subscriber::enabled` returns `false` for a given
+//! set of metadata, that `Subscriber` will *not* be notified about the
+//! corresponding `Span` or `Event`. For performance reasons, if no currently
+//! active subscribers express  interest in a given set of metadata by returning
+//! `true`, then the corresponding `Span` or `Event` will never be constructed.
+//!
+//! `Event`s and `Span`s are broadcast to `Subscriber`s by the [`Dispatcher`], a
+//! special `Subscriber` implementation which broadcasts the notifications it
+//! receives to a list of attached `Subscriber`s. The [`Dispatcher::builder`]
+//! function returns a builder that can be used to attach `Subscriber`s to a
+//! `Dispatcher` and initialize it.
+//!
+//! [`Span`]: span/struct.Span
+//! [`Event`]: struct.Event.html
+//! [`Subscriber`]: subscriber/trait.Subscriber.html
+//! [`observe_event`]: subscriber/trait.Subscriber.html#tymethod.observe_event
+//! [`enter`]: subscriber/trait.Subscriber.html#tymethod.enter
+//! [`exit`]: subscriber/trait.Subscriber.html#tymethod.exit
+//! [`enabled`]: subscriber/trait.Subscriber.html#tymethod.enabled
+//! [metadata]: struct.Meta.html
+//! [`Dispatcher`]: struct.Dispatcher.html
+//! [`Dispatcher::builder`]: struct.Dispatcher.html#method.builder
+
 extern crate futures;
 extern crate log;
 #[macro_use]
