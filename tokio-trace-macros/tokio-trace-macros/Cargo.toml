@@ -1,0 +1,13 @@
+[package]
+name = "tokio-trace-macros"
+version = "0.1.0"
+authors = ["David Barsky <me@davidbarsky.com>"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+tokio-trace = { path = "../../tokio-trace" }
+syn = { version = "0.15", features = ["full", "extra-traits"] }
+quote = "0.6"
+proc-macro2 = { version = "0.4", features = ["nightly"] }

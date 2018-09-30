@@ -6,5 +6,7 @@ members = [
     "tokio-trace-tower-http",
     "tokio-trace-log",
     "tokio-trace-env-logger",
-    "tokio-trace-slog"
+    "tokio-trace-slog",
+    "tokio-trace-macros/tokio-trace-macros",
+    "tokio-trace-macros/example"
 ]
