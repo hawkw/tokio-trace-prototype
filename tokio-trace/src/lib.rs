@@ -172,20 +172,24 @@ macro_rules! span {
 
 #[macro_export]
 macro_rules! event {
+
     (target: $target:expr, $lvl:expr, { $($k:ident = $val:expr),* }, $($arg:tt)+ ) => ({
-    {
-        static META: $crate::Meta<'static> = static_meta!(@ None, $target, $lvl, $($k),* );
-        let field_values: &[& dyn $crate::Value] = &[ $( & $val),* ];
-        use $crate::Subscriber;
-        $crate::Dispatcher::current().observe_event(&$crate::Event {
-            timestamp: ::std::time::Instant::now(),
-            parent: $crate::Span::current().into(),
-            follows_from: &[],
-            meta: &META,
-            field_values: &field_values[..],
-            message: format_args!( $($arg)+ ),
-        });
-    }
+        {
+            use $crate::{Subscriber, Dispatcher, Meta, Span, Event, Value};
+            static META: Meta<'static> = static_meta!(@ None, $target, $lvl, $($k),* );
+            let dispatcher = Dispatcher::current();
+            if dispatcher.enabled(&META) {
+                let field_values: &[& dyn Value] = &[ $( & $val),* ];
+                dispatcher.observe_event(&Event {
+                    timestamp: ::std::time::Instant::now(),
+                    parent: Span::current().into(),
+                    follows_from: &[],
+                    meta: &META,
+                    field_values: &field_values[..],
+                    message: format_args!( $($arg)+ ),
+                });
+            }
+        }
     });
     ($lvl:expr, { $($k:ident = $val:expr),* }, $($arg:tt)+ ) => (event!(target: None, $lvl, { $($k = $val),* }, $($arg)+))
 }
