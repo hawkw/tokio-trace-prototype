@@ -14,9 +14,64 @@ pub trait Subscriber {
     fn observe_event<'event, 'meta: 'event>(&self, event: &'event Event<'event, 'meta>);
     fn enter(&self, span: &SpanData, at: Instant);
     fn exit(&self, span: &SpanData, at: Instant);
+
+    /// Composes `self` with a `filter` that returns true or false if a span or
+    /// event with the specified metadata should be recorded.
+    ///
+    /// This function is intended to be used with composing subscribers from
+    /// external crates with user-defined filters, so that the resulting
+    /// subscriber is [`enabled`] only for a subset of the events and spans for
+    /// which the original subscriber would be enabled.
+    ///
+    /// For example:
+    /// ```
+    /// #[macro_use]
+    /// extern crate tokio_trace;
+    /// use tokio_trace::subscriber::{Subscriber, LogSubscriber};
+    /// # use tokio_trace::Level;
+    /// # fn main() {
+    ///
+    /// let filtered_subscriber = LogSubscriber
+    ///     // Subscribe *only* to spans named "foo".
+    ///     .with_filter(|meta| {
+    ///         meta.name == Some("foo")
+    ///     });
+    /// tokio_trace::Dispatcher::builder()
+    ///     .add_subscriber(filtered_subscriber)
+    ///     .try_init();
+    ///
+    /// // This span will be logged.
+    /// span!("foo", enabled = true) .enter(|| {
+    ///     // do work;
+    /// });
+    /// // This span will *not* be logged.
+    /// span!("bar", enabled = false).enter(|| {
+    ///     // This event also will not be logged.
+    ///     event!(Level::Debug, { enabled = false },"this won't be logged");
+    /// });
+    /// # }
+    /// ```
+    ///
+    /// [`enabled`]: #fn.enabled
+    fn with_filter<F>(self, filter: F) -> WithFilter<Self, F>
+    where
+        F: Fn(&Meta) -> bool,
+        Self: Sized,
+    {
+        WithFilter {
+            inner: self,
+            filter,
+        }
+    }
 }
 
 pub struct LogSubscriber;
+
+#[derive(Debug, Clone)]
+pub struct WithFilter<S, F> {
+    inner: S,
+    filter: F
+}
 
 impl LogSubscriber {
     pub fn new() -> Self {
@@ -58,9 +113,35 @@ impl Subscriber for LogSubscriber {
             .build()
         )
     }
+
     fn exit(&self, span: &SpanData, _at: Instant) {
         let logger = log::logger();
         logger.log(&log::Record::builder().args(format_args!("<- {:?}", span.name())).build())
+    }
+}
+
+impl<S, F> Subscriber for WithFilter<S, F>
+where
+    S: Subscriber,
+    F: Fn(&Meta) -> bool,
+{
+    fn enabled(&self, metadata: &Meta) -> bool {
+        (self.filter)(metadata) && self.inner.enabled(metadata)
+    }
+
+    #[inline]
+    fn observe_event<'event, 'meta: 'event>(&self, event: &'event Event<'event, 'meta>) {
+        self.inner.observe_event(event)
+    }
+
+    #[inline]
+    fn enter(&self, span: &SpanData, at: Instant) {
+        self.inner.enter(span, at)
+    }
+
+    #[inline]
+    fn exit(&self, span: &SpanData, at: Instant) {
+        self.inner.exit(span, at)
     }
 }
 
