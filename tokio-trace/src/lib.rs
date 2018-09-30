@@ -159,13 +159,18 @@ macro_rules! span {
     ($name:expr) => { span!($name,) };
     ($name:expr, $($k:ident = $val:expr),*) => {
         {
-            static META: $crate::Meta<'static> = static_meta!($name, $($k),* );
-            $crate::Span::new(
-                ::std::time::Instant::now(),
-                Some($crate::Span::current()),
-                &META,
-                vec![ $(Box::new($val)),* ], // todo: wish this wasn't double-boxed...
-            )
+            use $crate::{span, Subscriber, Dispatcher, Meta};
+            static META: Meta<'static> = static_meta!($name, $($k),* );
+            if Dispatcher::current().enabled(&META) {
+                span::Span::new(
+                    ::std::time::Instant::now(),
+                    Some(span::ActiveInner::current()),
+                    &META,
+                    vec![ $(Box::new($val)),* ], // todo: wish this wasn't double-boxed...
+                )
+            } else {
+                span::Span::disabled()
+            }
         }
     }
 }
@@ -175,14 +180,14 @@ macro_rules! event {
 
     (target: $target:expr, $lvl:expr, { $($k:ident = $val:expr),* }, $($arg:tt)+ ) => ({
         {
-            use $crate::{Subscriber, Dispatcher, Meta, Span, Event, Value};
+            use $crate::{Subscriber, Dispatcher, Meta, SpanData, Event, Value};
             static META: Meta<'static> = static_meta!(@ None, $target, $lvl, $($k),* );
             let dispatcher = Dispatcher::current();
             if dispatcher.enabled(&META) {
                 let field_values: &[& dyn Value] = &[ $( & $val),* ];
                 dispatcher.observe_event(&Event {
                     timestamp: ::std::time::Instant::now(),
-                    parent: Span::current().into(),
+                    parent: SpanData::current(),
                     follows_from: &[],
                     meta: &META,
                     field_values: &field_values[..],
