@@ -14,10 +14,9 @@ use std::{
 
 lazy_static! {
     static ref ROOT_SPAN: Span = Span::new(
-        Some("root"),
         Instant::now(),
         None,
-        &static_meta!(),
+        &static_meta!("root"),
         Vec::new(),
     );
 }
@@ -123,7 +122,6 @@ pub struct Data {
 /// interaction with a span's data is carried out through `Data` references.
 #[derive(Debug)]
 struct DataInner {
-    pub name: Option<&'static str>,
     pub opened_at: Instant,
 
     pub parent: Option<Data>,
@@ -199,14 +197,12 @@ impl Span {
     /// directly.
     #[doc(hidden)]
     pub fn new(
-        name: Option<&'static str>,
         opened_at: Instant,
         parent: Option<Span>,
         static_meta: &'static StaticMeta,
         field_values: Vec<Box<dyn Value>>,
     ) -> Self {
         let data = Data::new(
-            name,
             opened_at,
             parent.as_ref().map(Span::deref),
             static_meta,
@@ -305,7 +301,6 @@ impl Into<Data> for Span {
 
 impl Data {
     fn new(
-        name: Option<&'static str>,
         opened_at: Instant,
         parent: Option<&Data>,
         static_meta: &'static StaticMeta,
@@ -313,7 +308,6 @@ impl Data {
     ) -> Self {
         Data {
             inner: Arc::new(DataInner {
-                name,
                 opened_at,
                 parent: parent.cloned(),
                 static_meta,
@@ -325,7 +319,7 @@ impl Data {
 
     /// Returns the name of this span, or `None` if it is unnamed,
     pub fn name(&self) -> Option<&'static str> {
-        self.inner.name
+        self.inner.static_meta.name
     }
 
     /// Returns a `Data` reference to the parent of this span, if one exists.
@@ -446,7 +440,7 @@ impl<'a> IntoIterator for &'a Data {
 impl fmt::Debug for Data {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Span")
-            .field("name", &self.inner.name)
+            .field("name", &self.name())
             .field("opened_at", &self.inner.opened_at)
             .field("parent", &self.parent().unwrap_or(self).name())
             .field("fields", &self.debug_fields())
@@ -502,7 +496,6 @@ impl Hash for ActiveInner {
 
 impl Hash for DataInner {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.name.hash(state);
         self.opened_at.hash(state);
         self.static_meta.hash(state);
     }
@@ -510,7 +503,6 @@ impl Hash for DataInner {
 
 impl cmp::PartialEq for DataInner {
     fn eq(&self, other: &DataInner) -> bool {
-        self.name == other.name &&
         self.opened_at == other.opened_at &&
         self.static_meta == other.static_meta
     }

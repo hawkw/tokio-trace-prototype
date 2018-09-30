@@ -89,19 +89,35 @@ use self::dedup::IteratorDedup;
 #[macro_export]
 macro_rules! static_meta {
     ($($k:ident),*) => (
-        static_meta!(@ None, $crate::Level::Trace, $($k),* )
+        static_meta!(@ None, None, $crate::Level::Trace, $($k),* )
     );
     (level: $lvl:expr, $($k:ident),*) => (
-        static_meta!(@ None, $lvl, $($k),* )
+        static_meta!(@ None, None, $lvl, $($k),* )
     );
     (target: $target:expr, level: $lvl:expr, $($k:ident),*) => (
-        static_meta!(@ Some($target), $lvl, $($k),* )
+        static_meta!(@ None, Some($target), $lvl, $($k),* )
     );
     (target: $target:expr, $($k:ident),*) => (
-        static_meta!(@ Some($target), $crate::Level::Trace, $($k),* )
+        static_meta!(@ None, Some($target), $crate::Level::Trace, $($k),* )
     );
-    (@ $target:expr, $lvl:expr, $($k:ident),*) => (
+    ($name:expr) => (
+        static_meta!(@ Some($name), None, $crate::Level::Trace, )
+    );
+    ($name:expr, $($k:ident),*) => (
+        static_meta!(@ Some($name), None, $crate::Level::Trace, $($k),* )
+    );
+    ($name:expr, level: $lvl:expr, $($k:ident),*) => (
+        static_meta!(@ Some($name),None, $lvl, $($k),* )
+    );
+    ($name:expr, target: $target:expr, level: $lvl:expr, $($k:ident),*) => (
+        static_meta!(@ Some($name), Some($target), $lvl, $($k),* )
+    );
+    ($name:expr, target: $target:expr, $($k:ident),*) => (
+        static_meta!(@ Some($name), Some($target), $crate::Level::Trace, $($k),* )
+    );
+    (@ $name:expr, $target:expr, $lvl:expr, $($k:ident),*) => (
         $crate::Meta {
+            name: $name,
             target: $target,
             level: $lvl,
             module_path: module_path!(),
@@ -142,31 +158,34 @@ macro_rules! static_meta {
 macro_rules! span {
     ($name:expr) => { span!($name,) };
     ($name:expr, $($k:ident = $val:expr),*) => {
-        $crate::Span::new(
-            Some($name),
-            ::std::time::Instant::now(),
-            Some($crate::Span::current()),
-            &static_meta!( $($k),* ),
-            vec![ $(Box::new($val)),* ], // todo: wish this wasn't double-boxed...
-        )
+        {
+            static META: $crate::Meta<'static> = static_meta!($name, $($k),* );
+            $crate::Span::new(
+                ::std::time::Instant::now(),
+                Some($crate::Span::current()),
+                &META,
+                vec![ $(Box::new($val)),* ], // todo: wish this wasn't double-boxed...
+            )
+        }
     }
 }
 
 #[macro_export]
 macro_rules! event {
     (target: $target:expr, $lvl:expr, { $($k:ident = $val:expr),* }, $($arg:tt)+ ) => ({
-    {       let field_values: &[& dyn $crate::Value] = &[ $( & $val),* ];
-            use $crate::Subscriber;
-            $crate::Dispatcher::current().observe_event(&$crate::Event {
-                timestamp: ::std::time::Instant::now(),
-                parent: $crate::Span::current().into(),
-                follows_from: &[],
-                meta: &static_meta!(@ $target, $lvl, $($k),* ),
-                field_values: &field_values[..],
-                message: format_args!( $($arg)+ ),
-            });
-        }
-
+    {
+        static META: $crate::Meta<'static> = static_meta!(@ None, $target, $lvl, $($k),* );
+        let field_values: &[& dyn $crate::Value] = &[ $( & $val),* ];
+        use $crate::Subscriber;
+        $crate::Dispatcher::current().observe_event(&$crate::Event {
+            timestamp: ::std::time::Instant::now(),
+            parent: $crate::Span::current().into(),
+            follows_from: &[],
+            meta: &META,
+            field_values: &field_values[..],
+            message: format_args!( $($arg)+ ),
+        });
+    }
     });
     ($lvl:expr, { $($k:ident = $val:expr),* }, $($arg:tt)+ ) => (event!(target: None, $lvl, { $($k = $val),* }, $($arg)+))
 }
@@ -212,6 +231,7 @@ pub struct Event<'event, 'meta> {
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct Meta<'a> {
+    pub name: Option<&'a str>,
     pub target: Option<&'a str>,
     pub level: log::Level,
 
@@ -339,6 +359,7 @@ impl<'a> Iterator for Parents<'a> {
 impl<'a, 'meta> From<&'a log::Record<'meta>> for Meta<'meta> {
     fn from(record: &'a log::Record<'meta>) -> Self {
         Meta {
+            name: None,
             target: Some(record.target()),
             level: record.level(),
             module_path: record
