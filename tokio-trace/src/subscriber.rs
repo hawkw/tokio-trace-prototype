@@ -3,6 +3,12 @@ use log;
 use std::time::Instant;
 
 pub trait Subscriber {
+    /// Determines if a span or event with the specified metadata would be recorded.
+    ///
+    /// This is used by the dispatcher to avoid allocating for span construction
+    /// if the span would be discarded anyway.
+    fn enabled(&self, metadata: &Meta) -> bool;
+
     /// Note that this function is generic over a pair of lifetimes because the
     /// `Event` type is. See the documentation for [`Event`] for details.
     fn observe_event<'event, 'meta: 'event>(&self, event: &'event Event<'event, 'meta>);
@@ -19,6 +25,10 @@ impl LogSubscriber {
 }
 
 impl Subscriber for LogSubscriber {
+    fn enabled(&self, metadata: &Meta) -> bool {
+        log::logger().enabled(&metadata.into())
+    }
+
     fn observe_event<'event, 'meta: 'event>(&self, event: &'event Event<'event, 'meta>) {
         let fields = event.debug_fields();
         let meta = event.meta.into();
@@ -68,7 +78,7 @@ pub use self::test_support::*;
 #[cfg(test)]
 mod test_support {
     use super::Subscriber;
-    use ::{Event, SpanData};
+    use ::{Event, SpanData, Meta};
     use ::span::MockSpan;
 
     use std::{
@@ -138,6 +148,11 @@ mod test_support {
     }
 
     impl Subscriber for Running {
+        fn enabled(&self, _meta: &Meta) -> bool {
+            // TODO: allow the mock subscriber to filter events for testing filtering?
+            true
+        }
+
         fn observe_event<'event, 'meta: 'event>(&self, _event: &'event Event<'event, 'meta>) {
             match self.expected.borrow_mut().pop_front() {
                 None => {}
@@ -191,6 +206,11 @@ mod test_support {
     }
 
     impl Subscriber for MockDispatch {
+        fn enabled(&self, _meta: &Meta) -> bool {
+            // TODO: allow the mock dispatcher to filter events for testing filtering?
+            true
+        }
+
         fn observe_event<'event, 'meta: 'event>(&self, event: &'event Event<'event, 'meta>) {
             MOCK_SUBSCRIBER.with(|mock| {
                 if let Some(ref subscriber) = *mock.borrow() {
