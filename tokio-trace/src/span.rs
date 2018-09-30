@@ -3,7 +3,6 @@ use std::{
     cell::RefCell,
     cmp, fmt,
     hash::{Hash, Hasher},
-    // ops::Deref,
     slice,
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -13,7 +12,7 @@ use std::{
 };
 
 lazy_static! {
-    static ref ROOT_SPAN: Arc<ActiveInner> = ActiveInner::new(
+    static ref ROOT_SPAN: Active = Active::new(
         Data::new(
             Instant::now(),
             None,
@@ -25,7 +24,7 @@ lazy_static! {
 }
 
 thread_local! {
-    static CURRENT_SPAN: RefCell<Arc<ActiveInner>> = RefCell::new(ROOT_SPAN.clone());
+    static CURRENT_SPAN: RefCell<Active> = RefCell::new(ROOT_SPAN.clone());
 }
 
 /// A handle that represents a span in the process of executing.
@@ -103,7 +102,7 @@ thread_local! {
 /// all the [`Data`] handles have *also* been dropped.
 #[derive(Clone, PartialEq, Hash)]
 pub struct Span {
-    inner: Option<Arc<ActiveInner>>,
+    inner: Option<Active>,
 }
 
 /// A handle on the data associated with a span.
@@ -136,10 +135,16 @@ struct DataInner {
     state: AtomicUsize,
 }
 
+
+#[derive(Clone, Debug, PartialEq, Hash)]
+struct Active {
+    inner: Arc<ActiveInner>,
+}
+
 /// Internal representation of the inner state of a span which has not yet
 /// completed.
 ///
-/// This is kept separate from the `DataInner`, which holds the data about the
+/// This is kept separate from the `Data`, which holds the data about the
 /// span, because this type is referenced only by *entering* (`Span`) handles.
 /// It is only necessary to track this state while the capacity still exists to
 /// re-enter the span; once it can no longer be re-entered, the `ActiveInner`
@@ -157,8 +162,7 @@ struct DataInner {
 /// interaction with an active span's state is carried out through `Span`
 /// references.
 #[derive(Debug)]
-#[doc(hidden)]
-pub struct ActiveInner {
+struct ActiveInner {
     /// A reference to the span's associated data.
     data: Data,
 
@@ -167,7 +171,7 @@ pub struct ActiveInner {
     ///
     /// Implicitly, this also keeps the parent span from becoming `Done` as long
     /// as the child span's `Inner` remains alive.
-    enter_parent: Option<Arc<ActiveInner>>,
+    enter_parent: Option<Active>,
 
     /// The number of threads which have entered this span.
     ///
@@ -202,17 +206,17 @@ impl Span {
     #[doc(hidden)]
     pub fn new(
         opened_at: Instant,
-        parent: Option<Arc<ActiveInner>>,
         static_meta: &'static StaticMeta,
         field_values: Vec<Box<dyn Value>>,
     ) -> Self {
+        let parent = Active::current();
         let data = Data::new(
             opened_at,
-            parent.as_ref().map(|parent| &parent.data),
+            Some(parent.data()),
             static_meta,
             field_values,
         );
-        let inner = Some(ActiveInner::new(data, parent));
+        let inner = Some(Active::new(data, Some(parent)));
         Span {
             inner,
         }
@@ -222,32 +226,32 @@ impl Span {
     /// but it's not intended for use by consumers of the tokio-trace API
     /// directly.
     #[doc(hidden)]
-    pub fn disabled() -> Self {
+    pub fn new_disabled() -> Self {
         Span { inner: None }
     }
 
     /// Returns a reference to the span that this thread is currently
     /// executing.
     pub fn current() -> Self {
-        let inner = Some(ActiveInner::current());
+        let inner = Some(Active::current());
         Self { inner }
     }
 
     pub fn enter<F: FnOnce() -> T, T>(self, f: F) -> T {
         match self.inner {
-            Some(inner) => ActiveInner::enter(inner, f),
+            Some(inner) => inner.enter(f),
             None => f(),
         }
     }
 
     pub fn data(&self) -> Option<&Data> {
-        self.inner.as_ref().map(|inner| &inner.data)
+        self.inner.as_ref().map(Active::data)
     }
 }
 
 impl fmt::Debug for Span {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if let Some(inner) = self.inner.as_ref().map(|active| &active.data) {
+        if let Some(inner) = self.data() {
             f.debug_struct("Span")
                 .field("name", &inner.name())
                 .field("opened_at", &inner.opened_at())
@@ -262,24 +266,17 @@ impl fmt::Debug for Span {
     }
 }
 
-// impl Deref for Span {
-//     type Target = Data;
-//     fn deref(&self) -> &Self::Target {
-//         self.as_ref()
-//     }
-// }
+impl<'a> Into<Option<&'a Data>> for &'a Span {
+    fn into(self) -> Option<&'a Data> {
+        self.data()
+    }
+}
 
-// impl AsRef<Data> for Span {
-//     fn as_ref(&self) -> &Data {
-//         &self.inner.as_ref().data
-//     }
-// }
-
-// impl Into<Data> for Span {
-//     fn into(self) -> Data {
-//         self.as_ref().clone()
-//     }
-// }
+impl Into<Option<Data>> for Span {
+    fn into(self) -> Option<Data> {
+        self.data().cloned()
+    }
+}
 
 // ===== impl Data =====
 
@@ -303,7 +300,7 @@ impl Data {
 
     pub fn current() -> Self {
         CURRENT_SPAN.with(|current| {
-            current.borrow().data.clone()
+            current.borrow().data().clone()
         })
     }
 
@@ -439,21 +436,79 @@ impl fmt::Debug for Data {
     }
 }
 
-// ===== impl ActiveInner =====
+// ===== impl Active =====
 
-impl ActiveInner {
+impl Active {
     #[doc(hidden)]
-    pub fn current() -> Arc<Self> {
+    pub fn current() -> Self {
         CURRENT_SPAN.with(|span| span.borrow().clone())
     }
 
-    fn new(data: Data, enter_parent: Option<Arc<Self>>) -> Arc<Self> {
-        Arc::new(ActiveInner {
+    fn new(data: Data, enter_parent: Option<Self>) -> Self  {
+        let inner = Arc::new(ActiveInner {
             data,
             enter_parent,
             currently_entered: AtomicUsize::new(0)
-        })
+        });
+        Self {
+            inner,
+        }
     }
+
+    fn enter<F: FnOnce() -> T, T>(self, f: F) -> T {
+        let prior_state = self.inner.data.state();
+        match prior_state {
+            // The span has been marked as done; it may not be reentered again.
+            // TODO: maybe this should not crash the thread?
+            State::Done => panic!("cannot re-enter completed span!"),
+            _ => {
+                let result = CURRENT_SPAN.with(|current_span| {
+                    self.inner.transition_on_enter(prior_state);
+                    current_span.replace(self.clone());
+                    Dispatcher::current().enter(self.data(), Instant::now());
+                    f()
+                });
+
+                CURRENT_SPAN.with(|current_span| {
+                    let timestamp = Instant::now();
+                    if let Some(ref parent) = self.inner.enter_parent {
+                        current_span.replace(parent.clone());
+                    }
+                    // If we are the only remaining enter handle to this
+                    // span, it can now transition to Done. Otherwise, it
+                    // transitions to Idle.
+                    let next_state = if self.is_last_standing() {
+                        // Dropping this span handle will drop the enterable
+                        // reference to self.parent.
+                        State::Done
+                    } else {
+                        State::Idle
+                    };
+                    self.inner.transition_on_exit(next_state);
+                    Dispatcher::current().exit(self.data(), timestamp);
+                });
+                result
+            }
+        }
+    }
+
+    fn data(&self) -> &Data {
+        &self.inner.data
+    }
+
+    /// Returns true if this is the last remaining handle with the capacity to
+    /// enter the span.
+    ///
+    /// Used to determine when the span can be marked as completed.
+    fn is_last_standing(&self) -> bool {
+        Arc::strong_count(&self.inner) == 1
+    }
+}
+
+
+// ===== impl ActiveInnInner =====
+
+impl ActiveInner {
 
     /// Performs the state transition when entering the span.
     fn transition_on_enter(&self, from_state: State) {
@@ -472,51 +527,6 @@ impl ActiveInner {
         if remaining_exits == 1 {
             self.data.set_state(State::Running, next_state);
         }
-    }
-
-    fn enter<F: FnOnce() -> T, T>(this: Arc<Self>, f: F) -> T {
-        let prior_state = this.data.state();
-        match prior_state {
-            // The span has been marked as done; it may not be reentered again.
-            // TODO: maybe this should not crash the thread?
-            State::Done => panic!("cannot re-enter completed span!"),
-            _ => {
-                let result = CURRENT_SPAN.with(|current_span| {
-                    this.transition_on_enter(prior_state);
-                    current_span.replace(this.clone());
-                    Dispatcher::current().enter(&this.data, Instant::now());
-                    f()
-                });
-
-                CURRENT_SPAN.with(|current_span| {
-                    let timestamp = Instant::now();
-                    if let Some(ref parent) = this.enter_parent {
-                        current_span.replace(parent.clone());
-                    }
-                    // If we are the only remaining enter handle to this
-                    // span, it can now transition to Done. Otherwise, it
-                    // transitions to Idle.
-                    let next_state = if Self::is_last_standing(&this) {
-                        // Dropping this span handle will drop the enterable
-                        // reference to self.parent.
-                        State::Done
-                    } else {
-                        State::Idle
-                    };
-                    this.transition_on_exit(next_state);
-                    Dispatcher::current().exit(&this.data, timestamp);
-                });
-                result
-            }
-        }
-    }
-
-    /// Returns true if this is the last remaining handle with the capacity to
-    /// enter the span.
-    ///
-    /// Used to determine when the span can be marked as completed.
-    fn is_last_standing(this: &Arc<Self>) -> bool {
-        Arc::strong_count(this) == 1
     }
 }
 

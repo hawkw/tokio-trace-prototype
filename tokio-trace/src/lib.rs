@@ -164,12 +164,11 @@ macro_rules! span {
             if Dispatcher::current().enabled(&META) {
                 span::Span::new(
                     ::std::time::Instant::now(),
-                    Some(span::ActiveInner::current()),
                     &META,
                     vec![ $(Box::new($val)),* ], // todo: wish this wasn't double-boxed...
                 )
             } else {
-                span::Span::disabled()
+                span::Span::new_disabled()
             }
         }
     }
