@@ -397,20 +397,3 @@ impl<'a> Iterator for Parents<'a> {
         next
     }
 }
-
-impl<'a, 'meta> From<&'a log::Record<'meta>> for Meta<'meta> {
-    fn from(record: &'a log::Record<'meta>) -> Self {
-        Meta {
-            name: None,
-            target: Some(record.target()),
-            level: record.level(),
-            module_path: record
-                .module_path()
-                // TODO: make symmetric
-                .unwrap_or_else(|| record.target()),
-            line: record.line().unwrap_or(0),
-            file: record.file().unwrap_or("???"),
-            field_names: &[],
-        }
-    }
-}
