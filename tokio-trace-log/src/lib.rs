@@ -54,7 +54,7 @@ impl<'a> AsLog for Meta<'a> {
     type Log = log::Metadata<'a>;
     fn as_log(&self) -> Self::Log {
         log::Metadata::builder()
-            .level(&self.level.as_trace())
+            .level(self.level.as_log())
             .target(self.target.unwrap_or(""))
             .build()
     }
@@ -74,6 +74,32 @@ impl<'a> AsTrace for log::Record<'a> {
             line: self.line().unwrap_or(0),
             file: self.file().unwrap_or("???"),
             field_names: &[],
+        }
+    }
+}
+
+impl AsLog for tokio_trace::Level {
+    type Log = log::Level;
+    fn as_log(&self) -> log::Level {
+        match self {
+            tokio_trace::Level::Error => log::Level::Error,
+            tokio_trace::Level::Warn => log::Level::Warn,
+            tokio_trace::Level::Info => log::Level::Info,
+            tokio_trace::Level::Debug => log::Level::Debug,
+            tokio_trace::Level::Trace => log::Level::Trace,
+        }
+    }
+}
+
+impl AsTrace for log::Level {
+    type Trace = tokio_trace::Level;
+    fn as_trace(&self) -> tokio_trace::Level {
+        match self {
+            log::Level::Error => tokio_trace::Level::Error,
+            log::Level::Warn => tokio_trace::Level::Warn,
+            log::Level::Info => tokio_trace::Level::Info,
+            log::Level::Debug => tokio_trace::Level::Debug,
+            log::Level::Trace => tokio_trace::Level::Trace,
         }
     }
 }

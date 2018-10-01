@@ -5,7 +5,6 @@ authors = ["Eliza Weisman <eliza@buoyant.io>"]
 
 [dependencies]
 futures = "0.1"
-log = "0.4"
 
 [dev-dependencies]
 ansi_term = "0.11"

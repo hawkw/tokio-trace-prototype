@@ -112,12 +112,35 @@
 //! [`Dispatcher::builder`]: struct.Dispatcher.html#method.builder
 
 extern crate futures;
-extern crate log;
-pub use log::Level;
 
 use std::{fmt, slice, time::Instant};
 
 use self::dedup::IteratorDedup;
+
+#[repr(usize)]
+#[derive(Copy, Eq, Debug, Hash)]
+pub enum Level {
+    /// The "error" level.
+    ///
+    /// Designates very serious errors.
+    Error = 1, // This way these line up with the discriminants for LevelFilter below
+    /// The "warn" level.
+    ///
+    /// Designates hazardous situations.
+    Warn,
+    /// The "info" level.
+    ///
+    /// Designates useful information.
+    Info,
+    /// The "debug" level.
+    ///
+    /// Designates lower priority information.
+    Debug,
+    /// The "trace" level.
+    ///
+    /// Designates very low priority, often extremely verbose, information.
+    Trace,
+}
 
 #[doc(hidden)]
 #[macro_export]
@@ -275,7 +298,7 @@ pub struct Event<'event, 'meta> {
 pub struct Meta<'a> {
     pub name: Option<&'a str>,
     pub target: Option<&'a str>,
-    pub level: log::Level,
+    pub level: Level,
 
     pub module_path: &'a str,
     pub file: &'a str,
@@ -395,5 +418,22 @@ impl<'a> Iterator for Parents<'a> {
         let next = self.next;
         self.next = self.next.and_then(SpanData::parent);
         next
+    }
+}
+
+
+// ===== impl Level =====
+
+impl Clone for Level {
+    #[inline]
+    fn clone(&self) -> Level {
+        *self
+    }
+}
+
+impl PartialEq for Level {
+    #[inline]
+    fn eq(&self, other: &Level) -> bool {
+        *self as usize == *other as usize
     }
 }
