@@ -27,7 +27,7 @@ use tokio_trace::{Subscriber, Event, SpanData, Meta};
 
 /// Format a log record as a trace event in the current span.
 pub fn format_trace(record: &log::Record) -> io::Result<()> {
-    let meta: tokio_trace::Meta = record.into();
+    let meta: tokio_trace::Meta = record.as_trace();
     let event = Event {
         timestamp: Instant::now(),
         parent: tokio_trace::SpanData::current(),
@@ -40,25 +40,41 @@ pub fn format_trace(record: &log::Record) -> io::Result<()> {
     Ok(())
 }
 
-pub fn meta_to_log_metadata<'a>(meta: &tokio_trace::Meta<'a>) -> log::Metadata<'a> {
-    log::Metadata::builder()
-        .level(meta.level)
-        .target(meta.target.unwrap_or(""))
-        .build()
+pub trait AsLog {
+    type Log;
+    fn as_log(&self) -> Self::Log;
 }
 
-pub fn log_record_to_meta<'a>(record: &log::Record<'a>) -> Meta<'a> {
-    Meta {
-        name: None,
-        target: Some(record.target()),
-        level: record.level(),
-        module_path: record
-            .module_path()
-            // TODO: make symmetric
-            .unwrap_or_else(|| record.target()),
-        line: record.line().unwrap_or(0),
-        file: record.file().unwrap_or("???"),
-        field_names: &[],
+pub trait AsTrace {
+    type Trace;
+    fn as_trace(&self) -> Self::Trace;
+}
+
+impl<'a> AsLog for Meta<'a> {
+    type Log = log::Metadata<'a>;
+    fn as_log(&self) -> Self::Log {
+        log::Metadata::builder()
+            .level(&self.level.as_trace())
+            .target(self.target.unwrap_or(""))
+            .build()
+    }
+}
+
+impl<'a> AsTrace for log::Record<'a> {
+    type Trace = Meta<'a>;
+    fn as_trace(&self) -> Self::Trace {
+        Meta {
+            name: None,
+            target: Some(self.target()),
+            level: self.level().as_trace(),
+            module_path: self
+                .module_path()
+                // TODO: make symmetric
+                .unwrap_or_else(|| self.target()),
+            line: self.line().unwrap_or(0),
+            file: self.file().unwrap_or("???"),
+            field_names: &[],
+        }
     }
 }
 
@@ -110,12 +126,12 @@ impl LogSubscriber {
 
 impl Subscriber for LogSubscriber {
     fn enabled(&self, metadata: &Meta) -> bool {
-        log::logger().enabled(&meta_to_log_metadata(metadata))
+        log::logger().enabled(&metadata.as_log())
     }
 
     fn observe_event<'event, 'meta: 'event>(&self, event: &'event Event<'event, 'meta>) {
         let fields = event.debug_fields();
-        let meta = meta_to_log_metadata(event.meta);
+        let meta = event.meta.as_log();
         let logger = log::logger();
         let parents = event.parents().filter_map(SpanData::name).collect::<Vec<_>>();
         if logger.enabled(&meta) {
