@@ -117,11 +117,8 @@ use std::{fmt, slice, time::Instant};
 
 use self::dedup::IteratorDedup;
 
-// TODO: remove this and let the span/event macros generate the
-// metadata directly. this macro causes weird issues when using the
-// test-support code from other crates...
-#[macro_export]
 #[doc(hidden)]
+#[macro_export]
 macro_rules! static_meta {
     ($($k:ident),*) => (
         static_meta!(@ None, None, $crate::Level::Trace, $($k),* )
@@ -193,21 +190,9 @@ macro_rules! static_meta {
 macro_rules! span {
     ($name:expr) => { span!($name,) };
     ($name:expr, $($k:ident = $val:expr),*) => {
-        span!(@ Some($name), None, $crate::Level::Trace, $($k = $val),*)
-    };
-    // TODO: add support for spans with levels and targets.
-    (@ $name:expr, $target:expr, $lvl:expr, $($k:ident = $val:expr),*) => {
         {
             use $crate::{span, Subscriber, Dispatcher, Meta};
-            static META: Meta<'static> = Meta {
-                name: $name,
-                target: $target,
-                level: $lvl,
-                module_path: module_path!(),
-                file: file!(),
-                line: line!(),
-                field_names: &[ $(stringify!($k)),* ],
-            };
+            static META: Meta<'static> = static_meta!($name, $($k),* );
             if Dispatcher::current().enabled(&META) {
                 span::Span::new(
                     ::std::time::Instant::now(),
