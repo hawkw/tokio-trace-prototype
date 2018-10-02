@@ -180,7 +180,7 @@ mod test_support {
             self
         }
 
-        pub fn to_subscriber(self) -> Running {
+        pub fn to_subscriber(self) -> impl Subscriber {
             Running {
                 expected: RefCell::new(self.expected),
                 ids: AtomicUsize::new(0),
