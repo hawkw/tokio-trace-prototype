@@ -8,7 +8,6 @@ use std::{
         atomic::{AtomicUsize, Ordering},
         Arc,
     },
-    time::Instant,
 };
 
 thread_local! {
@@ -595,12 +594,11 @@ impl Active {
                 let result = CURRENT_SPAN.with(|current_span| {
                     self.inner.transition_on_enter(prior_state);
                     current_span.replace(Some(self.clone()));
-                    Dispatcher::current().enter(self.data(), Instant::now());
+                    Dispatcher::current().enter(self.data());
                     f()
                 });
 
                 CURRENT_SPAN.with(|current_span| {
-                    let timestamp = Instant::now();
                     current_span.replace(self.inner.enter_parent.as_ref().cloned());
                     // If we are the only remaining enter handle to this
                     // span, it can now transition to Done. Otherwise, it
@@ -613,7 +611,7 @@ impl Active {
                         State::Idle
                     };
                     self.inner.transition_on_exit(next_state);
-                    Dispatcher::current().exit(self.data(), timestamp);
+                    Dispatcher::current().exit(self.data());
                 });
                 result
             }
