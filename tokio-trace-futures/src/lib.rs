@@ -1,4 +1,4 @@
-#![macro_use]
+#[macro_use]
 extern crate tokio_trace;
 extern crate futures;
 
