@@ -1,4 +1,4 @@
-#[macro_use]
+#[cfg_attr(test, macro_use)]
 extern crate tokio_trace;
 extern crate futures;
 
