@@ -117,33 +117,11 @@ use std::{fmt, slice, time::Instant};
 
 use self::dedup::IteratorDedup;
 
-#[repr(usize)]
-#[derive(Copy, Eq, Debug, Hash)]
-pub enum Level {
-    /// The "error" level.
-    ///
-    /// Designates very serious errors.
-    Error = 1, // This way these line up with the discriminants for LevelFilter below
-    /// The "warn" level.
-    ///
-    /// Designates hazardous situations.
-    Warn,
-    /// The "info" level.
-    ///
-    /// Designates useful information.
-    Info,
-    /// The "debug" level.
-    ///
-    /// Designates lower priority information.
-    Debug,
-    /// The "trace" level.
-    ///
-    /// Designates very low priority, often extremely verbose, information.
-    Trace,
-}
-
-#[doc(hidden)]
+// TODO: remove this and let the span/event macros generate the
+// metadata directly. this macro causes weird issues when using the
+// test-support code from other crates...
 #[macro_export]
+#[doc(hidden)]
 macro_rules! static_meta {
     ($($k:ident),*) => (
         static_meta!(@ None, None, $crate::Level::Trace, $($k),* )
@@ -215,9 +193,21 @@ macro_rules! static_meta {
 macro_rules! span {
     ($name:expr) => { span!($name,) };
     ($name:expr, $($k:ident = $val:expr),*) => {
+        span!(@ Some($name), None, $crate::Level::Trace, $($k = $val),*)
+    };
+    // TODO: add support for spans with levels and targets.
+    (@ $name:expr, $target:expr, $lvl:expr, $($k:ident = $val:expr),*) => {
         {
             use $crate::{span, Subscriber, Dispatcher, Meta};
-            static META: Meta<'static> = static_meta!($name, $($k),* );
+            static META: Meta<'static> = Meta {
+                name: $name,
+                target: $target,
+                level: $lvl,
+                module_path: module_path!(),
+                file: file!(),
+                line: line!(),
+                field_names: &[ $(stringify!($k)),* ],
+            };
             if Dispatcher::current().enabled(&META) {
                 span::Span::new(
                     ::std::time::Instant::now(),
@@ -255,9 +245,33 @@ macro_rules! event {
     ($lvl:expr, { $($k:ident = $val:expr),* }, $($arg:tt)+ ) => (event!(target: None, $lvl, { $($k = $val),* }, $($arg)+))
 }
 
+#[repr(usize)]
+#[derive(Copy, Eq, Debug, Hash)]
+pub enum Level {
+    /// The "error" level.
+    ///
+    /// Designates very serious errors.
+    Error = 1, // This way these line up with the discriminants for LevelFilter below
+    /// The "warn" level.
+    ///
+    /// Designates hazardous situations.
+    Warn,
+    /// The "info" level.
+    ///
+    /// Designates useful information.
+    Info,
+    /// The "debug" level.
+    ///
+    /// Designates lower priority information.
+    Debug,
+    /// The "trace" level.
+    ///
+    /// Designates very low priority, often extremely verbose, information.
+    Trace,
+}
+
 mod dedup;
 mod dispatcher;
-pub mod instrument;
 pub mod span;
 pub mod subscriber;
 
