@@ -29,7 +29,6 @@ use tokio_trace::{span, Subscriber, Event, SpanData, Meta};
 pub fn format_trace(record: &log::Record) -> io::Result<()> {
     let meta: tokio_trace::Meta = record.as_trace();
     let event = Event {
-        timestamp: Instant::now(),
         parent: tokio_trace::SpanData::current(),
         follows_from: &[],
         meta: &meta,
