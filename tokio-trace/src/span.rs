@@ -5,7 +5,7 @@ use std::{
     hash::{Hash, Hasher},
     slice,
     sync::{
-        atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering},
+        atomic::{AtomicUsize, Ordering},
         Arc,
     },
     time::Instant,
@@ -110,7 +110,7 @@ pub struct Data {
 /// Span IDs are used primarily to determine of two handles refer to the same
 /// span, without requiring the comparison of the span's fields.
 #[derive(Clone, Debug, PartialEq, Hash)]
-pub struct Id(usize);
+pub struct Id(u64);
 
 /// Internal representation of the data associated with a span.
 ///
@@ -206,12 +206,14 @@ impl Span {
     /// directly.
     #[doc(hidden)]
     pub fn new(
+        id: Id,
         opened_at: Instant,
         static_meta: &'static StaticMeta,
         field_values: Vec<Box<dyn Value>>,
     ) -> Self {
         let parent = Active::current();
         let data = Data::new(
+            id,
             opened_at,
             parent.as_ref().map(Active::data),
             static_meta,
@@ -282,6 +284,7 @@ impl Into<Option<Data>> for Span {
 
 impl Data {
     fn new(
+        id: Id,
         opened_at: Instant,
         parent: Option<&Data>,
         static_meta: &'static StaticMeta,
@@ -293,7 +296,7 @@ impl Data {
                 parent: parent.cloned(),
                 static_meta,
                 field_values,
-                id: Id::next(),
+                id,
                 state: AtomicUsize::new(0),
             })
         }
@@ -442,15 +445,14 @@ impl fmt::Debug for Data {
     }
 }
 
+// ===== impl Id =====
+
 impl Id {
-    fn next() -> Self {
-        static NEXT_ID: AtomicUsize = ATOMIC_USIZE_INIT;
-        // TODO: is sequentially consistent ordering *really* necessary, or can
-        // we use a less strong ordering?
-        let next_id = NEXT_ID.fetch_sub(1, Ordering::SeqCst);
-        Id(next_id)
+    pub fn from_u64(u: u64) -> Self {
+        Id(u)
     }
 }
+
 
 // ===== impl Active =====
 
