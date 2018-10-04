@@ -759,11 +759,19 @@ mod tests {
 
         let subscriber = subscriber::mock()
             .enter(span::mock().named(Some("baz")))
+            // Main thread enters "quux".
+            .enter(span::mock().named(Some("quux")))
+            // Spawned thread also enters "quux".
             .enter(span::mock().named(Some("quux")))
             // When the main thread exits "quux", it will still be running in the
             // spawned thread.
             .exit(span::mock().named(Some("quux"))
                 .with_state(State::Running))
+            // Now, when this thread exits "quux", there is no handle to re-enter it, so
+            // it should become "done".
+            .exit(span::mock().named(Some("quux"))
+                .with_state(State::Done)
+            )
             // "baz" never had more than one handle, so it should also become
             // "done" when we exit it.
             .exit(span::mock().named(Some("baz"))
@@ -784,24 +792,12 @@ mod tests {
                 let handle = thread::Builder::new()
                     .name("thread-2".to_string())
                     .spawn(move || {
-                        let subscriber = subscriber::mock()
-                            // Spawned thread also enters "quux".
-                            .enter(span::mock().named(Some("quux")))
-                            // Now, when this thread exits "quux", there is no handle to re-enter it, so
-                            // it should become "done".
-                            .exit(span::mock().named(Some("quux"))
-                                .with_state(State::Done)
-                            )
-                            .run();
-                        let quux2 = quux2;
-                        Dispatch::to(subscriber).with(move || {
-                            quux2.enter(|| {
-                                // Once this thread has entered "quux", allow thread 1
-                                // to exit.
-                                t2_barrier1.wait();
-                                // Wait for the main thread to allow us to exit.
-                                t2_barrier2.wait();
-                            })
+                        quux2.enter(|| {
+                            // Once this thread has entered "quux", allow thread 1
+                            // to exit.
+                            t2_barrier1.wait();
+                            // Wait for the main thread to allow us to exit.
+                            t2_barrier2.wait();
                         })
                     })
                     .expect("spawn test thread");
