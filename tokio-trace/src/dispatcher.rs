@@ -1,13 +1,17 @@
 use {span, subscriber::Subscriber, Event, SpanData, Meta};
 
-use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+use std::{
+    cell::RefCell,
+    fmt,
+    sync::Arc,
+};
 
 thread_local! {
     static CURRENT_DISPATCH: RefCell<Dispatch> = RefCell::new(Dispatch::none());
 }
 
 #[derive(Clone)]
-pub struct Dispatch(Arc<dyn Subscriber>);
+pub struct Dispatch(Arc<dyn Subscriber + Send + Sync>);
 
 impl Dispatch {
     pub fn none() -> Self {
@@ -20,7 +24,11 @@ impl Dispatch {
         })
     }
 
-    pub fn to<S: Subscriber + 'static>(subscriber: S) -> Self {
+    pub fn to<S>(subscriber: S) -> Self
+    // TODO: Add some kind of `UnsyncDispatch`?
+    where
+        S: Subscriber + Send + Sync + 'static,
+    {
         Dispatch(Arc::new(subscriber))
     }
 
@@ -33,6 +41,12 @@ impl Dispatch {
             *current.borrow_mut() = prior;
         });
         result
+    }
+}
+
+impl fmt::Debug for Dispatch {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.pad("Dispatch(...)")
     }
 }
 

@@ -237,12 +237,10 @@ macro_rules! span {
             static META: Meta<'static> = static_meta!($name, $($k),* );
             let dispatcher = Dispatch::current();
             if cached_filter!(&META, dispatcher) {
-                let new_span = span::NewSpan::new(
+                span::NewSpan::new(
                     &META,
                     vec![ $(Box::new($val)),* ], // todo: wish this wasn't double-boxed...
-                );
-                let id = dispatcher.new_span(&new_span);
-                new_span.finish(id)
+                ).finish(dispatcher)
             } else {
                 span::Span::new_disabled()
             }

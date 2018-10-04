@@ -186,6 +186,11 @@ struct ActiveInner {
     ///
     /// Incremented on enter and decremented on exit.
     currently_entered: AtomicUsize,
+
+    /// The subscriber with which this span was registered.
+    /// TODO: it would be nice if this could be any arbitrary `Subscriber`,
+    /// rather than `Dispatch`, but object safety.
+    subscriber: Dispatch,
 }
 
 /// Enumeration of the potential states of a [`Span`].
@@ -209,27 +214,6 @@ pub enum State {
 // ===== impl Span =====
 
 impl Span {
-    /// This is primarily used by the `span!` macro, so it has to be public,
-    /// but it's not intended for use by consumers of the tokio-trace API
-    /// directly.
-    #[doc(hidden)]
-    pub fn new(
-        id: Id,
-        static_meta: &'static StaticMeta,
-        field_values: Vec<Box<dyn Value>>,
-    ) -> Self {
-        let parent = Active::current();
-        let data = Data::new(
-            id,
-            parent.as_ref().map(Active::data),
-            static_meta,
-            field_values,
-        );
-        let inner = Some(Active::new(data, parent));
-        Span {
-            inner,
-        }
-    }
 
     /// This is primarily used by the `span!` macro, so it has to be public,
     /// but it's not intended for use by consumers of the tokio-trace API
@@ -549,16 +533,17 @@ impl NewSpan {
             .dedup_by(|(k, _)| k)
     }
 
-    /// Finalize constructing the span by attaching a span ID and constructing
-    /// the internal span state.
-    pub fn finish(self, id: Id) -> Span {
+    /// Finalize constructing the span by attaching a subscriber, generating a
+    /// span ID, and constructing the internal span state.
+    pub fn finish(self, subscriber: Dispatch) -> Span {
+        let id = subscriber.new_span(&self);
         let data = Data::new(
             id,
             self.parent.as_ref().map(Active::data),
             self.static_meta,
             self.field_values,
         );
-        let inner = Some(Active::new(data, self.parent));
+        let inner = Some(Active::new(data, subscriber, self.parent));
         Span {
             inner,
         }
@@ -573,11 +558,12 @@ impl Active {
         CURRENT_SPAN.with(|span| span.borrow().as_ref().cloned())
     }
 
-    fn new(data: Data, enter_parent: Option<Self>) -> Self  {
+    fn new(data: Data, subscriber: Dispatch, enter_parent: Option<Self>) -> Self  {
         let inner = Arc::new(ActiveInner {
             data,
             enter_parent,
-            currently_entered: AtomicUsize::new(0)
+            currently_entered: AtomicUsize::new(0),
+            subscriber,
         });
         Self {
             inner,
@@ -594,7 +580,7 @@ impl Active {
                 let result = CURRENT_SPAN.with(|current_span| {
                     self.inner.transition_on_enter(prior_state);
                     current_span.replace(Some(self.clone()));
-                    Dispatch::current().enter(self.data());
+                    self.inner.subscriber.enter(self.data());
                     f()
                 });
 
@@ -611,7 +597,7 @@ impl Active {
                         State::Idle
                     };
                     self.inner.transition_on_exit(next_state);
-                    Dispatch::current().exit(self.data());
+                    self.inner.subscriber.exit(self.data());
                 });
                 result
             }
