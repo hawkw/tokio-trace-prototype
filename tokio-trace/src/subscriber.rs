@@ -159,10 +159,9 @@ mod test_support {
     use ::span::{self, MockSpan};
 
     use std::{
-        cell::RefCell,
         collections::VecDeque,
         thread,
-        sync::atomic::{AtomicUsize, Ordering},
+        sync::{Mutex, atomic::{AtomicUsize, Ordering}},
     };
 
     struct ExpectEvent {
@@ -176,7 +175,7 @@ mod test_support {
     }
 
     struct Running {
-        expected: RefCell<VecDeque<Expect>>,
+        expected: Mutex<VecDeque<Expect>>,
         ids: AtomicUsize,
     }
 
@@ -188,14 +187,6 @@ mod test_support {
         MockSubscriber {
             expected: VecDeque::new(),
         }
-    }
-
-    // hack so each test thread can run its own mock subscriber, even though the
-    // global dispatcher is static for the lifetime of the whole test binary.
-    pub struct MockDispatch {}
-
-    thread_local! {
-        static MOCK_SUBSCRIBER: RefCell<Option<Box<dyn Subscriber>>> = RefCell::new(None);
     }
 
     impl MockSubscriber {
@@ -212,7 +203,7 @@ mod test_support {
 
         pub fn run(self) -> impl Subscriber {
             Running {
-                expected: RefCell::new(self.expected),
+                expected: Mutex::new(self.expected),
                 ids: AtomicUsize::new(0),
             }
         }
@@ -229,7 +220,7 @@ mod test_support {
         }
 
         fn observe_event<'event, 'meta: 'event>(&self, _event: &'event Event<'event, 'meta>) {
-            match self.expected.borrow_mut().pop_front() {
+            match self.expected.lock().unwrap().pop_front() {
                 None => {}
                 Some(Expect::Event(_)) => unimplemented!(),
                 Some(Expect::Enter(expected_span)) => panic!("expected to enter span {:?}, but got an event", expected_span.name),
@@ -239,7 +230,7 @@ mod test_support {
 
         fn enter(&self, span: &SpanData) {
             println!("+ {}: {:?}", thread::current().name().unwrap_or("unknown thread"), span);
-            match self.expected.borrow_mut().pop_front() {
+            match self.expected.lock().unwrap().pop_front() {
                 None => {},
                 Some(Expect::Event(_)) => panic!("expected an event, but entered span {:?} instead", span.name()),
                 Some(Expect::Enter(expected_span)) => {
@@ -260,7 +251,7 @@ mod test_support {
 
         fn exit(&self, span: &SpanData) {
             println!("- {}: {:?}", thread::current().name().unwrap_or("unknown_thread"), span);
-            match self.expected.borrow_mut().pop_front() {
+            match self.expected.lock().unwrap().pop_front() {
                 None => {},
                 Some(Expect::Event(_)) => panic!("expected an event, but exited span {:?} instead", span.name()),
                 Some(Expect::Enter(expected_span)) => panic!(
