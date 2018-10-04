@@ -172,7 +172,7 @@ macro_rules! cached_filter {
             static FILTERED: AtomicUsize = ATOMIC_USIZE_INIT;
             const ENABLED: usize = 1;
             const DISABLED: usize = 2;
-            if $dispatcher.should_invalidate_filters($meta) {
+            if $dispatcher.should_invalidate_filter($meta) {
                 let enabled = $dispatcher.enabled(&META);
                 if enabled {
                     FILTERED.store(ENABLED, Ordering::Relaxed);
@@ -236,7 +236,7 @@ macro_rules! span {
             use $crate::{span, Subscriber, Dispatcher, Meta};
             static META: Meta<'static> = static_meta!($name, $($k),* );
             let dispatcher = Dispatcher::current();
-            if cached_filter!(&meta, dispatcher) {
+            if cached_filter!(&META, dispatcher) {
                 let new_span = span::NewSpan::new(
                     &META,
                     vec![ $(Box::new($val)),* ], // todo: wish this wasn't double-boxed...
