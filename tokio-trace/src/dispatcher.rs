@@ -77,12 +77,9 @@ impl Subscriber for Dispatch {
     }
 }
 
-struct NoDispatcher;
+struct NoSubscriber;
 
-#[derive(Debug)]
-pub struct InitError;
-
-impl Subscriber for NoDispatcher {
+impl Subscriber for NoSubscriber {
     fn enabled(&self, _metadata: &Meta) -> bool {
         false
     }

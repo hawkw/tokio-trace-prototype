@@ -709,6 +709,7 @@ mod test_support {
 #[cfg(test)]
 mod tests {
     use ::{subscriber, span, Dispatch};
+    use std::thread;
     use super::*;
 
     #[test]
@@ -755,7 +756,7 @@ mod tests {
     fn exit_doesnt_finish_concurrently_executing_spans() {
         // Test that exiting a span only marks it as "done" when no other
         // threads are still executing inside that span.
-        use std::{thread, sync::{Arc, Barrier}};
+        use std::sync::{Arc, Barrier};
 
         let subscriber = subscriber::mock()
             .enter(span::mock().named(Some("baz")))
@@ -861,5 +862,57 @@ mod tests {
             assert_ne!(foo1.data(), foo2.data());
         });
 
+    }
+
+    #[test]
+    fn spans_always_go_to_the_subscriber_that_tagged_them() {
+        let subscriber1 = subscriber::mock()
+            .enter(span::mock().named(Some("foo")))
+            .exit(span::mock().named(Some("foo"))
+                .with_state(State::Idle))
+            .enter(span::mock().named(Some("foo")))
+            .exit(span::mock().named(Some("foo"))
+                .with_state(State::Done)
+            );
+        let subscriber1 = Dispatch::to(subscriber1.run());
+        let subscriber2 = Dispatch::to(subscriber::mock().run());
+
+        let foo = subscriber1.with(|| {
+            let foo = span!("foo");
+            foo.clone().enter(|| { });
+            foo
+        });
+        // Even though we enter subscriber 2's context, the subscriber that
+        // tagged the span should see the enter/exit.
+        subscriber2.with(move || {
+            foo.enter(|| { })
+        });
+    }
+
+    #[test]
+    fn spans_always_go_to_the_subscriber_that_tagged_them_even_across_threads() {
+        let subscriber1 = subscriber::mock()
+            .enter(span::mock().named(Some("foo")))
+            .exit(span::mock().named(Some("foo"))
+                .with_state(State::Idle))
+            .enter(span::mock().named(Some("foo")))
+            .exit(span::mock().named(Some("foo"))
+                .with_state(State::Done)
+            );
+        let subscriber1 = Dispatch::to(subscriber1.run());
+        let foo = subscriber1.with(|| {
+            let foo = span!("foo");
+            foo.clone().enter(|| { });
+            foo
+        });
+
+        // Even though we enter subscriber 2's context, the subscriber that
+        // tagged the span should see the enter/exit.
+        thread::spawn(move || {
+            Dispatch::to(subscriber::mock().run()).with(|| {
+
+                foo.enter(|| { });
+            })
+        }).join().unwrap();
     }
 }
