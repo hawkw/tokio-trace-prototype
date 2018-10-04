@@ -172,7 +172,15 @@ macro_rules! cached_filter {
             static FILTERED: AtomicUsize = ATOMIC_USIZE_INIT;
             const ENABLED: usize = 1;
             const DISABLED: usize = 2;
-            match FILTERED.load(Ordering::Relaxed) {
+            if $dispatcher.should_invalidate_filters($meta) {
+                let enabled = $dispatcher.enabled(&META);
+                if enabled {
+                    FILTERED.store(ENABLED, Ordering::Relaxed);
+                } else {
+                    FILTERED.store(DISABLED, Ordering::Relaxed);
+                }
+                enabled
+            } else match FILTERED.load(Ordering::Relaxed) {
                 // If there's a cached result, use that.
                 ENABLED => true,
                 DISABLED => false,

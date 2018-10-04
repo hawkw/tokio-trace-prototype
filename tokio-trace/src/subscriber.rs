@@ -25,6 +25,37 @@ pub trait Subscriber {
     /// [span ID]: ../span/struct.Id.html
     fn new_span(&self, new_span: &span::NewSpan) -> span::Id;
 
+    /// Returns `true` if the cached result to a call to `enabled` for a span
+    /// with the given metadata is still valid.
+    ///
+    /// By default, this function assumes that cached filter results will remain
+    /// valid, but should be overridden when this is not the case.
+    ///
+    /// If this returns `false`, then the prior value may be used.
+    /// `Subscriber`s which require their filters to be run every time an event
+    /// occurs or a span is entered/exited should always return `true`.
+    ///
+    /// For example, suppose a sampling subscriber is implemented by incrementing a
+    /// counter every time `enabled` is called and only returning `true` when
+    /// the counter is divisible by a specified sampling rate. If that
+    /// subscriber returns `false` from `should_invalidate_filter`, then the
+    /// filter will not be re-evaluated once it has been applied to a given set
+    /// of metadata. Thus, the counter will not be incremented, and the span or
+    /// event that correspands to the metadata will never be `enabled`.
+    ///
+    /// Similarly, if a `Subscriber` has a filtering strategy that can be
+    /// changed dynamically at runtime, it would need to invalidate any cached
+    /// filter results when the filtering rules change.
+    ///
+    /// A subscriber which manages fanout to multiple other subscribers should
+    /// proxy this decision to all of its child subscribers, returning `false`
+    /// only if _all_ such children return `false`. If the set of subscribers to
+    /// which spans are broadcast may change dynamically, adding a new
+    /// subscriber should also invalidate cached filters.
+    fn should_invalidate_filter(&self, metadata: &Meta) -> bool {
+        false
+    }
+
     /// Note that this function is generic over a pair of lifetimes because the
     /// `Event` type is. See the documentation for [`Event`] for details.
     ///
