@@ -32,7 +32,7 @@ impl Dispatch {
         Dispatch(Arc::new(subscriber))
     }
 
-    pub fn with<T>(&self, f: impl Fn() -> T) -> T {
+    pub fn with<T>(&self, f: impl FnOnce() -> T) -> T {
         let (prior, result) = CURRENT_DISPATCH.with(|current| {
             let prior = current.replace(self.clone());
             (prior, (f)())
