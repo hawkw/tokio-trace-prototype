@@ -784,7 +784,7 @@ mod tests {
                 let handle = thread::Builder::new()
                     .name("thread-2".to_string())
                     .spawn(move || {
-                        subscriber::mock()
+                        let subscriber = subscriber::mock()
                             // Spawned thread also enters "quux".
                             .enter(span::mock().named(Some("quux")))
                             // Now, when this thread exits "quux", there is no handle to re-enter it, so
@@ -793,12 +793,15 @@ mod tests {
                                 .with_state(State::Done)
                             )
                             .run();
-                        quux2.enter(|| {
-                            // Once this thread has entered "quux", allow thread 1
-                            // to exit.
-                            t2_barrier1.wait();
-                            // Wait for the main thread to allow us to exit.
-                            t2_barrier2.wait();
+                        let quux2 = quux2;
+                        Dispatch::to(subscriber).with(move || {
+                            quux2.enter(|| {
+                                // Once this thread has entered "quux", allow thread 1
+                                // to exit.
+                                t2_barrier1.wait();
+                                // Wait for the main thread to allow us to exit.
+                                t2_barrier2.wait();
+                            })
                         })
                     })
                     .expect("spawn test thread");
