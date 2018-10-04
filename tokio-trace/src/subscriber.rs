@@ -86,18 +86,17 @@ pub trait Subscriber {
     ///     .with_filter(|meta| {
     ///         meta.name == Some("foo")
     ///     });
-    /// tokio_trace::Dispatcher::builder()
-    ///     .add_subscriber(filtered_subscriber)
-    ///     .try_init();
     ///
-    /// // This span will be logged.
-    /// span!("foo", enabled = true) .enter(|| {
-    ///     // do work;
-    /// });
-    /// // This span will *not* be logged.
-    /// span!("bar", enabled = false).enter(|| {
-    ///     // This event also will not be logged.
-    ///     event!(Level::Debug, { enabled = false },"this won't be logged");
+    /// tokio_trace::Dispatch::to(filtered_subscriber).with(|| {
+    ///     /// // This span will be logged.
+    ///     span!("foo", enabled = true) .enter(|| {
+    ///         // do work;
+    ///     });
+    ///     // This span will *not* be logged.
+    ///     span!("bar", enabled = false).enter(|| {
+    ///         // This event also will not be logged.
+    ///         event!(Level::Debug, { enabled = false },"this won't be logged");
+    ///     });
     /// });
     /// # }
     /// ```
@@ -211,15 +210,11 @@ mod test_support {
             self
         }
 
-        pub fn to_subscriber(self) -> impl Subscriber {
+        pub fn run(self) -> impl Subscriber {
             Running {
                 expected: RefCell::new(self.expected),
                 ids: AtomicUsize::new(0),
             }
-        }
-
-        pub fn run(self) {
-            MockDispatch::run(self.to_subscriber());
         }
     }
 
@@ -284,66 +279,6 @@ mod test_support {
             }
         }
     }
-
-    impl Subscriber for MockDispatch {
-        fn enabled(&self, meta: &Meta) -> bool {
-            MOCK_SUBSCRIBER.with(|mock| {
-                if let Some(ref subscriber) = *mock.borrow() {
-                    subscriber.enabled(meta)
-                } else {
-                    false
-                }
-            })
-        }
-
-        fn new_span(&self, new_span: &span::NewSpan) -> span::Id {
-            MOCK_SUBSCRIBER.with(|mock| {
-                mock.borrow()
-                    .as_ref()
-                    .map(|subscriber| subscriber.new_span(new_span))
-                    .unwrap_or_else(|| span::Id::from_u64(0))
-            })
-        }
-
-        fn observe_event<'event, 'meta: 'event>(&self, event: &'event Event<'event, 'meta>) {
-            MOCK_SUBSCRIBER.with(|mock| {
-                if let Some(ref subscriber) = *mock.borrow() {
-                    subscriber.observe_event(event)
-                }
-            })
-        }
-
-        #[inline]
-        fn enter(&self, span: &SpanData) {
-            MOCK_SUBSCRIBER.with(|mock| {
-                if let Some(ref subscriber) = *mock.borrow() {
-                    subscriber.enter(span)
-                }
-            })
-        }
-
-        #[inline]
-        fn exit(&self, span: &SpanData) {
-            MOCK_SUBSCRIBER.with(|mock| {
-                if let Some(ref subscriber) = *mock.borrow() {
-                    subscriber.exit(span)
-                }
-            })
-        }
-    }
-
-    impl MockDispatch {
-        pub fn run<T: Subscriber + Sized + 'static>(subscriber: T) {
-            // don't care if this succeeds --- another test may have already
-            // installed the test dispatcher.
-            let _ = ::Dispatcher::builder()
-                .add_subscriber(MockDispatch {})
-                .try_init();
-            MOCK_SUBSCRIBER.with(move |mock| {
-                *mock.borrow_mut() = Some(Box::new(subscriber));
-            })
-        }
-    }
 }
 
 #[cfg(test)]
@@ -351,6 +286,7 @@ mod tests {
     use ::{
         span,
         subscriber::{self, Subscriber},
+        Dispatch,
     };
     use std::sync::{
         Arc,
@@ -373,7 +309,7 @@ mod tests {
             .exit(span::mock().named(Some("bar")))
             .enter(span::mock().named(Some("bar")))
             .exit(span::mock().named(Some("bar")))
-            .to_subscriber()
+            .run()
             .with_filter(move |meta| match meta.name {
                 Some("foo") => {
                     foo_count2.fetch_add(1, Ordering::Relaxed);
@@ -385,33 +321,33 @@ mod tests {
                 },
                 _ => false,
             });
-        subscriber::MockDispatch::run(subscriber);
 
+        Dispatch::to(subscriber).with(move || {
+            // Enter "foo" and then "bar". The dispatcher expects to see "bar" but
+            // not "foo."
+            let foo = span!("foo");
+            let bar = foo.clone().enter(|| {
+                let bar = span!("bar");
+                bar.clone().enter(|| { bar })
+            });
 
-        // Enter "foo" and then "bar". The dispatcher expects to see "bar" but
-        // not "foo."
-        let foo = span!("foo");
-        let bar = foo.clone().enter(|| {
-            let bar = span!("bar");
-            bar.clone().enter(|| { bar })
+            // The filter should have seen each span a single time.
+            assert_eq!(foo_count.load(Ordering::Relaxed), 1);
+            assert_eq!(bar_count.load(Ordering::Relaxed), 1);
+
+            foo.clone().enter(|| {
+                bar.clone().enter(|| { })
+            });
+
+            // The subscriber should see "bar" again, but the filter should not have
+            // been called.
+            assert_eq!(foo_count.load(Ordering::Relaxed), 1);
+            assert_eq!(bar_count.load(Ordering::Relaxed), 1);
+
+            bar.clone().enter(|| { });
+            assert_eq!(foo_count.load(Ordering::Relaxed), 1);
+            assert_eq!(bar_count.load(Ordering::Relaxed), 1);
         });
-
-        // The filter should have seen each span a single time.
-        assert_eq!(foo_count.load(Ordering::Relaxed), 1);
-        assert_eq!(bar_count.load(Ordering::Relaxed), 1);
-
-        foo.clone().enter(|| {
-            bar.clone().enter(|| { })
-        });
-
-        // The subscriber should see "bar" again, but the filter should not have
-        // been called.
-        assert_eq!(foo_count.load(Ordering::Relaxed), 1);
-        assert_eq!(bar_count.load(Ordering::Relaxed), 1);
-
-        bar.clone().enter(|| { });
-        assert_eq!(foo_count.load(Ordering::Relaxed), 1);
-        assert_eq!(bar_count.load(Ordering::Relaxed), 1);
     }
 
     #[test]
@@ -430,7 +366,7 @@ mod tests {
             .exit(span::mock().named(Some("bar")))
             .enter(span::mock().named(Some("bar")))
             .exit(span::mock().named(Some("bar")))
-            .to_subscriber()
+            .run()
             .with_filter(move |meta| match meta.name {
                 Some("foo") => {
                     foo_count2.fetch_add(1, Ordering::Relaxed);
@@ -442,42 +378,42 @@ mod tests {
                 },
                 _ => false,
             });
-        subscriber::MockDispatch::run(subscriber);
 
+        Dispatch::to(subscriber).with(move || {
+            // Enter "foo" and then "bar". The dispatcher expects to see "bar" but
+            // not "foo."
+            let foo = span!("foo");
+            let bar = foo.clone().enter(|| {
+                let bar = span!("bar");
+                bar.clone().enter(|| { bar })
+            });
 
-        // Enter "foo" and then "bar". The dispatcher expects to see "bar" but
-        // not "foo."
-        let foo = span!("foo");
-        let bar = foo.clone().enter(|| {
-            let bar = span!("bar");
-            bar.clone().enter(|| { bar })
+            // The filter should have seen each span a single time.
+            assert_eq!(foo_count.load(Ordering::Relaxed), 1);
+            assert_eq!(bar_count.load(Ordering::Relaxed), 1);
+
+            foo.clone().enter(|| {
+                bar.clone().enter(|| { })
+            });
+
+            // The subscriber should see "bar" again, but the filter should not have
+            // been called.
+            assert_eq!(foo_count.load(Ordering::Relaxed), 1);
+            assert_eq!(bar_count.load(Ordering::Relaxed), 1);
+
+            // A different span with the same name has a different call site, so it
+            // should cause the filter to be reapplied.
+            let foo2 = span!("foo");
+            foo.clone().enter(|| { });
+            assert_eq!(foo_count.load(Ordering::Relaxed), 2);
+            assert_eq!(bar_count.load(Ordering::Relaxed), 1);
+
+            // But, the filter should not be re-evaluated for the new "foo" span
+            // when it is re-entered.
+            foo2.enter(|| { span!("bar").enter(|| { }) });
+            assert_eq!(foo_count.load(Ordering::Relaxed), 2);
+            assert_eq!(bar_count.load(Ordering::Relaxed), 2);
         });
-
-        // The filter should have seen each span a single time.
-        assert_eq!(foo_count.load(Ordering::Relaxed), 1);
-        assert_eq!(bar_count.load(Ordering::Relaxed), 1);
-
-        foo.clone().enter(|| {
-            bar.clone().enter(|| { })
-        });
-
-        // The subscriber should see "bar" again, but the filter should not have
-        // been called.
-        assert_eq!(foo_count.load(Ordering::Relaxed), 1);
-        assert_eq!(bar_count.load(Ordering::Relaxed), 1);
-
-        // A different span with the same name has a different call site, so it
-        // should cause the filter to be reapplied.
-        let foo2 = span!("foo");
-        foo.clone().enter(|| { });
-        assert_eq!(foo_count.load(Ordering::Relaxed), 2);
-        assert_eq!(bar_count.load(Ordering::Relaxed), 1);
-
-        // But, the filter should not be re-evaluated for the new "foo" span
-        // when it is re-entered.
-        foo2.enter(|| { span!("bar").enter(|| { }) });
-        assert_eq!(foo_count.load(Ordering::Relaxed), 2);
-        assert_eq!(bar_count.load(Ordering::Relaxed), 2);
     }
 
     #[test]
@@ -510,33 +446,32 @@ mod tests {
             .exit(span::mock().named(Some("bar")))
             .enter(span::mock().named(Some("foo")))
             .exit(span::mock().named(Some("foo")))
-            .to_subscriber()
+            .run()
             .with_filter(move |_meta| {
                 count2.fetch_add(1, Ordering::Relaxed);
                 true
             });
-        subscriber::MockDispatch::run(subscriber);
 
-        // Call the function once. The filter should be re-evaluated.
-        assert!(my_great_function());
-        assert_eq!(count.load(Ordering::Relaxed), 1);
+        Dispatch::to(subscriber).with(|| {
+            // Call the function once. The filter should be re-evaluated.
+            assert!(my_great_function());
+            assert_eq!(count.load(Ordering::Relaxed), 1);
 
-        // Call the function again. The cached result should be used.
-        assert!(my_great_function());
-        assert_eq!(count.load(Ordering::Relaxed), 1);
+            // Call the function again. The cached result should be used.
+            assert!(my_great_function());
+            assert_eq!(count.load(Ordering::Relaxed), 1);
 
-        assert!(my_other_function());
-        assert_eq!(count.load(Ordering::Relaxed), 2);
+            assert!(my_other_function());
+            assert_eq!(count.load(Ordering::Relaxed), 2);
 
-        assert!(my_great_function());
-        assert_eq!(count.load(Ordering::Relaxed), 2);
+            assert!(my_great_function());
+            assert_eq!(count.load(Ordering::Relaxed), 2);
 
-        assert!(my_other_function());
-        assert_eq!(count.load(Ordering::Relaxed), 2);
+            assert!(my_other_function());
+            assert_eq!(count.load(Ordering::Relaxed), 2);
 
-        assert!(my_great_function());
-        assert_eq!(count.load(Ordering::Relaxed), 2);
-
-
+            assert!(my_great_function());
+            assert_eq!(count.load(Ordering::Relaxed), 2);
+        });
     }
 }
