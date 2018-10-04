@@ -341,6 +341,105 @@ mod tests {
         });
     }
 
+
+    #[test]
+    fn filters_are_reevaluated_when_changing_subscribers() {
+        let foo_count = Arc::new(AtomicUsize::new(0));
+        let bar_count = Arc::new(AtomicUsize::new(0));
+
+        let foo_count1 = foo_count.clone();
+        let bar_count1 = bar_count.clone();
+        let subscriber1 = Dispatch::to(subscriber::mock()
+            .enter(span::mock().named(Some("bar")))
+            .exit(span::mock().named(Some("bar")))
+            .enter(span::mock().named(Some("bar")))
+            .exit(span::mock().named(Some("bar")))
+            .enter(span::mock().named(Some("bar")))
+            .exit(span::mock().named(Some("bar")))
+            .enter(span::mock().named(Some("bar")))
+            .exit(span::mock().named(Some("bar")))
+            .enter(span::mock().named(Some("bar")))
+            .exit(span::mock().named(Some("bar")))
+            .enter(span::mock().named(Some("bar")))
+            .exit(span::mock().named(Some("bar")))
+            .run()
+            .with_filter(move |meta| match meta.name {
+                Some("foo") => {
+                    foo_count1.fetch_add(1, Ordering::Relaxed);
+                    false
+                },
+                Some("bar") => {
+                    bar_count1.fetch_add(1, Ordering::Relaxed);
+                    true
+                },
+                _ => false,
+            }));
+
+        let foo_count2 = foo_count.clone();
+        let bar_count2 = bar_count.clone();
+        let subscriber2 = Dispatch::to(subscriber::mock()
+            .enter(span::mock().named(Some("foo")))
+            .exit(span::mock().named(Some("foo")))
+            .enter(span::mock().named(Some("foo")))
+            .exit(span::mock().named(Some("foo")))
+            .enter(span::mock().named(Some("foo")))
+            .exit(span::mock().named(Some("foo")))
+            .enter(span::mock().named(Some("foo")))
+            .exit(span::mock().named(Some("foo")))
+            .enter(span::mock().named(Some("foo")))
+            .exit(span::mock().named(Some("foo")))
+            .enter(span::mock().named(Some("foo")))
+            .exit(span::mock().named(Some("foo")))
+            .run()
+            .with_filter(move |meta| match meta.name {
+                Some("foo") => {
+                    foo_count2.fetch_add(1, Ordering::Relaxed);
+                    true
+                },
+                Some("bar") => {
+                    bar_count2.fetch_add(1, Ordering::Relaxed);
+                    false
+                },
+                _ => false,
+            }));
+
+
+        let do_test = move |n: usize| {
+            let foo = span!("foo");
+            let bar = foo.clone().enter(|| {
+                let bar = span!("bar");
+                bar.clone().enter(|| { bar })
+            });
+
+            assert_eq!(foo_count.load(Ordering::Relaxed), n);
+            assert_eq!(bar_count.load(Ordering::Relaxed), n);
+
+            foo.clone().enter(|| {
+                bar.clone().enter(|| { })
+            });
+
+            assert_eq!(foo_count.load(Ordering::Relaxed), n);
+            assert_eq!(bar_count.load(Ordering::Relaxed), n);
+        };
+
+        subscriber1.with(|| {
+            do_test(1);
+        });
+
+        subscriber2.with(|| {
+            do_test(2)
+        });
+
+        subscriber1.with(|| {
+            do_test(3)
+        });
+
+        subscriber2.with(|| {
+            do_test(4)
+        });
+
+    }
+
     #[test]
     fn filters_are_reevaluated_for_different_call_sites() {
         // Asserts that the `span!` macro caches the result of calling
