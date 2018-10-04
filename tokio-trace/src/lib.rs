@@ -180,21 +180,23 @@ macro_rules! cached_filter {
                     FILTERED.store(DISABLED, Ordering::Relaxed);
                 }
                 enabled
-            } else match FILTERED.load(Ordering::Relaxed) {
-                // If there's a cached result, use that.
-                ENABLED => true,
-                DISABLED => false,
-                // Otherwise, this span has not yet been filtered, so call
-                // `enabled` now and store the result.
-                _ => {
-                    let enabled = $dispatcher.enabled(&META);
-                    if enabled {
-                        FILTERED.store(ENABLED, Ordering::Relaxed);
-                    } else {
-                        FILTERED.store(DISABLED, Ordering::Relaxed);
-                    }
-                    enabled
-                },
+            } else {
+                match FILTERED.load(Ordering::Relaxed) {
+                    // If there's a cached result, use that.
+                    ENABLED => true,
+                    DISABLED => false,
+                    // Otherwise, this span has not yet been filtered, so call
+                    // `enabled` now and store the result.
+                    _ => {
+                        let enabled = $dispatcher.enabled(&META);
+                        if enabled {
+                            FILTERED.store(ENABLED, Ordering::Relaxed);
+                        } else {
+                            FILTERED.store(DISABLED, Ordering::Relaxed);
+                        }
+                        enabled
+                    },
+                }
             }
         }
     }
