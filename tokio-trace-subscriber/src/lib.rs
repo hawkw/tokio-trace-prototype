@@ -4,6 +4,7 @@ extern crate tokio_trace;
 use tokio_trace::{span, Event, Meta, SpanData};
 
 mod compose;
+pub use compose::Compose;
 
 /// The notification processing portion of the [`Subscriber`] trait.
 ///
