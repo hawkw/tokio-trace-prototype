@@ -419,7 +419,7 @@ impl fmt::Debug for Data {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Span")
             .field("name", &self.name())
-            .field("parent", &self.parent().unwrap_or(self).name())
+            .field("parent", &self.parent())
             .field("fields", &self.debug_fields())
             .field("meta", &self.meta())
             .finish()
