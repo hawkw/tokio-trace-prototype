@@ -3,11 +3,13 @@ extern crate tokio_trace;
 
 use tokio_trace::{span, Event, Meta, SpanData};
 
+mod compose;
+
 /// The notification processing portion of the [`Subscriber`] trait.
 ///
 /// Implementations of this trait describe the logic needed to process envent
 /// and span notifications, but don't implement filtering or span registration.
-pub trait Notify {
+pub trait Observe {
     fn observe_event<'event, 'meta: 'event>(&self, event: &'event Event<'event, 'meta>);
     fn enter(&self, span: &SpanData);
     fn exit(&self, span: &SpanData);
