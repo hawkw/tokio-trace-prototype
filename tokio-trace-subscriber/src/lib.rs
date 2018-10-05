@@ -8,9 +8,10 @@ mod compose;
 pub use compose::Composed;
 
 pub mod filter;
-pub use filter::FilterExt;
-
 pub mod observe;
+pub mod registry;
+
+pub use filter::FilterExt;
 pub use observe::ObserveExt;
 
 /// The notification processing portion of the [`Subscriber`] trait.
@@ -86,4 +87,13 @@ pub trait RegisterSpan {
     ///
     /// [span ID]: ../span/struct.Id.html
     fn new_span(&self, new_span: &span::NewSpan) -> span::Id;
+}
+
+impl<T> RegisterSpan for T
+where
+    T: Fn(&span::NewSpan) -> span::Id,
+{
+    fn new_span(&self, new_span: &span::NewSpan) -> span::Id {
+        self(new_span)
+    }
 }
