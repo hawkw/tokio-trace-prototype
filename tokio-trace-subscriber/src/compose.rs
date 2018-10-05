@@ -1,4 +1,4 @@
-use super::{Notify, RegisterSpan, Filter};
+use super::{Observe, RegisterSpan, Filter};
 use tokio_trace::{span, Subscriber, Meta, Event, SpanData};
 
 #[derive(Debug, Clone)]
@@ -24,13 +24,14 @@ impl<O, R> Composed<(), O, R> {
     /// Sets the [filter] to be used by the composed `Subscriber`.
     ///
     /// [filter]: ../trait.Filter.html
-    pub fn with_filter<F>(filter: F) -> Composed<F, O, R>
+    pub fn with_filter<F>(self, filter: F) -> Composed<F, O, R>
     where
         F: Filter,
     {
         Composed {
             filter,
-            ..self
+            observer: self.observer,
+            registry: self.registry,
         }
     }
 }
@@ -40,13 +41,14 @@ impl<F, R> Composed<F, (), R> {
     /// Sets the [observer] to be used by the composed `Subscriber`.
     ///
     /// [observer]: ../trait.Observe.html
-    pub fn with_observer<O>(observer: O) -> Composed<F, O, R>
+    pub fn with_observer<O>(self, observer: O) -> Composed<F, O, R>
     where
         O: Observe,
     {
         Composed {
+            filter: self.filter,
             observer,
-            ..self
+            registry: self.registry,
         }
     }
 }
@@ -55,13 +57,14 @@ impl<F, O> Composed<F, O, ()> {
     /// Sets the [span registry] to be used by the composed `Subscriber`.
     ///
     /// [span registry]: ../trait.Register.html
-    pub fn with_registry<R>(registry: R) -> Composed<F, O, R>
+    pub fn with_registry<R>(self, registry: R) -> Composed<F, O, R>
     where
-        R: Registry,
+        R: RegisterSpan,
     {
         Composed {
+            filter: self.filter,
+            observer: self.observer,
             registry,
-            ..self
         }
     }
 }
