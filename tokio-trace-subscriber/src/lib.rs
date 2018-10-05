@@ -10,6 +10,9 @@ pub use compose::Composed;
 pub mod filter;
 pub use filter::FilterExt;
 
+pub mod observe;
+pub use observe::ObserveExt;
+
 /// The notification processing portion of the [`Subscriber`] trait.
 ///
 /// Implementations of this trait describe the logic needed to process envent
