@@ -1,7 +1,6 @@
-use super::RegisterSpan;
 use tokio_trace::span::{NewSpan, Id};
 
-use std::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
+use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
 
 /// Registers new span IDs with an increasing `usize` counter.
 ///
