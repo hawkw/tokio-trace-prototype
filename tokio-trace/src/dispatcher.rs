@@ -2,12 +2,22 @@ use {span, subscriber::Subscriber, Event, SpanData, Meta};
 
 use std::{
     cell::RefCell,
+    collections::{
+        HashSet,
+        hash_map::DefaultHasher,
+    },
+    hash::{Hash, Hasher},
     fmt,
     sync::Arc,
 };
 
 thread_local! {
-    static CURRENT_DISPATCH: RefCell<Dispatch> = RefCell::new(Dispatch::none());
+    static CURRENT_DISPATCH: RefCell<Current> = RefCell::new(Dispatch::none().with_invalidate());
+}
+
+struct Current {
+    dispatch: Dispatch,
+    seen: HashSet<u64>,
 }
 
 #[derive(Clone)]
@@ -20,7 +30,7 @@ impl Dispatch {
 
     pub fn current() -> Dispatch {
         CURRENT_DISPATCH.with(|current| {
-            current.borrow().clone()
+            current.borrow().dispatch.clone()
         })
     }
 
@@ -33,14 +43,19 @@ impl Dispatch {
     }
 
     pub fn with<T>(&self, f: impl FnOnce() -> T) -> T {
-        let (prior, result) = CURRENT_DISPATCH.with(|current| {
-            let prior = current.replace(self.clone());
-            (prior, (f)())
-        });
-        CURRENT_DISPATCH.with(move |current| {
-            *current.borrow_mut() = prior;
-        });
-        result
+        CURRENT_DISPATCH.with(|current| {
+            let prior = current.replace(self.with_invalidate()).dispatch;
+            let result = f();
+            *current.borrow_mut() = prior.with_invalidate();
+            result
+        })
+    }
+
+    fn with_invalidate(&self) -> Current {
+        Current {
+            dispatch: self.clone(),
+            seen: HashSet::new(),
+        }
     }
 }
 
@@ -51,6 +66,22 @@ impl fmt::Debug for Dispatch {
 }
 
 impl Subscriber for Dispatch {
+    fn should_invalidate_filter(&self, metadata: &Meta) -> bool {
+        CURRENT_DISPATCH.with(|current| {
+            let mut hasher = DefaultHasher::new();
+            metadata.hash(&mut hasher);
+            let hash = hasher.finish();
+
+            if current.borrow().seen.contains(&hash) {
+                self.0.should_invalidate_filter(metadata)
+            } else {
+                current.borrow_mut().seen.insert(hash);
+                true
+            }
+        })
+
+    }
+
     #[inline]
     fn enabled(&self, metadata: &Meta) -> bool {
         self.0.enabled(metadata)
