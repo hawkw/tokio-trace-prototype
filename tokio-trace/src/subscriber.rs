@@ -229,7 +229,7 @@ mod test_support {
         }
 
         fn enter(&self, span: &SpanData) {
-            println!("+ {}: {:?}", thread::current().name().unwrap_or("unknown thread"), span);
+            // println!("+ {}: {:?}", thread::current().name().unwrap_or("unknown thread"), span);
             match self.expected.lock().unwrap().pop_front() {
                 None => {},
                 Some(Expect::Event(_)) => panic!("expected an event, but entered span {:?} instead", span.name()),
@@ -250,7 +250,7 @@ mod test_support {
         }
 
         fn exit(&self, span: &SpanData) {
-            println!("- {}: {:?}", thread::current().name().unwrap_or("unknown_thread"), span);
+            // println!("- {}: {:?}", thread::current().name().unwrap_or("unknown_thread"), span);
             match self.expected.lock().unwrap().pop_front() {
                 None => {},
                 Some(Expect::Event(_)) => panic!("expected an event, but exited span {:?} instead", span.name()),
@@ -277,11 +277,16 @@ mod tests {
     use ::{
         span,
         subscriber::{self, Subscriber},
+        Span,
         Dispatch,
     };
-    use std::sync::{
-        Arc,
-        atomic::{AtomicUsize, Ordering},
+    use std::{
+        thread,
+        sync::{
+            Arc,
+            Barrier,
+            atomic::{AtomicUsize, Ordering},
+        },
     };
 
     #[test]
@@ -437,7 +442,82 @@ mod tests {
         subscriber2.with(|| {
             do_test(4)
         });
+    }
 
+    #[test]
+    fn filters_evaluated_across_threads() {
+        fn do_test() -> Span {
+            let foo = span!("foo");
+            let bar = foo.clone().enter(|| {
+                let bar = span!("bar");
+                bar.clone().enter(|| { bar })
+            });
+
+            foo.enter(|| {
+                bar.clone().enter(|| { })
+            });
+
+            bar.clone()
+        }
+
+        let barrier = Arc::new(Barrier::new(2));
+
+        let barrier1 = barrier.clone();
+        let thread1 = thread::spawn(move || {
+            let subscriber = subscriber::mock()
+                .enter(span::mock().named(Some("bar")))
+                .exit(span::mock().named(Some("bar")))
+                .enter(span::mock().named(Some("bar")))
+                .exit(span::mock().named(Some("bar")))
+                .enter(span::mock().named(Some("bar")))
+                .exit(span::mock().named(Some("bar")))
+                .enter(span::mock().named(Some("bar")))
+                .exit(span::mock().named(Some("bar")))
+                .enter(span::mock().named(Some("bar")))
+                .exit(span::mock().named(Some("bar")))
+                .run()
+                .with_filter(|meta| match meta.name {
+                    Some("bar") => true,
+                    _ => false,
+                });
+            // barrier1.wait();
+            let subscriber = Dispatch::to(subscriber);
+            subscriber.with(do_test);
+            barrier1.wait();
+            subscriber.with(do_test)
+        });
+
+        let thread2 = thread::spawn(move || {
+            let subscriber = subscriber::mock()
+                .enter(span::mock().named(Some("foo")))
+                .exit(span::mock().named(Some("foo")))
+                .enter(span::mock().named(Some("foo")))
+                .exit(span::mock().named(Some("foo")))
+                .enter(span::mock().named(Some("foo")))
+                .exit(span::mock().named(Some("foo")))
+                .enter(span::mock().named(Some("foo")))
+                .exit(span::mock().named(Some("foo")))
+                .enter(span::mock().named(Some("foo")))
+                .exit(span::mock().named(Some("foo")))
+                .run()
+                .with_filter(move |meta| match meta.name {
+                    Some("foo") => true,
+                    _ => false,
+                });
+            let subscriber = Dispatch::to(subscriber);
+            subscriber.with(do_test);
+            barrier.wait();
+            subscriber.with(do_test)
+        });
+
+        // the threads have completed, but the spans should still notify their
+        // parent subscribers.
+
+        let bar = thread1.join().unwrap();
+        bar.enter(|| { });
+
+        let bar = thread2.join().unwrap();
+        bar.enter(|| { });
     }
 
     #[test]
