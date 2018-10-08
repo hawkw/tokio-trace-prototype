@@ -32,6 +32,9 @@ pub trait FilterExt: Filter {
 }
 
 #[derive(Debug, Clone)]
+pub struct NoFilter;
+
+#[derive(Debug, Clone)]
 pub struct And<A, B> {
     a: A,
     b: B,
@@ -97,7 +100,7 @@ impl Sample {
 }
 
 impl Filter for Sample {
-    fn enabled(&self, metadata: &Meta) -> bool {
+    fn enabled(&self, _metadata: &Meta) -> bool {
         // TODO: it would be nice to be able to have a definition of sampling
         // that also enables all the children of a sampled span...figure that out.
         let current = self.count.fetch_add(1, Ordering::Acquire);
@@ -109,10 +112,20 @@ impl Filter for Sample {
         }
     }
 
-    fn should_invalidate_filter(&self, metadata: &Meta) -> bool {
+    fn should_invalidate_filter(&self, _metadata: &Meta) -> bool {
         // The filter _needs_ to be re-evaluated every time, or else the counter
         // won't be updated.
         true
+    }
+}
+
+impl Filter for NoFilter {
+    fn enabled(&self, _metadata: &Meta) -> bool {
+        true
+    }
+
+    fn should_invalidate_filter(&self, _metadata: &Meta) -> bool {
+        false
     }
 }
 

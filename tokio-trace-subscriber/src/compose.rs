@@ -92,11 +92,11 @@ where
     R: RegisterSpan,
 {
     fn enabled(&self, metadata: &Meta) -> bool {
-        self.filter.enabled(metadata) && self.observer.enabled(metadata)
+        self.filter.enabled(metadata) && self.observer.filter().enabled(metadata)
     }
 
     fn should_invalidate_filter(&self, metadata: &Meta) -> bool {
-        self.filter.should_invalidate_filter(metadata) || self.observer.should_invalidate_filter(metadata)
+        self.filter.should_invalidate_filter(metadata) || self.observer.filter().should_invalidate_filter(metadata)
     }
 
     fn new_span(&self, new_span: &span::NewSpan) -> span::Id {

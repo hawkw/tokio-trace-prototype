@@ -18,10 +18,14 @@ pub use observe::ObserveExt;
 ///
 /// Implementations of this trait describe the logic needed to process envent
 /// and span notifications, but don't implement span registration.
-pub trait Observe: Filter {
+pub trait Observe {
     fn observe_event<'event, 'meta: 'event>(&self, event: &'event Event<'event, 'meta>);
     fn enter(&self, span: &SpanData);
     fn exit(&self, span: &SpanData);
+
+    fn filter(&self) -> &dyn Filter {
+        &filter::NoFilter
+    }
 }
 
 /// The filtering portion of the [`Subscriber`] trait.
