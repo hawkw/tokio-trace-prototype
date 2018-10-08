@@ -51,6 +51,46 @@ pub trait Filter {
 pub trait FilterExt: Filter {
     /// Construct a new `Filter` that enables a span or event if both `self`
     /// *AND* `other` consider it enabled.
+    ///
+    /// For example:
+    /// ```
+    /// #[macro_use]
+    /// extern crate tokio_trace;
+    /// extern crate tokio_trace_subscriber;
+    /// use tokio_trace_subscriber::{Filter, FilterExt};
+    /// # use tokio_trace::{Level, Meta};
+    /// # fn main() {
+    /// fn foo() {
+    ///     // This span will not be enabled.
+    ///     span!("foo").enter(|| { })
+    /// }
+    ///
+    /// pub mod my_module {
+    ///     pub fn foo() {
+    ///         // This span will be enabled.
+    ///         span!("foo").enter(|| { })
+    ///     }
+    ///
+    ///     pub fn bar() {
+    ///         // This span will not enabled.
+    ///         span!("foo").enter(|| { })
+    ///     }
+    /// }
+    ///
+    /// let name_filter = |meta: &Meta| { meta.name == Some("foo") };
+    /// let mod_filter = |meta: &Meta| { meta.module_path == "my_module" };
+    ///
+    /// let subscriber = tokio_trace_subscriber::Composed::builder()
+    ///     .with_registry(tokio_trace_subscriber::registry::increasing_counter)
+    ///     .with_filter(name_filter.and(mod_filter));
+    ///
+    /// tokio_trace::Dispatch::to(subscriber).with(|| {
+    ///     foo();
+    ///     my_module::foo();
+    ///     my_module::bar();
+    /// })
+    /// #}
+    /// ```
     fn and<B>(self, other: B) -> And<Self, B>
     where
         B: Filter + Sized,
@@ -98,11 +138,15 @@ pub struct Sample {
     count: AtomicUsize,
 }
 
+/// A filter that enables all spans and events, except those originating
+/// from a specified set of module paths.
 #[derive(Debug)]
 pub struct ModuleBlacklist {
     modules: HashSet<String>,
 }
 
+/// A filter that enables only spans and events originating from a specified
+/// set of module paths.
 #[derive(Debug)]
 pub struct ModuleWhitelist {
     modules: HashSet<String>,
@@ -121,7 +165,7 @@ where
     }
 }
 
-/// Returns a filter that enables only  spans and events originating from a
+/// Returns a filter that enables only spans and events originating from a
 /// specified set of module paths.
 pub fn module_whitelist<I>(modules: I) -> ModuleWhitelist
 where
