@@ -1,7 +1,10 @@
 use super::Filter;
 use tokio_trace::Meta;
 
-use std::sync::atomic::{Ordering, AtomicUsize};
+use std::{
+    collections::HashSet,
+    sync::atomic::{Ordering, AtomicUsize},
+};
 
 pub trait FilterExt: Filter {
     /// Construct a new `Filter` that enables a span or event if both `self`
@@ -51,6 +54,42 @@ pub struct Or<A, B> {
 pub struct Sample {
     every: usize,
     count: AtomicUsize,
+}
+
+#[derive(Debug)]
+pub struct ModuleBlacklist {
+    modules: HashSet<String>,
+}
+
+#[derive(Debug)]
+pub struct ModuleWhitelist {
+    modules: HashSet<String>,
+}
+
+/// Returns a filter that enables all spans and events, except those originating
+/// from a specified set of module paths.
+pub fn module_blacklist<I>(modules: I) -> ModuleBlacklist
+where
+    I: IntoIterator,
+    String: From<<I as IntoIterator>::Item>,
+{
+    let modules = modules.into_iter().map(String::from).collect();
+    ModuleBlacklist {
+        modules,
+    }
+}
+
+/// Returns a filter that enables only  spans and events originating from a
+/// specified set of module paths.
+pub fn module_whitelist<I>(modules: I) -> ModuleWhitelist
+where
+    I: IntoIterator,
+    String: From<<I as IntoIterator>::Item>,
+{
+    let modules = modules.into_iter().map(String::from).collect();
+    ModuleWhitelist {
+        modules,
+    }
 }
 
 impl<A, B> Filter for And<A, B>
@@ -122,6 +161,26 @@ impl Filter for Sample {
 impl Filter for NoFilter {
     fn enabled(&self, _metadata: &Meta) -> bool {
         true
+    }
+
+    fn should_invalidate_filter(&self, _metadata: &Meta) -> bool {
+        false
+    }
+}
+
+impl Filter for ModuleBlacklist {
+    fn enabled(&self, metadata: &Meta) -> bool {
+        !self.modules.contains(metadata.module_path)
+    }
+
+    fn should_invalidate_filter(&self, _metadata: &Meta) -> bool {
+        false
+    }
+}
+
+impl Filter for ModuleWhitelist {
+    fn enabled(&self, metadata: &Meta) -> bool {
+        self.modules.contains(metadata.module_path)
     }
 
     fn should_invalidate_filter(&self, _metadata: &Meta) -> bool {
