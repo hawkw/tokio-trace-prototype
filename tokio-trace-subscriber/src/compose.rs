@@ -1,4 +1,4 @@
-use super::{Observe, RegisterSpan, Filter};
+use ::{filter::NoFilter, observe::NoObserver, Observe, RegisterSpan, Filter};
 use tokio_trace::{span, Subscriber, Meta, Event, SpanData};
 
 #[derive(Debug, Clone)]
@@ -8,19 +8,19 @@ pub struct Composed<F, O, R> {
     registry: R,
 }
 
-impl Composed<(), (), ()> {
+impl Composed<NoFilter, NoObserver, ()> {
     /// Returns a new instance of `Composed` which can be built using the
     /// [`with_filter`], [`with_observer`], and [`with_registry`] methods.
     pub fn builder() -> Self {
         Composed {
-            filter: (),
-            observer: (),
+            filter: NoFilter,
+            observer: NoObserver,
             registry: (),
         }
     }
 }
 
-impl<O, R> Composed<(), O, R> {
+impl<O, R> Composed<NoFilter, O, R> {
     /// Sets the [filter] to be used by the composed `Subscriber`.
     ///
     /// [filter]: ../trait.Filter.html
@@ -37,7 +37,7 @@ impl<O, R> Composed<(), O, R> {
 }
 
 
-impl<F, R> Composed<F, (), R> {
+impl<F, R> Composed<F, NoObserver, R> {
     /// Sets the [observer] to be used by the composed `Subscriber`.
     ///
     /// [observer]: ../trait.Observe.html
