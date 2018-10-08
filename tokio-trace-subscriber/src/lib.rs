@@ -101,3 +101,18 @@ where
         self(new_span)
     }
 }
+
+impl<F> Filter for F
+where
+    F: for<'a, 'b> Fn(&'a Meta<'b>) -> bool,
+{
+    fn enabled(&self, meta: &Meta) -> bool {
+        self(meta)
+    }
+
+    fn should_invalidate_filter(&self, _: &Meta) -> bool {
+        // Since this implementation is for immutable closures only, we can
+        // treat these functions as stateless and assume they remain valid.
+        false
+    }
+}
