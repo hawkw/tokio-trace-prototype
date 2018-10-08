@@ -1,5 +1,5 @@
-use ::{filter::NoFilter, observe::NoObserver, Observe, RegisterSpan, Filter};
-use tokio_trace::{span, Subscriber, Meta, Event, SpanData};
+use tokio_trace::{span, Event, Meta, SpanData, Subscriber};
+use {filter::NoFilter, observe::NoObserver, Filter, Observe, RegisterSpan};
 
 #[derive(Debug, Clone)]
 pub struct Composed<F, O, R> {
@@ -35,7 +35,6 @@ impl<O, R> Composed<NoFilter, O, R> {
         }
     }
 }
-
 
 impl<F, R> Composed<F, NoObserver, R> {
     /// Sets the [observer] to be used by the composed `Subscriber`.
@@ -96,7 +95,8 @@ where
     }
 
     fn should_invalidate_filter(&self, metadata: &Meta) -> bool {
-        self.filter.should_invalidate_filter(metadata) || self.observer.filter().should_invalidate_filter(metadata)
+        self.filter.should_invalidate_filter(metadata)
+            || self.observer.filter().should_invalidate_filter(metadata)
     }
 
     fn new_span(&self, new_span: &span::NewSpan) -> span::Id {

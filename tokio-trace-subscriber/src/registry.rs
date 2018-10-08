@@ -1,6 +1,6 @@
-use tokio_trace::span::{NewSpan, Id};
+use tokio_trace::span::{Id, NewSpan};
 
-use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 
 /// The span registration portion of the [`Subscriber`] trait.
 ///

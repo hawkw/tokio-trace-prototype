@@ -1,5 +1,5 @@
 use filter::{self, Filter};
-use tokio_trace::{Event, SpanData, Meta};
+use tokio_trace::{Event, Meta, SpanData};
 
 /// The notification processing portion of the [`Subscriber`] trait.
 ///
@@ -56,7 +56,7 @@ pub trait ObserveExt: Observe {
     fn tee_to<I>(self, other: I) -> Tee<Self, I::Observer>
     where
         I: IntoObserver,
-        Self: Sized
+        Self: Sized,
     {
         Tee {
             a: self,
@@ -132,7 +132,7 @@ pub trait ObserveExt: Observe {
     {
         WithFilter {
             inner: self,
-            filter
+            filter,
         }
     }
 }
@@ -219,7 +219,7 @@ pub struct Tee<A, B> {
 #[derive(Debug, Clone)]
 pub struct WithFilter<O, F> {
     inner: O,
-    filter: F
+    filter: F,
 }
 
 impl<O, F> Filter for WithFilter<O, F>
@@ -234,8 +234,8 @@ where
 
     #[inline]
     fn should_invalidate_filter(&self, metadata: &Meta) -> bool {
-         self.filter.should_invalidate_filter(metadata) ||
-         self.inner.filter().should_invalidate_filter(metadata)
+        self.filter.should_invalidate_filter(metadata)
+            || self.inner.filter().should_invalidate_filter(metadata)
     }
 }
 
@@ -268,10 +268,7 @@ pub fn none() -> NoObserver {
     NoObserver
 }
 
-impl<T> ObserveExt for T
-where
-    T: Observe,
-{ }
+impl<T> ObserveExt for T where T: Observe {}
 
 impl<T> IntoObserver for T
 where
@@ -319,8 +316,8 @@ where
     }
 
     fn should_invalidate_filter(&self, metadata: &Meta) -> bool {
-        self.a.filter().should_invalidate_filter(metadata) ||
-        self.b.filter().should_invalidate_filter(metadata)
+        self.a.filter().should_invalidate_filter(metadata)
+            || self.b.filter().should_invalidate_filter(metadata)
     }
 }
 
@@ -372,11 +369,11 @@ where
 }
 
 impl Observe for NoObserver {
-    fn observe_event<'event, 'meta: 'event>(&self, _event: &'event Event<'event, 'meta>) { }
+    fn observe_event<'event, 'meta: 'event>(&self, _event: &'event Event<'event, 'meta>) {}
 
-    fn enter(&self, _span: &SpanData) { }
+    fn enter(&self, _span: &SpanData) {}
 
-    fn exit(&self, _span: &SpanData) { }
+    fn exit(&self, _span: &SpanData) {}
 
     fn filter(&self) -> &dyn Filter {
         self

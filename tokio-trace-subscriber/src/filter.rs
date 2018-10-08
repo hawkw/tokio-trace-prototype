@@ -2,7 +2,7 @@ use tokio_trace::Meta;
 
 use std::{
     collections::HashSet,
-    sync::atomic::{Ordering, AtomicUsize},
+    sync::atomic::{AtomicUsize, Ordering},
 };
 
 /// The filtering portion of the [`Subscriber`] trait.
@@ -94,12 +94,9 @@ pub trait FilterExt: Filter {
     fn and<B>(self, other: B) -> And<Self, B>
     where
         B: Filter + Sized,
-        Self: Sized
+        Self: Sized,
     {
-        And {
-            a: self,
-            b: other,
-        }
+        And { a: self, b: other }
     }
 
     /// Construct a new `Filter` that enables a span or event if either `self`
@@ -107,12 +104,9 @@ pub trait FilterExt: Filter {
     fn or<B>(self, other: B) -> Or<Self, B>
     where
         B: Filter + Sized,
-        Self: Sized
+        Self: Sized,
     {
-        Or {
-            a: self,
-            b: other,
-        }
+        Or { a: self, b: other }
     }
 }
 
@@ -160,9 +154,7 @@ where
     String: From<<I as IntoIterator>::Item>,
 {
     let modules = modules.into_iter().map(String::from).collect();
-    ModuleBlacklist {
-        modules,
-    }
+    ModuleBlacklist { modules }
 }
 
 /// Returns a filter that enables only spans and events originating from a
@@ -173,9 +165,7 @@ where
     String: From<<I as IntoIterator>::Item>,
 {
     let modules = modules.into_iter().map(String::from).collect();
-    ModuleWhitelist {
-        modules,
-    }
+    ModuleWhitelist { modules }
 }
 
 impl<F> Filter for F
@@ -207,8 +197,7 @@ where
         // actual filter result, not whether or not the filter needs to be
         // invalidated. If either of the composed filters requests its cached
         // results be invalidated, we need to honor that.
-        self.a.should_invalidate_filter(metadata) ||
-        self.b.should_invalidate_filter(metadata)
+        self.a.should_invalidate_filter(metadata) || self.b.should_invalidate_filter(metadata)
     }
 }
 
@@ -222,8 +211,7 @@ where
     }
 
     fn should_invalidate_filter(&self, metadata: &Meta) -> bool {
-        self.a.should_invalidate_filter(metadata) ||
-        self.b.should_invalidate_filter(metadata)
+        self.a.should_invalidate_filter(metadata) || self.b.should_invalidate_filter(metadata)
     }
 }
 
@@ -259,7 +247,6 @@ impl Filter for Sample {
     }
 }
 
-
 impl Filter for NoFilter {
     fn enabled(&self, _metadata: &Meta) -> bool {
         true
@@ -290,7 +277,4 @@ impl Filter for ModuleWhitelist {
     }
 }
 
-impl<F> FilterExt for F
-where
-    F: Filter
-{ }
+impl<F> FilterExt for F where F: Filter {}
