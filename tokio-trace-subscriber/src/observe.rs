@@ -24,6 +24,7 @@ pub trait ObserveExt: Observe {
     /// ```
     /// #[macro_use]
     /// extern crate tokio_trace;
+    /// extern crate tokio_trace_log;
     /// extern crate tokio_trace_subscriber;
     /// use tokio_trace_subscriber::{registry, filter, Observe, ObserveExt};
     /// # use tokio_trace::{Level, Meta};

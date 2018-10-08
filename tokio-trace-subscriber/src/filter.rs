@@ -88,8 +88,9 @@ pub trait FilterExt: Filter {
     ///     foo();
     ///     my_module::foo();
     ///     my_module::bar();
-    /// })
-    /// #}
+    /// });
+    ///
+    /// # }
     /// ```
     fn and<B>(self, other: B) -> And<Self, B>
     where
