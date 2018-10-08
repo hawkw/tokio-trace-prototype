@@ -5,3 +5,6 @@ authors = ["Eliza Weisman <eliza@buoyant.io>"]
 
 [dependencies]
 tokio-trace = { path = "../tokio-trace" }
+
+[dev-dependencies]
+tokio-trace-log = { path = "../tokio-trace-log" }
