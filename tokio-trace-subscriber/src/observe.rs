@@ -14,7 +14,15 @@ pub trait ObserveExt: Observe {
         }
     }
 
-    /// Construct a new observer that filters events with the given `filter`.
+    /// Composes `self` with a [`Filter`].
+    ///
+    /// This function is intended to be used with composing observers from
+    /// external crates with user-defined filters, so that the resulting
+    /// observer is [`enabled`] only for a subset of the events and spans for
+    /// which the original observer would be enabled.
+    ///
+    /// [`Filter`]: ../trait.Filter.html
+    /// [`enabled`]: ../trait.Filter.html#tymethod.enabled
     fn with_filter<F>(self, filter: F) -> WithFilter<Self, F>
     where
         F: Filter,
@@ -214,11 +222,11 @@ impl Observe for NoObserver {
 }
 
 impl Filter for NoObserver {
-    fn enabled(&self, metadata: &Meta) -> bool {
+    fn enabled(&self, _metadata: &Meta) -> bool {
         false
     }
 
-    fn should_invalidate_filter(&self, metadata: &Meta) -> bool {
+    fn should_invalidate_filter(&self, _metadata: &Meta) -> bool {
         false
     }
 }
