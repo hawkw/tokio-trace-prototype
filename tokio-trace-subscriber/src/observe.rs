@@ -13,6 +13,18 @@ pub trait ObserveExt: Observe {
             b: other.into_observer(),
         }
     }
+
+    /// Construct a new observer that filters events with the given `filter`.
+    fn with_filter<F>(self, filter: F) -> WithFilter<S, F>
+    where
+        F: Filter,
+        Self: Sized,
+    {
+        WithFilter {
+            inner: self,
+            filter
+        }
+    }
 }
 
 pub trait IntoObserver {
@@ -32,6 +44,48 @@ pub enum Either<A, B> {
 pub struct Tee<A, B> {
     a: A,
     b: B,
+}
+
+#[derive(Debug, Clone)]
+pub struct WithFilter<O, F> {
+    inner: O,
+    filter: F
+}
+
+impl<O, F> Filter for WithFilter<O, F>
+where
+    O: Observe,
+    F: Filter,
+{
+    #[inline]
+    fn enabled(&self, metadata: &Meta) -> bool {
+        self.filter.enabled(metadata) && self.inner.enabled(metadata)
+    }
+
+    #[inline]
+    fn new_span(&self, new_span: &span::NewSpan) -> span::Id {
+        self.inner.new_span(&new_span)
+    }
+}
+
+impl<O, F> Filter for WithFilter<O, F>
+where
+    O: Observe,
+{
+    #[inline]
+    fn observe_event<'event, 'meta: 'event>(&self, event: &'event Event<'event, 'meta>) {
+        self.inner.observe_event(event)
+    }
+
+    #[inline]
+    fn enter(&self, span: &SpanData) {
+        self.inner.enter(span)
+    }
+
+    #[inline]
+    fn exit(&self, span: &SpanData) {
+        self.inner.exit(span)
+    }
 }
 
 pub fn none() -> NoObserver {
@@ -75,6 +129,21 @@ where
     }
 }
 
+impl<A, B> Filter for Tee<A, B>
+where
+    A: Filter,
+    B: Filter,
+{
+    fn enabled(&self, metadata: &Meta) -> bool {
+        self.a.enabled(metadata) || self.b.enabled(metadata)
+    }
+
+    fn should_invalidate_filter(&self, metadata: &Meta) -> bool {
+        self.a.should_invalidate_filter(metadata) ||
+        self.b.should_invalidate_filter(metadata)
+    }
+}
+
 impl<A, B> Observe for Either<A, B>
 where
     A: Observe,
@@ -102,10 +171,40 @@ where
     }
 }
 
+impl<A, B> Filter for Either<A, B>
+where
+    A: Filter,
+    B: Filter,
+{
+    fn enabled(&self, metadata: &Meta) -> bool {
+        match self {
+            Either::A(a) => a.enabled(metadata),
+            Either::B(b) => b.enabled(metadata),
+        }
+    }
+
+    fn should_invalidate_filter(&self, metadata: &Meta) -> bool {
+        match self {
+            Either::A(a) => a.should_invalidate_filter(metadata),
+            Either::B(b) => b.should_invalidate_filter(metadata),
+        }
+    }
+}
+
 impl Observe for NoObserver {
     fn observe_event<'event, 'meta: 'event>(&self, _event: &'event Event<'event, 'meta>) { }
 
     fn enter(&self, _span: &SpanData) { }
 
     fn exit(&self, _span: &SpanData) { }
+}
+
+impl Filter for NoObserver {
+    fn enabled(&self, metadata: &Meta) -> bool {
+        false
+    }
+
+    fn should_invalidate_filter(&self, metadata: &Meta) -> bool {
+        false
+    }
 }

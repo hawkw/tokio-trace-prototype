@@ -92,15 +92,15 @@ where
     R: RegisterSpan,
 {
     fn enabled(&self, metadata: &Meta) -> bool {
-        self.filter.enabled(metadata)
+        self.filter.enabled(metadata) && self.observer.enabled(metadata)
+    }
+
+    fn should_invalidate_filter(&self, metadata: &Meta) -> bool {
+        self.filter.should_invalidate_filter(metadata) || self.observer.should_invalidate_filter(metadata)
     }
 
     fn new_span(&self, new_span: &span::NewSpan) -> span::Id {
         self.registry.new_span(new_span)
-    }
-
-    fn should_invalidate_filter(&self, metadata: &Meta) -> bool {
-        self.filter.should_invalidate_filter(metadata)
     }
 
     fn observe_event<'event, 'meta: 'event>(&self, event: &'event Event<'event, 'meta>) {

@@ -4,7 +4,6 @@ use tokio_trace::Meta;
 use std::sync::atomic::{Ordering, AtomicUsize};
 
 pub trait FilterExt: Filter {
-
     /// Construct a new `Filter` that enables a span or event if both `self`
     /// *AND* `other` consider it enabled.
     fn and<B>(self, other: B) -> And<Self, B>
