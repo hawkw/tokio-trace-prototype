@@ -1,6 +1,22 @@
-use ::{Observe, Filter};
+use filter::{self, Filter};
 use tokio_trace::{Event, SpanData, Meta};
 
+/// The notification processing portion of the [`Subscriber`] trait.
+///
+/// Implementations of this trait describe the logic needed to process envent
+/// and span notifications, but don't implement span registration.
+pub trait Observe {
+    fn observe_event<'event, 'meta: 'event>(&self, event: &'event Event<'event, 'meta>);
+    fn enter(&self, span: &SpanData);
+    fn exit(&self, span: &SpanData);
+
+    fn filter(&self) -> &dyn Filter {
+        &filter::NoFilter
+    }
+}
+
+/// Extension trait providing combinators and helper methods for working with
+/// instances of `Observe`.
 pub trait ObserveExt: Observe {
     /// Construct a new observer that sends events to both `self` and `other`.
     ///
@@ -61,7 +77,7 @@ pub trait ObserveExt: Observe {
     /// extern crate tokio_trace;
     /// extern crate tokio_trace_subscriber;
     /// use tokio_trace_subscriber::{registry, Observe, ObserveExt};
-    /// # use tokio_trace_subscriber::{Filter, filter::NoFilter};
+    /// # use tokio_trace_subscriber::filter::{Filter, NoFilter};
     /// # use tokio_trace::{Level, Meta, Event, SpanData};
     /// # fn main() {
     ///
@@ -140,7 +156,7 @@ pub struct NoObserver;
 /// # extern crate tokio_trace;
 /// extern crate tokio_trace_subscriber;
 /// use tokio_trace_subscriber::{observe, Observe};
-/// # use tokio_trace_subscriber::{Filter, filter::NoFilter};
+/// # use tokio_trace_subscriber::filter::{Filter, NoFilter};
 /// # use tokio_trace::{Event, SpanData};
 /// # fn main() {}
 ///

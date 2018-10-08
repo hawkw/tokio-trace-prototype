@@ -1,4 +1,3 @@
-use super::Filter;
 use tokio_trace::Meta;
 
 use std::{
@@ -6,6 +5,49 @@ use std::{
     sync::atomic::{Ordering, AtomicUsize},
 };
 
+/// The filtering portion of the [`Subscriber`] trait.
+///
+/// Implementations of this trait represent _just_ the logic necessary to filter
+/// events and spans, but none of the processing or registration logic.
+pub trait Filter {
+    /// Determines if a span or event with the specified metadata would be recorded.
+    ///
+    /// This is used by the dispatcher to avoid allocating for span construction
+    /// if the span would be discarded anyway.
+    fn enabled(&self, metadata: &Meta) -> bool;
+
+    /// Returns `true` if the cached result to a call to `enabled` for a span
+    /// with the given metadata is still valid.
+    ///
+    /// By default, this function assumes that cached filter results will remain
+    /// valid, but should be overridden when this is not the case.
+    ///
+    /// If this returns `false`, then the prior value may be used.
+    /// `Subscriber`s which require their filters to be run every time an event
+    /// occurs or a span is entered/exited should always return `true`.
+    ///
+    /// For example, suppose a sampling subscriber is implemented by incrementing a
+    /// counter every time `enabled` is called and only returning `true` when
+    /// the counter is divisible by a specified sampling rate. If that
+    /// subscriber returns `false` from `should_invalidate_filter`, then the
+    /// filter will not be re-evaluated once it has been applied to a given set
+    /// of metadata. Thus, the counter will not be incremented, and the span or
+    /// event that correspands to the metadata will never be `enabled`.
+    ///
+    /// Similarly, if a `Subscriber` has a filtering strategy that can be
+    /// changed dynamically at runtime, it would need to invalidate any cached
+    /// filter results when the filtering rules change.
+    ///
+    /// A subscriber which manages fanout to multiple other subscribers should
+    /// proxy this decision to all of its child subscribers, returning `false`
+    /// only if _all_ such children return `false`. If the set of subscribers to
+    /// which spans are broadcast may change dynamically, adding a new
+    /// subscriber should also invalidate cached filters.
+    fn should_invalidate_filter(&self, metadata: &Meta) -> bool;
+}
+
+/// Extension trait providing combinators and helper methods for working with
+/// instances of `Filter`.
 pub trait FilterExt: Filter {
     /// Construct a new `Filter` that enables a span or event if both `self`
     /// *AND* `other` consider it enabled.
@@ -92,6 +134,21 @@ where
     }
 }
 
+impl<F> Filter for F
+where
+    F: for<'a, 'b> Fn(&'a Meta<'b>) -> bool,
+{
+    fn enabled(&self, meta: &Meta) -> bool {
+        self(meta)
+    }
+
+    fn should_invalidate_filter(&self, _: &Meta) -> bool {
+        // Since this implementation is for immutable closures only, we can
+        // treat these functions as stateless and assume they remain valid.
+        false
+    }
+}
+
 impl<A, B> Filter for And<A, B>
 where
     A: Filter,
@@ -157,6 +214,7 @@ impl Filter for Sample {
         true
     }
 }
+
 
 impl Filter for NoFilter {
     fn enabled(&self, _metadata: &Meta) -> bool {
