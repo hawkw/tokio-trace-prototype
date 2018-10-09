@@ -384,13 +384,7 @@ impl Data {
 
     /// Returns the current [`State`] of this span.
     pub fn state(&self) -> State {
-        match self.inner.state.load(Ordering::Acquire) {
-            s if s == State::Unentered as usize => State::Unentered,
-            s if s == State::Running as usize => State::Running,
-            s if s == State::Idle as usize => State::Idle,
-            s if s == State::Done as usize => State::Done,
-            invalid => panic!("invalid state: {:?}", invalid),
-        }
+        self.inner.state()
     }
 
     /// Returns the span's identifier.
@@ -571,7 +565,7 @@ impl Active {
     }
 
     fn enter<F: FnOnce() -> T, T>(self, f: F) -> T {
-        let prior_state = self.inner.data.state();
+        let prior_state = self.state();
         match prior_state {
             // The span has been marked as done; it may not be reentered again.
             // TODO: maybe this should not crash the thread?
@@ -580,7 +574,7 @@ impl Active {
                 let result = CURRENT_SPAN.with(|current_span| {
                     self.inner.transition_on_enter(prior_state);
                     current_span.replace(Some(self.clone()));
-                    self.inner.subscriber.enter(self.data());
+                    self.inner.subscriber.enter(self.id(), self.state());
                     f()
                 });
 
@@ -597,7 +591,7 @@ impl Active {
                         State::Idle
                     };
                     self.inner.transition_on_exit(next_state);
-                    self.inner.subscriber.exit(self.data());
+                    self.inner.subscriber.exit(self.id(), self.state());
                 });
                 result
             }
@@ -614,6 +608,14 @@ impl Active {
     /// Used to determine when the span can be marked as completed.
     fn is_last_standing(&self) -> bool {
         Arc::strong_count(&self.inner) == 1
+    }
+
+    fn id(&self) -> Id {
+        self.data().id()
+    }
+
+    fn state(&self) -> State {
+        self.data().state()
     }
 }
 
@@ -655,6 +657,20 @@ impl Hash for ActiveInner {
 }
 
 // ===== impl DataInner =====
+
+impl DataInner {
+
+    /// Returns the current [`State`] of this span.
+    pub fn state(&self) -> State {
+        match self.state.load(Ordering::Acquire) {
+            s if s == State::Unentered as usize => State::Unentered,
+            s if s == State::Running as usize => State::Running,
+            s if s == State::Idle as usize => State::Idle,
+            s if s == State::Done as usize => State::Done,
+            invalid => panic!("invalid state: {:?}", invalid),
+        }
+    }
+}
 
 impl Hash for DataInner {
     fn hash<H: Hasher>(&self, state: &mut H) {

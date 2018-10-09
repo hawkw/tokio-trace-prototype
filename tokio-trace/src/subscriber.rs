@@ -1,4 +1,4 @@
-use super::{span, Event, SpanData, Meta};
+use super::{span, Event, SpanId, Meta};
 
 pub trait Subscriber {
     /// Determines if a span or event with the specified metadata would be recorded.
@@ -23,7 +23,7 @@ pub trait Subscriber {
     /// from all calls to this function, if they so choose.
     ///
     /// [span ID]: ../span/struct.Id.html
-    fn new_span(&self, new_span: &span::NewSpan) -> span::Id;
+    fn new_span(&self, new_span: &span::NewSpan) -> SpanId;
 
     /// Returns `true` if the cached result to a call to `enabled` for a span
     /// with the given metadata is still valid.
@@ -61,8 +61,8 @@ pub trait Subscriber {
     ///
     /// [`Event`]: ../struct.Event.html
     fn observe_event<'event, 'meta: 'event>(&self, event: &'event Event<'event, 'meta>);
-    fn enter(&self, span: &SpanData);
-    fn exit(&self, span: &SpanData);
+    fn enter(&self, span: SpanId, state: span::State);
+    fn exit(&self, span: SpanId, state: span::State);
 }
 
 #[cfg(any(test, feature = "test-support"))]

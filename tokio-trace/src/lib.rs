@@ -296,7 +296,7 @@ pub mod subscriber;
 
 pub use self::{
     dispatcher::Dispatch,
-    span::{Data as SpanData, Span},
+    span::{Data as SpanData, Span, Id as SpanId},
     subscriber::Subscriber,
 };
 
