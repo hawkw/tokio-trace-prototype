@@ -1,6 +1,6 @@
 use futures::{future::{Executor, ExecuteError}, Future};
 use tokio_trace::Span;
-use ::{Instrumented, Instrument};
+use ::{Instrumented, Instrument, WithDispatch};
 
 pub trait InstrumentExecutor<F>
 where
@@ -31,6 +31,16 @@ where
     F: Future<Item = (), Error = ()>,
 { }
 
+macro_rules! deinstrument_err {
+    ($e:expr) => {
+        $e.map_err(|e| {
+            let kind = e.kind();
+            let future = e.into_future().inner;
+            ExecuteError::new(kind, future)
+        })
+    }
+}
+
 impl<T, F, N> Executor<F> for InstrumentedExecutor<T, N>
 where
     T: Executor<Instrumented<F>>,
@@ -38,12 +48,18 @@ where
     N: Fn() -> Span,
 {
     fn execute(&self, future: F) -> Result<(), ExecuteError<F>> {
-        self.inner
-            .execute(future.instrument((self.mk_span)()))
-            .map_err(|e| {
-                let kind = e.kind();
-                let future = e.into_future().inner;
-                ExecuteError::new(kind, future)
-            })
+        let future = future.instrument((self.mk_span)());
+        deinstrument_err!(self.inner.execute(future))
+    }
+}
+
+impl<T, F> Executor<F> for WithDispatch<T>
+where
+    T: Executor<WithDispatch<F>>,
+    F: Future<Item = (), Error = ()>,
+{
+    fn execute(&self, future: F) -> Result<(), ExecuteError<F>> {
+        let future = self.with_dispatch(future);
+        deinstrument_err!(self.inner.execute(future))
     }
 }
