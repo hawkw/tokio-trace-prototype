@@ -1,4 +1,4 @@
-use tokio_trace::span::{Id, NewSpan};
+use tokio_trace::span::{Id, NewSpan, Data};
 
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 
@@ -25,7 +25,7 @@ pub trait RegisterSpan {
     /// [span ID]: ../span/struct.Id.html
     fn new_span(&self, new_span: &NewSpan) -> Id;
 
-    fn get(&self, Id) -> Option<&SpanData>;
+    // fn get(&self, Id) -> Option<&Data>;
 }
 
 /// Registers new span IDs with an increasing `usize` counter.

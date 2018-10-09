@@ -107,11 +107,13 @@ where
         self.observer.observe_event(event)
     }
 
-    fn enter(&self, span: &SpanData) {
-        self.observer.enter(span)
+    fn enter(&self, span: span::Id, state: span::State) {
+        // self.observer.enter(span)
+        unimplemented!()
     }
 
-    fn exit(&self, span: &SpanData) {
-        self.observer.exit(span)
+    fn exit(&self, span: span::Id, state: span::State) {
+        // self.observer.exit(span)
+        unimplemented!()
     }
 }

@@ -147,38 +147,39 @@ impl tokio_trace::Subscriber for SloggishSubscriber {
     }
 
     #[inline]
-    fn enter(&self, span: &tokio_trace::SpanData) {
-        let mut stderr = self.stderr.lock();
+    fn enter(&self, span: tokio_trace::span::Id, state: tokio_trace::span::State) {
+        // let mut stderr = self.stderr.lock();
 
-        let span_hash = self.hash_span(span);
-        let parent_hash = span.parent()
-            .map(|parent| self.hash_span(parent));
+        // let span_hash = self.hash_span(span);
+        // let parent_hash = span.parent()
+        //     .map(|parent| self.hash_span(parent));
 
-        let mut stack = self.stack.lock().unwrap();
-        if stack.iter().any(|hash| hash == &span_hash) {
-            // We are already in this span, do nothing.
-            return;
-        } else {
-            let indent = if let Some(idx) = stack
-                .iter()
-                .position(|hash| parent_hash
-                    .map(|p| hash == &p)
-                    .unwrap_or(false))
-            {
-                let idx = idx + 1;
-                stack.truncate(idx);
-                idx
-            } else {
-                stack.clear();
-                0
-            };
-            self.print_indent(&mut stderr, indent).unwrap();
-            stack.push(span_hash);
-            self.print_kvs(&mut stderr, span.fields(), "").unwrap();
-            write!(&mut stderr, "\n").unwrap();
-        }
+        // let mut stack = self.stack.lock().unwrap();
+        // if stack.iter().any(|hash| hash == &span_hash) {
+        //     // We are already in this span, do nothing.
+        //     return;
+        // } else {
+        //     let indent = if let Some(idx) = stack
+        //         .iter()
+        //         .position(|hash| parent_hash
+        //             .map(|p| hash == &p)
+        //             .unwrap_or(false))
+        //     {
+        //         let idx = idx + 1;
+        //         stack.truncate(idx);
+        //         idx
+        //     } else {
+        //         stack.clear();
+        //         0
+        //     };
+        //     self.print_indent(&mut stderr, indent).unwrap();
+        //     stack.push(span_hash);
+        //     self.print_kvs(&mut stderr, span.fields(), "").unwrap();
+        //     write!(&mut stderr, "\n").unwrap();
+        // }
+        unimplemented!()
     }
 
     #[inline]
-    fn exit(&self, _span: &tokio_trace::SpanData) {}
+    fn exit(&self, span: tokio_trace::span::Id, state: tokio_trace::span::State) {}
 }

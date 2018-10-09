@@ -178,17 +178,19 @@ impl Subscriber for TraceLogger {
         }
     }
 
-    fn enter(&self, span: &SpanData) {
-        let logger = log::logger();
-        logger.log(&log::Record::builder()
-            .args(format_args!("-> {:?}", span.name()))
-            .build()
-        )
+    fn enter(&self, span: span::Id, state: span::State) {
+        // let logger = log::logger();
+        // logger.log(&log::Record::builder()
+        //     .args(format_args!("-> {:?}", span.name()))
+        //     .build()
+        // )
+        unimplemented!()
     }
 
-    fn exit(&self, span: &SpanData) {
-        let logger = log::logger();
-        logger.log(&log::Record::builder().args(format_args!("<- {:?}", span.name())).build())
+    fn exit(&self, span: span::Id, state: span::State) {
+        // let logger = log::logger();
+        // logger.log(&log::Record::builder().args(format_args!("<- {:?}", span.name())).build())
+        unimplemented!()
     }
 }
 
@@ -198,11 +200,13 @@ impl tokio_trace_subscriber::Observe for TraceLogger {
     }
 
     fn enter(&self, span: &SpanData) {
-        <Self as Subscriber>::enter(&self, span)
+        // <Self as Subscriber>::enter(&self, span)
+        unimplemented!()
     }
 
     fn exit(&self, span: &SpanData) {
-        <Self as Subscriber>::exit(&self, span)
+        // <Self as Subscriber>::exit(&self, span)
+        unimplemented!()
     }
 
     fn filter(&self) -> &dyn tokio_trace_subscriber::Filter {
