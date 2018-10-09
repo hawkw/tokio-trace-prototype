@@ -75,7 +75,7 @@ mod test_support {
     use ::span::{self, MockSpan};
 
     use std::{
-        collections::VecDeque,
+        collections::{HashMap, VecDeque},
         thread,
         sync::{Mutex, atomic::{AtomicUsize, Ordering}},
     };
@@ -91,6 +91,7 @@ mod test_support {
     }
 
     struct Running<F: Fn(&Meta) -> bool> {
+        spans: Mutex<HashMap<span::Id, Meta<'static>>>,
         expected: Mutex<VecDeque<Expect>>,
         ids: AtomicUsize,
         filter: F,
@@ -132,6 +133,7 @@ mod test_support {
 
         pub fn run(self) -> impl Subscriber {
             Running {
+                spans: Mutex::new(HashMap::new()),
                 expected: Mutex::new(self.expected),
                 ids: AtomicUsize::new(0),
                 filter: self.filter,
@@ -144,8 +146,11 @@ mod test_support {
             (self.filter)(meta)
         }
 
-        fn new_span(&self, _: &span::NewSpan) -> span::Id {
-            span::Id::from_u64(self.ids.fetch_add(1, Ordering::SeqCst) as u64)
+        fn new_span(&self, span: &span::NewSpan) -> span::Id {
+            let id = self.ids.fetch_add(1, Ordering::SeqCst);
+            let id = span::Id::from_u64(id as u64);
+            self.spans.lock().unwrap().insert(id.clone(), span.meta().clone());
+            id
         }
 
         fn observe_event<'event, 'meta: 'event>(&self, _event: &'event Event<'event, 'meta>) {
@@ -157,42 +162,50 @@ mod test_support {
             }
         }
 
-        fn enter(&self, span: &SpanData) {
-            // println!("+ {}: {:?}", thread::current().name().unwrap_or("unknown thread"), span);
+        fn enter(&self, span: span::Id, state: span::State) {
+            let spans = self.spans.lock().unwrap();
+            let span = spans.get(&span)
+                .unwrap_or_else(|| {
+                    panic!("no span for ID {:?}", span)
+                });
             match self.expected.lock().unwrap().pop_front() {
                 None => {},
-                Some(Expect::Event(_)) => panic!("expected an event, but entered span {:?} instead", span.name()),
+                Some(Expect::Event(_)) => panic!("expected an event, but entered span {:?} instead", span.name),
                 Some(Expect::Enter(expected_span)) => {
                     if let Some(name) = expected_span.name {
-                        assert_eq!(name, span.name());
+                        assert_eq!(name, span.name);
                     }
-                    if let Some(state) = expected_span.state {
-                        assert_eq!(state, span.state());
+                    if let Some(expected_state) = expected_span.state {
+                        assert_eq!(expected_state, state);
                     }
                     // TODO: expect fields
                 }
                 Some(Expect::Exit(expected_span)) => panic!(
                     "expected to exit span {:?}, but entered span {:?} instead",
                     expected_span.name,
-                    span.name()),
+                    span.name),
             }
         }
 
-        fn exit(&self, span: &SpanData) {
-            // println!("- {}: {:?}", thread::current().name().unwrap_or("unknown_thread"), span);
+        fn exit(&self, span: span::Id, state: span::State)  {
+            let spans = self.spans.lock().unwrap();
+            let span = spans.get(&span)
+                .unwrap_or_else(|| {
+                    panic!("no span for ID {:?}", span)
+                });
             match self.expected.lock().unwrap().pop_front() {
                 None => {},
-                Some(Expect::Event(_)) => panic!("expected an event, but exited span {:?} instead", span.name()),
+                Some(Expect::Event(_)) => panic!("expected an event, but exited span {:?} instead", span.name),
                 Some(Expect::Enter(expected_span)) => panic!(
                     "expected to enter span {:?}, but exited span {:?} instead",
                     expected_span.name,
-                    span.name()),
+                    span.name),
                 Some(Expect::Exit(expected_span)) => {
                     if let Some(name) = expected_span.name {
-                        assert_eq!(name, span.name());
+                        assert_eq!(name, span.name);
                     }
-                    if let Some(state) = expected_span.state {
-                        assert_eq!(state, span.state());
+                    if let Some(expected_state) = expected_span.state {
+                        assert_eq!(expected_state, state);
                     }
                     // TODO: expect fields
                 }

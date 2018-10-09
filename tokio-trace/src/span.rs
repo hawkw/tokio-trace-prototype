@@ -119,7 +119,7 @@ pub struct Data {
 /// method for more information on span ID generation.
 ///
 /// [`Subscriber::new_span_id`]: ../subscriber/trait.Subscriber.html#tymethod.new_span_id
-#[derive(Clone, Debug, PartialEq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Id(u64);
 
 /// Internal representation of the data associated with a span.
