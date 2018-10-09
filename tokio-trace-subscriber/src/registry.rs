@@ -24,6 +24,8 @@ pub trait RegisterSpan {
     ///
     /// [span ID]: ../span/struct.Id.html
     fn new_span(&self, new_span: &NewSpan) -> Id;
+
+    fn get(&self, Id) -> Option<&SpanData>;
 }
 
 /// Registers new span IDs with an increasing `usize` counter.
