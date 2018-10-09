@@ -5,6 +5,8 @@ extern crate futures;
 use tokio_trace::Span;
 use futures::{Async, Future, Sink, Stream, Poll, StartSend};
 
+pub mod executor;
+
 // TODO: seal?
 pub trait Instrument: Sized {
     fn instrument(self, span: Span) -> Instrumented<Self> {
@@ -91,7 +93,6 @@ impl<T: Sink> Sink for Instrumented<T> {
         })
     }
 }
-
 
 #[cfg(test)]
 mod tests {
