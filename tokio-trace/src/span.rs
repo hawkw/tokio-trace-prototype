@@ -133,15 +133,13 @@ pub struct Id(u64);
 /// interaction with a span's data is carried out through `Data` references.
 #[derive(Debug)]
 struct DataInner {
-    pub parent: Option<Data>,
+    pub parent: Option<Id>,
 
     pub static_meta: &'static StaticMeta,
 
     pub field_values: Vec<Box<dyn Value>>,
 
     pub id: Id,
-
-    state: AtomicUsize,
 }
 
 
@@ -172,8 +170,7 @@ struct Active {
 /// references.
 #[derive(Debug)]
 struct ActiveInner {
-    /// A reference to the span's associated data.
-    data: Data,
+    id: Id,
 
     /// An entering reference to the span's parent, used to re-enter the parent
     /// span upon exiting this span.
@@ -191,6 +188,8 @@ struct ActiveInner {
     /// TODO: it would be nice if this could be any arbitrary `Subscriber`,
     /// rather than `Dispatch`, but object safety.
     subscriber: Dispatch,
+
+    state: AtomicUsize,
 }
 
 /// Enumeration of the potential states of a [`Span`].
@@ -272,22 +271,22 @@ impl Into<Option<Data>> for Span {
 // ===== impl Data =====
 
 impl Data {
-    fn new(
-        id: Id,
-        parent: Option<&Data>,
-        static_meta: &'static StaticMeta,
-        field_values: Vec<Box<dyn Value>>,
-    ) -> Self {
-        Data {
-            inner: Arc::new(DataInner {
-                parent: parent.cloned(),
-                static_meta,
-                field_values,
-                id,
-                state: AtomicUsize::new(0),
-            })
-        }
-    }
+    // fn new(
+    //     id: Id,
+    //     parent: Option<&Data>,
+    //     static_meta: &'static StaticMeta,
+    //     field_values: Vec<Box<dyn Value>>,
+    // ) -> Self {
+    //     Data {
+    //         inner: Arc::new(DataInner {
+    //             parent: parent.cloned(),
+    //             static_meta,
+    //             field_values,
+    //             id,
+    //             state: AtomicUsize::new(0),
+    //         })
+    //     }
+    // }
 
     pub fn current() -> Option<Self> {
         CURRENT_SPAN.with(|current| {
@@ -302,7 +301,8 @@ impl Data {
 
     /// Returns a `Data` reference to the parent of this span, if one exists.
     pub fn parent(&self) -> Option<&Data> {
-        self.inner.parent.as_ref()
+        // self.inner.parent.as_ref()
+        unimplemented!("api will have to change...")
     }
 
     /// Borrows this span's metadata.
@@ -384,20 +384,13 @@ impl Data {
 
     /// Returns the current [`State`] of this span.
     pub fn state(&self) -> State {
-        self.inner.state()
+        // self.inner.state()
+        unimplemented!("may not come back")
     }
 
     /// Returns the span's identifier.
     pub fn id(&self) -> Id {
         Id(self.inner.id.0)
-    }
-
-    fn set_state(&self, prev: State, next: State) {
-        self.inner.state.compare_and_swap(
-            prev as usize,
-            next as usize,
-            Ordering::Release,
-        );
     }
 }
 
@@ -531,13 +524,7 @@ impl NewSpan {
     /// span ID, and constructing the internal span state.
     pub fn finish(self, subscriber: Dispatch) -> Span {
         let id = subscriber.new_span(&self);
-        let data = Data::new(
-            id,
-            self.parent.as_ref().map(Active::data),
-            self.static_meta,
-            self.field_values,
-        );
-        let inner = Some(Active::new(data, subscriber, self.parent));
+        let inner = Some(Active::new(id, subscriber, self.parent));
         Span {
             inner,
         }
@@ -552,11 +539,12 @@ impl Active {
         CURRENT_SPAN.with(|span| span.borrow().as_ref().cloned())
     }
 
-    fn new(data: Data, subscriber: Dispatch, enter_parent: Option<Self>) -> Self  {
+    fn new(id: Id, subscriber: Dispatch, enter_parent: Option<Self>) -> Self  {
         let inner = Arc::new(ActiveInner {
-            data,
+            id,
             enter_parent,
             currently_entered: AtomicUsize::new(0),
+            state: AtomicUsize::new(State::Unentered as usize),
             subscriber,
         });
         Self {
@@ -599,7 +587,8 @@ impl Active {
     }
 
     fn data(&self) -> &Data {
-        &self.inner.data
+        // &self.inner.data
+        unimplemented!("may not come back")
     }
 
     /// Returns true if this is the last remaining handle with the capacity to
@@ -611,11 +600,11 @@ impl Active {
     }
 
     fn id(&self) -> Id {
-        self.data().id()
+        self.inner.id.clone()
     }
 
     fn state(&self) -> State {
-        self.data().state()
+        self.inner.state()
     }
 }
 
@@ -623,43 +612,6 @@ impl Active {
 // ===== impl ActiveInnInner =====
 
 impl ActiveInner {
-
-    /// Performs the state transition when entering the span.
-    fn transition_on_enter(&self, from_state: State) {
-        self.currently_entered
-            .fetch_add(1, Ordering::Release);
-        self.data.set_state(from_state, State::Running);
-    }
-
-    /// Performs the state transition when exiting the span.
-    fn transition_on_exit(&self, next_state: State) {
-        // Decrement the exit count
-        let remaining_exits = self.currently_entered
-            .fetch_sub(1, Ordering::AcqRel);
-        // Only advance the state if we are the last remaining
-        // thread to exit the span.
-        if remaining_exits == 1 {
-            self.data.set_state(State::Running, next_state);
-        }
-    }
-}
-
-impl cmp::PartialEq for ActiveInner {
-    fn eq(&self, other: &ActiveInner) -> bool {
-        self.data == other.data
-    }
-}
-
-impl Hash for ActiveInner {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.data.hash(state);
-    }
-}
-
-// ===== impl DataInner =====
-
-impl DataInner {
-
     /// Returns the current [`State`] of this span.
     pub fn state(&self) -> State {
         match self.state.load(Ordering::Acquire) {
@@ -670,7 +622,48 @@ impl DataInner {
             invalid => panic!("invalid state: {:?}", invalid),
         }
     }
+
+    fn set_state(&self, prev: State, next: State) {
+        self.state.compare_and_swap(
+            prev as usize,
+            next as usize,
+            Ordering::Release,
+        );
+    }
+
+    /// Performs the state transition when entering the span.
+    fn transition_on_enter(&self, from_state: State) {
+        self.currently_entered
+            .fetch_add(1, Ordering::Release);
+        self.set_state(from_state, State::Running);
+    }
+
+    /// Performs the state transition when exiting the span.
+    fn transition_on_exit(&self, next_state: State) {
+        // Decrement the exit count
+        let remaining_exits = self.currently_entered
+            .fetch_sub(1, Ordering::AcqRel);
+        // Only advance the state if we are the last remaining
+        // thread to exit the span.
+        if remaining_exits == 1 {
+            self.set_state(State::Running, next_state);
+        }
+    }
 }
+
+impl cmp::PartialEq for ActiveInner {
+    fn eq(&self, other: &ActiveInner) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Hash for ActiveInner {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
+}
+
+// ===== impl DataInner =====
 
 impl Hash for DataInner {
     fn hash<H: Hasher>(&self, state: &mut H) {
