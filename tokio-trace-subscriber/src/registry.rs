@@ -1,4 +1,4 @@
-use tokio_trace::span::{Id, NewSpan, Data};
+use tokio_trace::span::{Id, Data};
 
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 
