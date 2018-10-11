@@ -99,7 +99,7 @@ where
             || self.observer.filter().should_invalidate_filter(metadata)
     }
 
-    fn new_span(&self, new_span: &span::NewSpan) -> span::Id {
+    fn new_span(&self, new_span: SpanData) -> span::Id {
         self.registry.new_span(new_span)
     }
 

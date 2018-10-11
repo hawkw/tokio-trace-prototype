@@ -67,7 +67,7 @@ impl fmt::Debug for Dispatch {
 
 impl Subscriber for Dispatch {
     fn new_span(&self, span: span::Data) -> span::Id {
-        self.0.register(span)
+        self.0.new_span(span)
     }
 
     fn should_invalidate_filter(&self, metadata: &Meta) -> bool {

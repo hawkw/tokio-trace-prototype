@@ -23,7 +23,7 @@ pub trait RegisterSpan {
     /// from all calls to this function, if they so choose.
     ///
     /// [span ID]: ../span/struct.Id.html
-    fn new_span(&self, new_span: &NewSpan) -> Id;
+    fn new_span(&self, new_span: Data) -> Id;
 
     // fn get(&self, Id) -> Option<&Data>;
 }
@@ -39,9 +39,9 @@ pub fn increasing_counter(_new_span: &NewSpan) -> Id {
 
 impl<T> RegisterSpan for T
 where
-    T: Fn(&NewSpan) -> Id,
+    T: Fn(Data) -> Id,
 {
-    fn new_span(&self, new_span: &NewSpan) -> Id {
+    fn new_span(&self, new_span: Data) -> Id {
         self(new_span)
     }
 }
