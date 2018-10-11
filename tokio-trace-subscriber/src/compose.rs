@@ -103,6 +103,10 @@ where
         self.registry.new_span(new_span)
     }
 
+    fn span_data(&self, id: &span::Id) -> Option<&SpanData> {
+        unimplemented!("TODO: RegisterSpan should support this")
+    }
+
     fn observe_event<'event, 'meta: 'event>(&self, event: &'event Event<'event, 'meta>) {
         self.observer.observe_event(event)
     }

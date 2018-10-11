@@ -353,7 +353,8 @@ type StaticMeta = Meta<'static>;
 
 /// Iterator over the parents of a span or event
 pub struct Parents<'a> {
-    next: Option<&'a SpanData>,
+    next: Option<&'a span::Id>,
+    registry: &'a Subscriber
 }
 
 // ===== impl Meta =====
@@ -465,9 +466,11 @@ impl<'event, 'meta: 'event> Event<'event, 'meta> {
     /// The iterator will traverse the trace tree in ascending order from this
     /// event's immediate parent to the root span of the trace.
     pub fn parents<'a>(&'a self) -> Parents<'a> {
-        Parents {
-            next: self.parent.as_ref(),
-        }
+        // Parents {
+        //     next: self.inner.parent.as_ref(),
+        //     registry: &self.inner.subscriber
+        // }
+        unimplemented!("todo fix")
     }
 
     /// Returns an iterator over all the field names and values of this `Event`
@@ -528,8 +531,8 @@ where
 impl<'a> Iterator for Parents<'a> {
     type Item = &'a SpanData;
     fn next(&mut self) -> Option<Self::Item> {
-        let next = self.next;
-        self.next = self.next.and_then(SpanData::parent);
+        let next = self.next.and_then(|id| self.registry.span_data(id));
+        self.next = next.as_ref().and_then(|data| data.parent.as_ref());
         next
     }
 }

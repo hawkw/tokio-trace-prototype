@@ -22,6 +22,9 @@ pub trait Subscriber {
     /// [span ID]: ../span/struct.Id.html
     fn new_span(&self, span: span::Data) -> span::Id;
 
+    // XXX: should this be a subscriber method or should it have its own type???
+    fn span_data(&self, id: &span::Id) -> Option<&span::Data>;
+
     // === Filtering methods ==================================================
 
     /// Determines if a span or event with the specified metadata would be recorded.
@@ -158,6 +161,10 @@ mod test_support {
             let id = span::Id::from_u64(id as u64);
             self.spans.lock().unwrap().insert(id.clone(), span);
             id
+        }
+
+        fn span_data(&self, span: &span::Id) -> Option<&span::Data> {
+            unimplemented!()
         }
 
         fn observe_event<'event, 'meta: 'event>(&self, _event: &'event Event<'event, 'meta>) {

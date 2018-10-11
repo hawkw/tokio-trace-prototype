@@ -232,7 +232,18 @@ impl Span {
     }
 
     pub fn data(&self) -> Option<&Data> {
-        self.inner.as_ref().map(Active::data)
+        self.inner.as_ref()
+            .and_then(|active| active.inner.subscriber.span_data(&active.inner.id))
+    }
+
+    pub fn parent(&self) -> Option<&Data> {
+        self.inner.as_ref()
+            .and_then(|active| {
+                let registry = &active.inner.subscriber;
+                let id = registry.span_data(&active.inner.id)
+                    .and_then(|data| data.parent.as_ref());
+                registry.span_data(id?)
+            })
     }
 }
 
@@ -280,9 +291,9 @@ impl Data {
     }
 
     /// Returns a `Data` reference to the parent of this span, if one exists.
-    pub fn parent(&self) -> Option<&Data> {
-        // self.inner.parent.as_ref()
-        unimplemented!("api will have to change...")
+    pub fn parent<'r, R: Subscriber>(&self, registry: &'r R) -> Option<&'r Data> {
+        self.parent.as_ref()
+            .and_then(|id| registry.span_data(id))
     }
 
     /// Borrows this span's metadata.
@@ -330,11 +341,11 @@ impl Data {
     ///
     /// The iterator will traverse the trace tree in ascending order from this
     /// span's immediate parent to the root span of the trace.
-    pub fn parents<'a>(&'a self) -> Parents<'a> {
-        // Parents {
-        //     next: self.parent(),
-        // }
-        unimplemented!("will require ref to registry or something")
+    pub fn parents<'a, R: Subscriber>(&'a self, registry: &'a R) -> Parents<'a> {
+        Parents {
+            next: self.parent.as_ref(),
+            registry,
+        }
     }
 
     /// Returns an iterator over all the field names and values of this span
@@ -358,14 +369,13 @@ impl Data {
     /// ```
     /// If a `Subscriber` were to call `all_fields` on "my span" event, it will
     /// receive an iterator with the values `("foo", 2)` and `("bar", 2)`.
-    pub fn all_fields<'a>(
+    pub fn all_fields<'a, R: Subscriber>(
         &'a self,
+        registry: &'a R,
     ) -> impl Iterator<Item = (&'a str, &'a dyn Value)> {
-        // self.fields()
-        //     .chain(self.parents().flat_map(|parent| parent.fields()))
-        //     .dedup_by(|(k, _)| k)
-        unimplemented!("will require ref to registry or something");
-        ::std::iter::empty()
+        self.fields()
+            .chain(self.parents(registry).flat_map(|parent| parent.fields()))
+            .dedup_by(|(k, _)| k)
     }
 
     /// Returns the current [`State`] of this span.
@@ -393,7 +403,7 @@ impl fmt::Debug for Data {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Span")
             .field("name", &self.name())
-            .field("parent", &self.parent())
+            .field("parent", &self.parent)
             .field("fields", &self.debug_fields())
             .field("meta", &self.meta())
             .finish()
@@ -462,9 +472,8 @@ impl Active {
         }
     }
 
-    fn data(&self) -> &Data {
-        // &self.inner.data
-        unimplemented!("may not come back")
+    fn data(&self) -> Option<&Data> {
+        self.inner.subscriber.span_data(&self.inner.id)
     }
 
     /// Returns true if this is the last remaining handle with the capacity to

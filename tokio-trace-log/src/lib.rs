@@ -156,6 +156,12 @@ impl Subscriber for TraceLogger {
         span::Id::from_u64(0)
     }
 
+    fn span_data(&self, _id: &span::Id) -> Option<&span::Data> {
+        // TODO: should this type just be an observer, or should it also impl
+        // subscriber?
+        unimplemented!("no registry")
+    }
+
     fn observe_event<'event, 'meta: 'event>(&self, event: &'event Event<'event, 'meta>) {
         let fields = event.debug_fields();
         let meta = event.meta.as_log();
