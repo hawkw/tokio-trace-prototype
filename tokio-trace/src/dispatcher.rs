@@ -36,6 +36,9 @@ impl Dispatch {
 
     pub fn to<S>(subscriber: S) -> Self
     // TODO: Add some kind of `UnsyncDispatch`?
+    // TODO: agh, dispatchers really need not be sync, _only_ the exit part
+    // really has to be Send + Sync. if this were in the subscriber crate, we
+    // could slice and dice the sync requirement a little better...hmmm...
     where
         S: Subscriber + Send + Sync + 'static,
     {
