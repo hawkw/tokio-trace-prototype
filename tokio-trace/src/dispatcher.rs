@@ -66,6 +66,10 @@ impl fmt::Debug for Dispatch {
 }
 
 impl Subscriber for Dispatch {
+    fn new_span(&self, span: span::Data) -> span::Id {
+        self.0.register(span)
+    }
+
     fn should_invalidate_filter(&self, metadata: &Meta) -> bool {
         CURRENT_DISPATCH.with(|current| {
             let mut hasher = DefaultHasher::new();
@@ -88,11 +92,6 @@ impl Subscriber for Dispatch {
     }
 
     #[inline]
-    fn new_span(&self, new_span: &span::NewSpan) -> span::Id {
-        self.0.new_span(new_span)
-    }
-
-    #[inline]
     fn observe_event<'event, 'meta: 'event>(&self, event: &'event Event<'event, 'meta>) {
         self.0.observe_event(event)
     }
@@ -111,12 +110,12 @@ impl Subscriber for Dispatch {
 struct NoSubscriber;
 
 impl Subscriber for NoSubscriber {
-    fn enabled(&self, _metadata: &Meta) -> bool {
-        false
+    fn new_span(&self, span: span::Data) -> span::Id {
+        span::Id::from_u64(0)
     }
 
-    fn new_span(&self, _new_span: &span::NewSpan) -> span::Id {
-        span::Id::from_u64(0)
+    fn enabled(&self, _metadata: &Meta) -> bool {
+        false
     }
 
     fn observe_event<'event, 'meta: 'event>(&self, _event: &'event Event<'event, 'meta>) {

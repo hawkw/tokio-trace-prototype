@@ -101,12 +101,19 @@ pub struct NewSpan {
     field_values: Vec<Box<dyn Value>>,
 }
 
-/// A handle on the data associated with a span.
+/// Representation of the data associated with a span.
 ///
-/// This may be used to access the span but may *not* be used to enter the span.
-#[derive(Clone, PartialEq, Hash)]
+/// This has the potential to outlive the span itself if it exists after the
+/// span completes executing --- such as if it is still being processed by a
+/// subscriber.
+///
+/// This may *not* be used to enter the span.
 pub struct Data {
-    inner: Arc<DataInner>,
+    pub parent: Option<Id>,
+
+    pub static_meta: &'static StaticMeta,
+
+    pub field_values: Vec<Box<dyn Value>>,
 }
 
 /// Identifies a span within the context of a process.
@@ -121,27 +128,6 @@ pub struct Data {
 /// [`Subscriber::new_span_id`]: ../subscriber/trait.Subscriber.html#tymethod.new_span_id
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Id(u64);
-
-/// Internal representation of the data associated with a span.
-///
-/// This has the potential to outlive the span itself, if a `Data` reference to
-/// it exists after the span completes executing --- such as if it is still
-/// being processed by a subscriber.
-///
-/// This type is purely internal to the `span` module and is not intended to be
-/// interacted with directly by downstream users of `tokio-trace`. Instead, all
-/// interaction with a span's data is carried out through `Data` references.
-#[derive(Debug)]
-struct DataInner {
-    pub parent: Option<Id>,
-
-    pub static_meta: &'static StaticMeta,
-
-    pub field_values: Vec<Box<dyn Value>>,
-
-    pub id: Id,
-}
-
 
 #[derive(Clone, Debug, PartialEq, Hash)]
 struct Active {
@@ -242,61 +228,45 @@ impl Span {
 
 impl fmt::Debug for Span {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if let Some(inner) = self.data() {
-            f.debug_struct("Span")
-                .field("name", &inner.name())
-                .field("parent", &inner.parent().map(Data::name))
-                .field("fields", &inner.debug_fields())
-                .field("meta", &inner.meta())
-                .finish()
+        let mut span = f.debug_struct("Span");
+        if let Some(ref inner) = self.inner {
+            span.field("id", &inner.id())
+                .field("parent", &inner.parent())
+                .field("state", &inner.state())
+                .field("is_last_standing", &inner.is_last_standing())
         } else {
-            f.debug_struct("Span").field("disabled", &true).finish()
+            span.field("disabled", &true)
         }
+        .finish()
 
-    }
-}
-
-impl<'a> Into<Option<&'a Data>> for &'a Span {
-    fn into(self) -> Option<&'a Data> {
-        self.data()
-    }
-}
-
-impl Into<Option<Data>> for Span {
-    fn into(self) -> Option<Data> {
-        self.data().cloned()
     }
 }
 
 // ===== impl Data =====
 
 impl Data {
-    // fn new(
-    //     id: Id,
-    //     parent: Option<&Data>,
-    //     static_meta: &'static StaticMeta,
-    //     field_values: Vec<Box<dyn Value>>,
-    // ) -> Self {
-    //     Data {
-    //         inner: Arc::new(DataInner {
-    //             parent: parent.cloned(),
-    //             static_meta,
-    //             field_values,
-    //             id,
-    //             state: AtomicUsize::new(0),
-    //         })
-    //     }
-    // }
+    fn new(
+        parent: Option<&Id>,
+        static_meta: &'static StaticMeta,
+        field_values: Vec<Box<dyn Value>>,
+    ) -> Self {
+        Data {
+            parent: parent.cloned(),
+            static_meta,
+            field_values,
+        }
+    }
 
     pub fn current() -> Option<Self> {
-        CURRENT_SPAN.with(|current| {
-            current.borrow().as_ref().map(Active::data).cloned()
-        })
+        // CURRENT_SPAN.with(|current| {
+        //     current.borrow().as_ref().map(Active::data).cloned()
+        // })
+        unimplemented!("who knows, this may not come back")
     }
 
     /// Returns the name of this span, or `None` if it is unnamed,
     pub fn name(&self) -> Option<&'static str> {
-        self.inner.static_meta.name
+        self.static_meta.name
     }
 
     /// Returns a `Data` reference to the parent of this span, if one exists.
@@ -307,12 +277,12 @@ impl Data {
 
     /// Borrows this span's metadata.
     pub fn meta(&self) -> &'static StaticMeta {
-        self.inner.static_meta
+        self.static_meta
     }
 
     /// Returns an iterator over the names of all the fields on this span.
     pub fn field_names<'a>(&self) -> slice::Iter<&'a str> {
-        self.inner.static_meta.field_names.iter()
+        self.static_meta.field_names.iter()
     }
 
     /// Borrows the value of the field named `name`, if it exists. Otherwise,
@@ -323,8 +293,7 @@ impl Data {
     {
         self.field_names()
             .position(|&field_name| field_name == key)
-            .and_then(|i| self.inner
-                .field_values
+            .and_then(|i| self.field_values
                 .get(i)
                 .map(AsRef::as_ref))
     }
@@ -333,7 +302,11 @@ impl Data {
     pub fn fields<'a>(&'a self) -> impl Iterator<Item = (&'a str, &'a dyn Value)> {
         self.field_names()
             .enumerate()
-            .map(move |(idx, &name)| (name, self.inner.field_values[idx].as_ref()))
+            .filter_map(move |(i, &name)| {
+                self.field_values
+                .get(i)
+                .map(move |val| (name, val.as_ref()))
+        })
     }
 
     /// Returns a struct that can be used to format all the fields on this
@@ -348,9 +321,10 @@ impl Data {
     /// The iterator will traverse the trace tree in ascending order from this
     /// span's immediate parent to the root span of the trace.
     pub fn parents<'a>(&'a self) -> Parents<'a> {
-        Parents {
-            next: self.parent(),
-        }
+        // Parents {
+        //     next: self.parent(),
+        // }
+        unimplemented!("will require ref to registry or something")
     }
 
     /// Returns an iterator over all the field names and values of this span
@@ -377,9 +351,11 @@ impl Data {
     pub fn all_fields<'a>(
         &'a self,
     ) -> impl Iterator<Item = (&'a str, &'a dyn Value)> {
-        self.fields()
-            .chain(self.parents().flat_map(|parent| parent.fields()))
-            .dedup_by(|(k, _)| k)
+        // self.fields()
+        //     .chain(self.parents().flat_map(|parent| parent.fields()))
+        //     .dedup_by(|(k, _)| k)
+        unimplemented!("will require ref to registry or something");
+        ::std::iter::empty()
     }
 
     /// Returns the current [`State`] of this span.
@@ -390,7 +366,8 @@ impl Data {
 
     /// Returns the span's identifier.
     pub fn id(&self) -> Id {
-        Id(self.inner.id.0)
+        // Id(self.inner.id.0)
+        unimplemented!("may not come back")
     }
 }
 
@@ -606,6 +583,10 @@ impl Active {
     fn state(&self) -> State {
         self.inner.state()
     }
+
+    fn parent(&self) -> Option<Id> {
+        self.inner.enter_parent.as_ref().map(Active::id)
+    }
 }
 
 
@@ -664,18 +645,6 @@ impl Hash for ActiveInner {
 }
 
 // ===== impl DataInner =====
-
-impl Hash for DataInner {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.id.hash(state);
-    }
-}
-
-impl cmp::PartialEq for DataInner {
-    fn eq(&self, other: &DataInner) -> bool {
-        self.id == other.id
-    }
-}
 
 #[cfg(any(test, feature = "test-support"))]
 pub use self::test_support::*;
@@ -837,8 +806,8 @@ mod tests {
             // Two handles that point to the same span are equal.
             assert_eq!(foo1, foo2);
 
-            // The two span's data handles are also equal.
-            assert_eq!(foo1.data(), foo2.data());
+            // // The two span's data handles are also equal.
+            // assert_eq!(foo1.data(), foo2.data());
         });
     }
 
@@ -851,7 +820,7 @@ mod tests {
             let foo2 = span!("foo", bar = 1, baz = false);
 
             assert_ne!(foo1, foo2);
-            assert_ne!(foo1.data(), foo2.data());
+            // assert_ne!(foo1.data(), foo2.data());
         });
     }
 
@@ -868,7 +837,7 @@ mod tests {
             let foo2 = make_span();
 
             assert_ne!(foo1, foo2);
-            assert_ne!(foo1.data(), foo2.data());
+            // assert_ne!(foo1.data(), foo2.data());
         });
 
     }

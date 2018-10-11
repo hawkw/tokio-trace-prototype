@@ -1,11 +1,8 @@
 use super::{span, Event, SpanId, Meta};
 
+
 pub trait Subscriber {
-    /// Determines if a span or event with the specified metadata would be recorded.
-    ///
-    /// This is used by the dispatcher to avoid allocating for span construction
-    /// if the span would be discarded anyway.
-    fn enabled(&self, metadata: &Meta) -> bool;
+    // === Span registry methods ==============================================
 
     /// Record the construction of a new [`Span`], returning a a new [span ID] for
     /// the span being constructed.
@@ -23,7 +20,15 @@ pub trait Subscriber {
     /// from all calls to this function, if they so choose.
     ///
     /// [span ID]: ../span/struct.Id.html
-    fn new_span(&self, new_span: &span::NewSpan) -> SpanId;
+    fn new_span(&self, span: span::Data) -> span::Id;
+
+    // === Filtering methods ==================================================
+
+    /// Determines if a span or event with the specified metadata would be recorded.
+    ///
+    /// This is used by the dispatcher to avoid allocating for span construction
+    /// if the span would be discarded anyway.
+    fn enabled(&self, metadata: &Meta) -> bool;
 
     /// Returns `true` if the cached result to a call to `enabled` for a span
     /// with the given metadata is still valid.
@@ -56,6 +61,8 @@ pub trait Subscriber {
         false
     }
 
+    // === Notification methods ===============================================
+
     /// Note that this function is generic over a pair of lifetimes because the
     /// `Event` type is. See the documentation for [`Event`] for details.
     ///
@@ -71,7 +78,7 @@ pub use self::test_support::*;
 #[cfg(any(test, feature = "test-support"))]
 mod test_support {
     use super::Subscriber;
-    use ::{Event, SpanData, Meta};
+    use ::{Event, SpanData, SpanId, Meta};
     use ::span::{self, MockSpan};
 
     use std::{
@@ -91,7 +98,7 @@ mod test_support {
     }
 
     struct Running<F: Fn(&Meta) -> bool> {
-        spans: Mutex<HashMap<span::Id, Meta<'static>>>,
+        spans: Mutex<HashMap<SpanId, SpanData>>,
         expected: Mutex<VecDeque<Expect>>,
         ids: AtomicUsize,
         filter: F,
@@ -146,10 +153,10 @@ mod test_support {
             (self.filter)(meta)
         }
 
-        fn new_span(&self, span: &span::NewSpan) -> span::Id {
+        fn new_span(&self, span: SpanData) -> span::Id {
             let id = self.ids.fetch_add(1, Ordering::SeqCst);
             let id = span::Id::from_u64(id as u64);
-            self.spans.lock().unwrap().insert(id.clone(), span.meta().clone());
+            self.spans.lock().unwrap().insert(id.clone(), span);
             id
         }
 
@@ -170,10 +177,10 @@ mod test_support {
                 });
             match self.expected.lock().unwrap().pop_front() {
                 None => {},
-                Some(Expect::Event(_)) => panic!("expected an event, but entered span {:?} instead", span.name),
+                Some(Expect::Event(_)) => panic!("expected an event, but entered span {:?} instead", span.name()),
                 Some(Expect::Enter(expected_span)) => {
                     if let Some(name) = expected_span.name {
-                        assert_eq!(name, span.name);
+                        assert_eq!(name, span.name());
                     }
                     if let Some(expected_state) = expected_span.state {
                         assert_eq!(expected_state, state);
@@ -183,7 +190,7 @@ mod test_support {
                 Some(Expect::Exit(expected_span)) => panic!(
                     "expected to exit span {:?}, but entered span {:?} instead",
                     expected_span.name,
-                    span.name),
+                    span.name()),
             }
         }
 
@@ -195,14 +202,14 @@ mod test_support {
                 });
             match self.expected.lock().unwrap().pop_front() {
                 None => {},
-                Some(Expect::Event(_)) => panic!("expected an event, but exited span {:?} instead", span.name),
+                Some(Expect::Event(_)) => panic!("expected an event, but exited span {:?} instead", span.name()),
                 Some(Expect::Enter(expected_span)) => panic!(
                     "expected to enter span {:?}, but exited span {:?} instead",
                     expected_span.name,
-                    span.name),
+                    span.name()),
                 Some(Expect::Exit(expected_span)) => {
                     if let Some(name) = expected_span.name {
-                        assert_eq!(name, span.name);
+                        assert_eq!(name, span.name());
                     }
                     if let Some(expected_state) = expected_span.state {
                         assert_eq!(expected_state, state);
