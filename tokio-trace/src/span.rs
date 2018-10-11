@@ -92,15 +92,6 @@ pub struct Span {
     inner: Option<Active>,
 }
 
-#[derive(Debug)]
-pub struct NewSpan {
-    parent: Option<Active>,
-
-    static_meta: &'static StaticMeta,
-
-    field_values: Vec<Box<dyn Value>>,
-}
-
 /// Representation of the data associated with a span.
 ///
 /// This has the potential to outlive the span itself if it exists after the
