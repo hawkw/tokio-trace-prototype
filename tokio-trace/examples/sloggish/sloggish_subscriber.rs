@@ -100,8 +100,9 @@ impl SloggishSubscriber {
 
     fn hash_span(&self, span: &tokio_trace::SpanData) -> u64 {
         let mut hasher = self.hash_builder.build_hasher();
-        span.hash(&mut hasher);
-        hasher.finish()
+        // span.hash(&mut hasher);
+        // hasher.finish()
+        unimplemented!("this example needs some rewriting")
     }
 }
 
@@ -110,7 +111,7 @@ impl tokio_trace::Subscriber for SloggishSubscriber {
         true
     }
 
-    fn new_span(&self, _: &tokio_trace::span::NewSpan) -> tokio_trace::span::Id {
+    fn new_span(&self, _: tokio_trace::SpanData) -> tokio_trace::span::Id {
         let next = self.ids.fetch_add(1, Ordering::SeqCst) as u64;
         tokio_trace::span::Id::from_u64(next)
     }

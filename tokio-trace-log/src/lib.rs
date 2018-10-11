@@ -152,7 +152,7 @@ impl Subscriber for TraceLogger {
         log::logger().enabled(&metadata.as_log())
     }
 
-    fn new_span(&self, _new_span: &span::NewSpan) -> span::Id {
+    fn new_span(&self, _new_span: span::Data) -> span::Id {
         span::Id::from_u64(0)
     }
 
