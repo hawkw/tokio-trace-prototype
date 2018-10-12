@@ -1,6 +1,10 @@
-use tokio_trace::span::{Id, Data};
+use tokio_trace::span::{Id, Data, State};
 
-use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+use std::{
+    cmp,
+    hash::{Hash, Hasher},
+    sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT},
+};
 
 /// The span registration portion of the [`Subscriber`] trait.
 ///
@@ -25,23 +29,50 @@ pub trait RegisterSpan {
     /// [span ID]: ../span/struct.Id.html
     fn new_span(&self, new_span: Data) -> Id;
 
-    // fn get(&self, Id) -> Option<&Data>;
-}
+    fn span_data(&self, id: &Id) -> Option<&Data>;
 
-/// Registers new span IDs with an increasing `usize` counter.
-///
-/// This may overflow on 32-bit machines.
-pub fn increasing_counter(_new_span: Data) -> Id {
-    static NEXT_ID: AtomicUsize = ATOMIC_USIZE_INIT;
-    let next = NEXT_ID.fetch_add(1, Ordering::SeqCst);
-    Id::from_u64(next as u64)
-}
-
-impl<T> RegisterSpan for T
-where
-    T: Fn(Data) -> Id,
-{
-    fn new_span(&self, new_span: Data) -> Id {
-        self(new_span)
+    fn span<'a>(&'a self, id: &'a Id, state: State) -> SpanRef<'a> {
+        let data = self.span_data(id);
+        SpanRef {
+            id,
+            data,
+            state,
+            _priv: (),
+        }
     }
 }
+
+#[derive(Debug)]
+pub struct SpanRef<'a> {
+    pub id: &'a Id,
+    pub data: Option<&'a Data>,
+    pub state: State,
+    _priv: (),
+}
+
+impl<'a> Hash for SpanRef<'a> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+        self.state.hash(state);
+    }
+}
+
+impl<'a, 'b> cmp::PartialEq<SpanRef<'b>> for SpanRef<'a> {
+    fn eq(&self, other: &SpanRef<'b>) -> bool {
+        self.id == other.id && self.state == other.state
+    }
+}
+
+impl<'a> cmp::Eq for SpanRef<'a> { }
+// /// Registers new span IDs with an increasing `usize` counter.
+// ///
+// /// This may overflow on 32-bit machines.
+// pub fn increasing_counter(_new_span: Data) -> Id {
+//     static NEXT_ID: AtomicUsize = ATOMIC_USIZE_INIT;
+//     let next = NEXT_ID.fetch_add(1, Ordering::SeqCst);
+//     Id::from_u64(next as u64)
+// }
+
+// struct IncreasingCounter {
+
+// }

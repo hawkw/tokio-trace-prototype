@@ -104,20 +104,20 @@ where
     }
 
     fn span_data(&self, id: &span::Id) -> Option<&SpanData> {
-        unimplemented!("TODO: RegisterSpan should support this")
+        self.registry.span_data(id)
     }
 
     fn observe_event<'event, 'meta: 'event>(&self, event: &'event Event<'event, 'meta>) {
         self.observer.observe_event(event)
     }
 
-    fn enter(&self, span: span::Id, state: span::State) {
-        // self.observer.enter(span)
-        unimplemented!()
+    fn enter(&self, id: span::Id, state: span::State) {
+        let span = self.registry.span(&id, state);
+        self.observer.enter(&span);
     }
 
-    fn exit(&self, span: span::Id, state: span::State) {
-        // self.observer.exit(span)
-        unimplemented!()
+    fn exit(&self, id: span::Id, state: span::State) {
+        let span = self.registry.span(&id, state);
+        self.observer.exit(&span);
     }
 }

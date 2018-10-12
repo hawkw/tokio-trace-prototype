@@ -1,5 +1,9 @@
-use filter::{self, Filter};
-use tokio_trace::{Event, Meta, SpanData};
+use ::{
+    filter::{self, Filter},
+    SpanRef,
+};
+
+use tokio_trace::{Event, Meta};
 
 /// The notification processing portion of the [`Subscriber`] trait.
 ///
@@ -7,8 +11,8 @@ use tokio_trace::{Event, Meta, SpanData};
 /// and span notifications, but don't implement span registration.
 pub trait Observe {
     fn observe_event<'event, 'meta: 'event>(&self, event: &'event Event<'event, 'meta>);
-    fn enter(&self, span: &SpanData);
-    fn exit(&self, span: &SpanData);
+    fn enter<'a>(&self, span: &SpanRef<'a>);
+    fn exit<'a>(&self, span: &SpanRef<'a>);
 
     fn filter(&self) -> &dyn Filter {
         &filter::NoFilter
@@ -77,9 +81,9 @@ pub trait ObserveExt: Observe {
     /// #[macro_use]
     /// extern crate tokio_trace;
     /// extern crate tokio_trace_subscriber;
-    /// use tokio_trace_subscriber::{registry, Observe, ObserveExt};
+    /// use tokio_trace_subscriber::{registry, Event, Observe, ObserveExt, SpanRef};
     /// # use tokio_trace_subscriber::filter::{Filter, NoFilter};
-    /// # use tokio_trace::{Level, Meta, Event, SpanData};
+    /// # use tokio_trace::{Level, Meta};
     /// # fn main() {
     ///
     /// struct Foo {
@@ -93,16 +97,16 @@ pub trait ObserveExt: Observe {
     /// impl Observe for Foo {
     ///     // ...
     /// # fn observe_event<'event, 'meta: 'event>(&self, _: &'event Event<'event, 'meta>) {}
-    /// # fn enter(&self, _: &SpanData) {}
-    /// # fn exit(&self, _: &SpanData) {}
+    /// # fn enter(&self, _: &SpanRef) {}
+    /// # fn exit(&self, _: &SpanRef) {}
     /// # fn filter(&self) -> &dyn Filter { &NoFilter}
     /// }
     ///
     /// impl Observe for Bar {
     ///     // ...
     /// # fn observe_event<'event, 'meta: 'event>(&self, _: &'event Event<'event, 'meta>) {}
-    /// # fn enter(&self, _: &SpanData) {}
-    /// # fn exit(&self, _: &SpanData) {}
+    /// # fn enter(&self, _: &SpanRef) {}
+    /// # fn exit(&self, _: &SpanRef) {}
     /// # fn filter(&self) -> &dyn Filter { &NoFilter}
     /// }
     ///
@@ -156,9 +160,8 @@ pub struct NoObserver;
 /// ```
 /// # extern crate tokio_trace;
 /// extern crate tokio_trace_subscriber;
-/// use tokio_trace_subscriber::{observe, Observe};
+/// use tokio_trace_subscriber::{observe, Event, Observe, SpanRef};
 /// # use tokio_trace_subscriber::filter::{Filter, NoFilter};
-/// # use tokio_trace::{Event, SpanData};
 /// # fn main() {}
 ///
 /// struct Foo {
@@ -172,16 +175,16 @@ pub struct NoObserver;
 /// impl Observe for Foo {
 ///     // ...
 /// # fn observe_event<'event, 'meta: 'event>(&self, _: &'event Event<'event, 'meta>) {}
-/// # fn enter(&self, _: &SpanData) {}
-/// # fn exit(&self, _: &SpanData) {}
+/// # fn enter(&self, _: &SpanRef) {}
+/// # fn exit(&self, _: &SpanRef) {}
 /// # fn filter(&self) -> &dyn Filter { &NoFilter}
 /// }
 ///
 /// impl Observe for Bar {
 ///     // ...
 /// # fn observe_event<'event, 'meta: 'event>(&self, _: &'event Event<'event, 'meta>) {}
-/// # fn enter(&self, _: &SpanData) {}
-/// # fn exit(&self, _: &SpanData) {}
+/// # fn enter(&self, _: &SpanRef) {}
+/// # fn exit(&self, _: &SpanRef) {}
 /// # fn filter(&self) -> &dyn Filter { &NoFilter}
 /// }
 ///
@@ -251,12 +254,12 @@ where
     }
 
     #[inline]
-    fn enter(&self, span: &SpanData) {
+    fn enter<'a>(&self, span: &SpanRef<'a>) {
         self.inner.enter(span)
     }
 
     #[inline]
-    fn exit(&self, span: &SpanData) {
+    fn exit<'a>(&self, span: &SpanRef<'a>) {
         self.inner.exit(span)
     }
 
@@ -292,12 +295,12 @@ where
         self.b.observe_event(event);
     }
 
-    fn enter(&self, span: &SpanData) {
+    fn enter<'a>(&self, span: &SpanRef<'a>) {
         self.a.enter(span);
         self.b.enter(span);
     }
 
-    fn exit(&self, span: &SpanData) {
+    fn exit<'a>(&self, span: &SpanRef<'a>) {
         self.a.exit(span);
         self.b.exit(span);
     }
@@ -334,14 +337,14 @@ where
         }
     }
 
-    fn enter(&self, span: &SpanData) {
+    fn enter<'a>(&self, span: &SpanRef<'a>) {
         match self {
             Either::A(a) => a.enter(span),
             Either::B(b) => b.enter(span),
         }
     }
 
-    fn exit(&self, span: &SpanData) {
+    fn exit<'a>(&self, span: &SpanRef<'a>) {
         match self {
             Either::A(a) => a.exit(span),
             Either::B(b) => b.exit(span),
@@ -372,9 +375,9 @@ where
 impl Observe for NoObserver {
     fn observe_event<'event, 'meta: 'event>(&self, _event: &'event Event<'event, 'meta>) {}
 
-    fn enter(&self, _span: &SpanData) {}
+    fn enter<'a>(&self, span: &SpanRef<'a>) {}
 
-    fn exit(&self, _span: &SpanData) {}
+    fn exit<'a>(&self, span: &SpanRef<'a>) {}
 
     fn filter(&self) -> &dyn Filter {
         self

@@ -11,4 +11,4 @@ pub mod registry;
 
 pub use filter::{Filter, FilterExt};
 pub use observe::{Observe, ObserveExt};
-pub use registry::RegisterSpan;
+pub use registry::{RegisterSpan, SpanRef};

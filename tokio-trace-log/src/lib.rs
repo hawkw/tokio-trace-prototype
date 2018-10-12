@@ -25,6 +25,7 @@ extern crate log;
 
 use std::io;
 use tokio_trace::{span, Subscriber, Event, SpanData, Meta};
+use tokio_trace_subscriber::SpanRef;
 
 /// Format a log record as a trace event in the current span.
 pub fn format_trace(record: &log::Record) -> io::Result<()> {
@@ -205,12 +206,12 @@ impl tokio_trace_subscriber::Observe for TraceLogger {
         <Self as Subscriber>::observe_event(&self, event)
     }
 
-    fn enter(&self, span: &SpanData) {
+    fn enter(&self, span: &SpanRef) {
         // <Self as Subscriber>::enter(&self, span)
         unimplemented!()
     }
 
-    fn exit(&self, span: &SpanData) {
+    fn exit(&self, span: &SpanRef) {
         // <Self as Subscriber>::exit(&self, span)
         unimplemented!()
     }
