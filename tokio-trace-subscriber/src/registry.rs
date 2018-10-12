@@ -2,8 +2,10 @@ use tokio_trace::span::{Id, Data, State};
 
 use std::{
     cmp,
+    cell::RefCell,
+    collections::HashMap,
     hash::{Hash, Hasher},
-    sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT},
+    sync::atomic::{AtomicUsize, Ordering},
 };
 
 /// The span registration portion of the [`Subscriber`] trait.
@@ -11,6 +13,7 @@ use std::{
 /// Implementations of this trait represent the logic run on span creation. They
 /// handle span ID generation.
 pub trait RegisterSpan {
+
     /// Record the construction of a new [`Span`], returning a a new [span ID] for
     /// the span being constructed.
     ///
@@ -29,9 +32,9 @@ pub trait RegisterSpan {
     /// [span ID]: ../span/struct.Id.html
     fn new_span(&self, new_span: Data) -> Id;
 
-    fn span_data(&self, id: &Id) -> Option<&Data>;
+    fn span_data<'a>(&self, id: &Id) -> Option<&Data>;
 
-    fn span<'a>(&'a self, id: &'a Id, state: State) -> SpanRef<'a> {
+    fn span<'a>(&'a self, id: &'a Id, state: State) -> SpanRef {
         let data = self.span_data(id);
         SpanRef {
             id,
@@ -64,6 +67,8 @@ impl<'a, 'b> cmp::PartialEq<SpanRef<'b>> for SpanRef<'a> {
 }
 
 impl<'a> cmp::Eq for SpanRef<'a> { }
+
+
 // /// Registers new span IDs with an increasing `usize` counter.
 // ///
 // /// This may overflow on 32-bit machines.
@@ -73,6 +78,28 @@ impl<'a> cmp::Eq for SpanRef<'a> { }
 //     Id::from_u64(next as u64)
 // }
 
-// struct IncreasingCounter {
+#[derive(Default)]
+pub struct IncreasingCounter {
+    next_id: AtomicUsize,
+    spans: RefCell<HashMap<Id, Data>>,
+}
 
-// }
+pub fn increasing_counter() -> IncreasingCounter {
+    IncreasingCounter::default()
+}
+
+impl RegisterSpan for IncreasingCounter {
+    fn new_span(&self, new_span: Data) -> Id {
+        let id = self.next_id.fetch_add(1, Ordering::SeqCst);
+        let id = Id::from_u64(id as u64);
+        if let Ok(mut spans) = self.spans.lock() {
+            spans.insert(id.clone(), new_span);
+        }
+        id
+    }
+
+    fn span_data(&self, id: &Id) -> Option<&Data> {
+        let spans = self.spans.lock().ok()?;
+        spans.get(id).as_ref().map(|&s| s)
+    }
+}
