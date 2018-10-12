@@ -531,9 +531,10 @@ where
 impl<'a> Iterator for Parents<'a> {
     type Item = &'a SpanData;
     fn next(&mut self) -> Option<Self::Item> {
-        let next = self.next.and_then(|id| self.registry.span_data(id));
-        self.next = next.as_ref().and_then(|data| data.parent.as_ref());
-        next
+        // let next = self.next.and_then(|id| self.registry.span_data(id));
+        // self.next = next.as_ref().and_then(|data| data.parent.as_ref());
+        // next
+        unimplemented!("make this work with with_span?")
     }
 }
 

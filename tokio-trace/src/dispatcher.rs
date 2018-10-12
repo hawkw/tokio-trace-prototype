@@ -73,10 +73,6 @@ impl Subscriber for Dispatch {
         self.0.new_span(span)
     }
 
-    fn span_data(&self, id: &span::Id) -> Option<&span::Data> {
-        self.0.span_data(id)
-    }
-
     fn should_invalidate_filter(&self, metadata: &Meta) -> bool {
         CURRENT_DISPATCH.with(|current| {
             let mut hasher = DefaultHasher::new();
@@ -119,10 +115,6 @@ struct NoSubscriber;
 impl Subscriber for NoSubscriber {
     fn new_span(&self, span: span::Data) -> span::Id {
         span::Id::from_u64(0)
-    }
-
-    fn span_data(&self, _id: &span::Id) -> Option<&span::Data> {
-        None
     }
 
     fn enabled(&self, _metadata: &Meta) -> bool {

@@ -232,17 +232,19 @@ impl Span {
     }
 
     pub fn data(&self) -> Option<&Data> {
-        self.inner.as_ref()
-            .and_then(|active| active.inner.subscriber.span_data(&active.inner.id))
+        unimplemented!("make this work with with_span?")
+        // self.inner.as_ref()
+        //     .and_then(|active| active.inner.subscriber.span_data(&active.inner.id))
     }
 
     pub fn parent(&self) -> Option<&Data> {
         self.inner.as_ref()
             .and_then(|active| {
-                let registry = &active.inner.subscriber;
-                let id = registry.span_data(&active.inner.id)
-                    .and_then(|data| data.parent.as_ref());
-                registry.span_data(id?)
+                // let registry = &active.inner.subscriber;
+                // let id = registry.span_data(&active.inner.id)
+                //     .and_then(|data| data.parent.as_ref());
+                // registry.span_data(id?)
+                unimplemented!("make this work with with_span?")
             })
     }
 }
@@ -292,8 +294,9 @@ impl Data {
 
     /// Returns a `Data` reference to the parent of this span, if one exists.
     pub fn parent<'r, R: Subscriber>(&self, registry: &'r R) -> Option<&'r Data> {
-        self.parent.as_ref()
-            .and_then(|id| registry.span_data(id))
+        // self.parent.as_ref()
+        //     .and_then(|id| registry.span_data(id))
+        unimplemented!("make this work with with_span?")
     }
 
     /// Borrows this span's metadata.
@@ -473,7 +476,8 @@ impl Active {
     }
 
     fn data(&self) -> Option<&Data> {
-        self.inner.subscriber.span_data(&self.inner.id)
+        // self.inner.subscriber.span_data(&self.inner.id)
+        unimplemented!("make this work with with_span?")
     }
 
     /// Returns true if this is the last remaining handle with the capacity to

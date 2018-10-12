@@ -116,10 +116,6 @@ impl tokio_trace::Subscriber for SloggishSubscriber {
         tokio_trace::span::Id::from_u64(next)
     }
 
-    fn span_data(&self, _: &tokio_trace::SpanId) -> Option<&tokio_trace::SpanData> {
-        unimplemented!("this example needs some rewriting")
-    }
-
     #[inline]
     fn observe_event<'event, 'meta: 'event>(&self, event: &'event tokio_trace::Event<'event, 'meta>) {
         let mut stderr = self.stderr.lock();

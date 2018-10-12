@@ -103,21 +103,20 @@ where
         self.registry.new_span(new_span)
     }
 
-    fn span_data(&self, id: &span::Id) -> Option<&SpanData> {
-        self.registry.span_data(id)
-    }
-
     fn observe_event<'event, 'meta: 'event>(&self, event: &'event Event<'event, 'meta>) {
         self.observer.observe_event(event)
     }
 
     fn enter(&self, id: span::Id, state: span::State) {
-        let span = self.registry.span(&id, state);
-        self.observer.enter(&span);
+        self.registry.with_span(&id, state, |span| {
+            self.observer.enter(span);
+        });
+
     }
 
     fn exit(&self, id: span::Id, state: span::State) {
-        let span = self.registry.span(&id, state);
-        self.observer.exit(&span);
+        self.registry.with_span(&id, state, |span| {
+            self.observer.exit(span);
+        });
     }
 }

@@ -2,10 +2,9 @@ use tokio_trace::span::{Id, Data, State};
 
 use std::{
     cmp,
-    cell::RefCell,
     collections::HashMap,
     hash::{Hash, Hasher},
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::{Mutex, atomic::{AtomicUsize, Ordering}},
 };
 
 /// The span registration portion of the [`Subscriber`] trait.
@@ -32,17 +31,9 @@ pub trait RegisterSpan {
     /// [span ID]: ../span/struct.Id.html
     fn new_span(&self, new_span: Data) -> Id;
 
-    fn span_data<'a>(&self, id: &Id) -> Option<&Data>;
-
-    fn span<'a>(&'a self, id: &'a Id, state: State) -> SpanRef {
-        let data = self.span_data(id);
-        SpanRef {
-            id,
-            data,
-            state,
-            _priv: (),
-        }
-    }
+    fn with_span<F>(&self, id: &Id, state: State, f: F)
+    where
+        F: for<'a> Fn(&'a SpanRef<'a>);
 }
 
 #[derive(Debug)]
@@ -50,7 +41,6 @@ pub struct SpanRef<'a> {
     pub id: &'a Id,
     pub data: Option<&'a Data>,
     pub state: State,
-    _priv: (),
 }
 
 impl<'a> Hash for SpanRef<'a> {
@@ -81,7 +71,7 @@ impl<'a> cmp::Eq for SpanRef<'a> { }
 #[derive(Default)]
 pub struct IncreasingCounter {
     next_id: AtomicUsize,
-    spans: RefCell<HashMap<Id, Data>>,
+    spans: Mutex<HashMap<Id, Data>>,
 }
 
 pub fn increasing_counter() -> IncreasingCounter {
@@ -98,8 +88,17 @@ impl RegisterSpan for IncreasingCounter {
         id
     }
 
-    fn span_data(&self, id: &Id) -> Option<&Data> {
-        let spans = self.spans.lock().ok()?;
-        spans.get(id).as_ref().map(|&s| s)
+    fn with_span<F>(&self, id: &Id, state: State, f: F)
+    where
+        F: for<'a> Fn(&'a SpanRef<'a>)
+    {
+        let spans = self.spans.lock().expect("mutex poisoned!");
+        let data = spans.get(id);
+        let span = SpanRef {
+            id,
+            data,
+            state,
+        };
+        f(&span);
     }
 }
