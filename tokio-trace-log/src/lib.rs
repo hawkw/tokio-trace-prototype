@@ -230,14 +230,58 @@ impl tokio_trace_subscriber::Observe for TraceLogger {
         <Self as Subscriber>::observe_event(&self, event)
     }
 
-    fn enter(&self, _span: &SpanRef) {
-        // <Self as Subscriber>::enter(&self, span)
-        unimplemented!()
+    fn enter(&self, span: &SpanRef) {
+        if let Some(data) = span.data {
+            let meta = data.meta();
+            let log_meta = meta.as_log();
+            let logger = log::logger();
+            if logger.enabled(&log_meta) {
+                let fields = data.debug_fields();
+                logger.log(
+                    &log::Record::builder()
+                        .metadata(log_meta)
+                        .module_path(meta.module_path)
+                        .file(meta.file)
+                        .line(meta.line)
+                        .args(format_args!(
+                            "enter: {}{:?}; span={:?}; parent={:?}; state={:?};",
+                            meta.name.unwrap_or(""),
+                            fields,
+                            span.id,
+                            data.parent,
+                            span.state,
+                        )).build(),
+                );
+            }
+        } else {
+            <Self as Subscriber>::enter(&self, span.id.clone(), span.state)
+        }
     }
 
-    fn exit(&self, _span: &SpanRef) {
-        // <Self as Subscriber>::exit(&self, span)
-        unimplemented!()
+    fn exit(&self, span: &SpanRef) {
+        if let Some(data) = span.data {
+            let meta = data.meta();
+            let log_meta = meta.as_log();
+            let logger = log::logger();
+            if logger.enabled(&log_meta) {
+                logger.log(
+                    &log::Record::builder()
+                        .metadata(log_meta)
+                        .module_path(meta.module_path)
+                        .file(meta.file)
+                        .line(meta.line)
+                        .args(format_args!(
+                            "exit: {}; span={:?}; parent={:?}; state={:?};",
+                            meta.name.unwrap_or(""),
+                            span.id,
+                            data.parent,
+                            span.state,
+                        )).build(),
+                );
+            }
+        } else {
+            <Self as Subscriber>::exit(&self, span.id.clone(), span.state)
+        }
     }
 
     fn filter(&self) -> &dyn tokio_trace_subscriber::Filter {
