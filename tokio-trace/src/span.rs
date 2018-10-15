@@ -344,6 +344,11 @@ impl Id {
     pub fn from_u64(u: u64) -> Self {
         Id(u)
     }
+
+    /// Returns the ID of the currently-executing span.
+    pub fn current() -> Option<Self> {
+        Active::current().as_ref().map(Active::id)
+    }
 }
 
 // ===== impl Active =====

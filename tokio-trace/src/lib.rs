@@ -241,7 +241,7 @@ macro_rules! span {
 macro_rules! event {
     (target: $target:expr, $lvl:expr, { $($k:ident = $val:expr),* }, $($arg:tt)+ ) => ({
         {
-            use $crate::{Subscriber, Dispatch, Meta, SpanData, Event, Value};
+            use $crate::{SpanId, Subscriber, Dispatch, Meta, SpanData, Event, Value};
             static META: Meta<'static> = meta! { event:
                 $lvl,
                 target:
@@ -251,7 +251,7 @@ macro_rules! event {
             if cached_filter!(&META, dispatcher) {
                 let field_values: &[& dyn Value] = &[ $( & $val),* ];
                 dispatcher.observe_event(&Event {
-                    parent: SpanData::current(),
+                    parent: SpanId::current(),
                     follows_from: &[],
                     meta: &META,
                     field_values: &field_values[..],
@@ -317,8 +317,8 @@ impl<T> Value for T where T: fmt::Debug + Send + Sync {}
 /// macro). Consumers of `Event` probably do not need to actually care about
 /// these lifetimes, however.
 pub struct Event<'event, 'meta> {
-    pub parent: Option<SpanData>,
-    pub follows_from: &'event [SpanData],
+    pub parent: Option<SpanId>,
+    pub follows_from: &'event [SpanId],
 
     pub meta: &'meta Meta<'meta>,
     // TODO: agh box
