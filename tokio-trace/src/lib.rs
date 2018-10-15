@@ -117,6 +117,37 @@ use std::{fmt, slice};
 
 use self::dedup::IteratorDedup;
 
+#[doc(hidden)]
+#[macro_export]
+macro_rules! meta {
+    (span: $name:expr, $( $field_name:ident ),*) => ({
+        $crate::Meta {
+            name: Some($name),
+            target: module_path!(),
+            level: $crate::Level::Trace,
+            module_path: Some(module_path!()),
+            file: Some(file!()),
+            line: Some(line!()),
+            field_names: &[ $(stringify!($field_name)),* ],
+            kind: $crate::Kind::Span,
+        }
+    });
+    (event: $lvl:expr, $( $field_name:ident ),*) =>
+        (meta!(event: $lvl, target: module_path!(), $( $field_name ),* ));
+    (event: $lvl:expr, target: $target:expr, $( $field_name:ident ),*) => ({
+        $crate::Meta {
+            name: None,
+            target: $target,
+            level: $lvl,
+            module_path: Some(module_path!()),
+            file: Some(file!()),
+            line: Some(line!()),
+            field_names: &[ $(stringify!($field_name)),* ],
+            kind: $crate::Kind::Event,
+        }
+    });
+}
+
 // Cache the result of testing if a span or event with the given metadata is
 // enabled by the current subscriber, so the filter doesn't have to be
 // reapplied if we have already called `enabled`.
@@ -190,16 +221,8 @@ macro_rules! span {
     ($name:expr) => { span!($name,) };
     ($name:expr, $($k:ident = $val:expr),*) => {
         {
-            use $crate::{span, Subscriber, Dispatch, Meta, Level};
-            static META: Meta<'static> = Meta::new_span(
-                Some($name),
-                module_path!(),
-                Level::Trace,
-                Some(module_path!()),
-                Some(file!()),
-                Some(line!()),
-                &[ $(stringify!($k)),* ],
-            );
+            use $crate::{span, Subscriber, Dispatch, Meta};
+            static META: Meta<'static> = meta! { span: $name, $( $k ),* };
             let dispatcher = Dispatch::current();
             if cached_filter!(&META, dispatcher) {
                 span::NewSpan::new(
@@ -215,18 +238,14 @@ macro_rules! span {
 
 #[macro_export]
 macro_rules! event {
-
     (target: $target:expr, $lvl:expr, { $($k:ident = $val:expr),* }, $($arg:tt)+ ) => ({
         {
             use $crate::{Subscriber, Dispatch, Meta, SpanData, Event, Value};
-            static META: Meta<'static> = Meta::new_event(
-                $target,
+            static META: Meta<'static> = meta! { event:
                 $lvl,
-                Some(module_path!()),
-                Some(file!()),
-                Some(line!()),
-                &[ $(stringify!($k)),* ],
-            );
+                target:
+                $target, $( $k ),*
+            };
             let dispatcher = Dispatch::current();
             if cached_filter!(&META, dispatcher) {
                 let field_values: &[& dyn Value] = &[ $( & $val),* ];
@@ -318,11 +337,13 @@ pub struct Meta<'a> {
 
     pub field_names: &'a [&'a str],
 
-    kind: Kind,
+    #[doc(hidden)]
+    pub kind: Kind,
 }
 
+#[doc(hidden)]
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
-enum Kind {
+pub enum Kind {
     Span,
     Event,
 }
@@ -336,8 +357,7 @@ pub struct Parents<'a> {
 
 // ===== impl Meta =====
 impl<'a> Meta<'a> {
-    #[doc(hidden)]
-    pub const fn new_span(
+    pub fn new_span(
         name: Option<&'a str>,
         target: &'a str,
         level: Level,
@@ -358,8 +378,7 @@ impl<'a> Meta<'a> {
         }
     }
 
-    #[doc(hidden)]
-    pub const fn new_event(
+    pub fn new_event(
         target: &'a str,
         level: Level,
         module_path: Option<&'a str>,
