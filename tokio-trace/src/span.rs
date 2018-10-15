@@ -1,4 +1,4 @@
-use super::{DebugFields, Dispatch, StaticMeta, Subscriber, Value, Parents, dedup::IteratorDedup};
+use super::{DebugFields, Dispatch, StaticMeta, Subscriber, Value};
 use std::{
     cell::RefCell,
     cmp, fmt,
@@ -231,21 +231,9 @@ impl Span {
         }
     }
 
-    pub fn data(&self) -> Option<&Data> {
-        unimplemented!("make this work with with_span?")
-        // self.inner.as_ref()
-        //     .and_then(|active| active.inner.subscriber.span_data(&active.inner.id))
-    }
-
-    pub fn parent(&self) -> Option<&Data> {
-        self.inner.as_ref()
-            .and_then(|active| {
-                // let registry = &active.inner.subscriber;
-                // let id = registry.span_data(&active.inner.id)
-                //     .and_then(|data| data.parent.as_ref());
-                // registry.span_data(id?)
-                unimplemented!("make this work with with_span?")
-            })
+    /// Returns the `Id` of the parent of this span, if one exists.
+    pub fn parent(&self) -> Option<Id> {
+        self.inner.as_ref().and_then(Active::parent)
     }
 }
 
@@ -280,23 +268,14 @@ impl Data {
         }
     }
 
-    pub fn current() -> Option<Self> {
-        // CURRENT_SPAN.with(|current| {
-        //     current.borrow().as_ref().map(Active::data).cloned()
-        // })
-        unimplemented!("who knows, this may not come back")
-    }
-
     /// Returns the name of this span, or `None` if it is unnamed,
     pub fn name(&self) -> Option<&'static str> {
         self.static_meta.name
     }
 
-    /// Returns a `Data` reference to the parent of this span, if one exists.
-    pub fn parent<'r, R: Subscriber>(&self, registry: &'r R) -> Option<&'r Data> {
-        // self.parent.as_ref()
-        //     .and_then(|id| registry.span_data(id))
-        unimplemented!("make this work with with_span?")
+    /// Returns the `Id` of the parent of this span, if one exists.
+    pub fn parent(&self) -> Option<&Id> {
+        self.parent.as_ref()
     }
 
     /// Borrows this span's metadata.
@@ -337,60 +316,6 @@ impl Data {
     /// span ith `fmt::Debug`.
     pub fn debug_fields<'a>(&'a self) -> DebugFields<'a, Self> {
         DebugFields(self)
-    }
-
-    /// Returns an iterator over [`Data`] references to all the spans that are
-    /// parents of this span.
-    ///
-    /// The iterator will traverse the trace tree in ascending order from this
-    /// span's immediate parent to the root span of the trace.
-    pub fn parents<'a, R: Subscriber>(&'a self, registry: &'a R) -> Parents<'a> {
-        Parents {
-            next: self.parent.as_ref(),
-            registry,
-        }
-    }
-
-    /// Returns an iterator over all the field names and values of this span
-    /// and all of its parent spans.
-    ///
-    /// Fields with duplicate names are skipped, and the value defined lowest
-    /// in the tree is used. For example:
-    /// ```
-    /// # #[macro_use]
-    /// # extern crate tokio_trace;
-    /// # use tokio_trace::Level;
-    /// # fn main() {
-    /// span!("parent 1", foo = 1, bar = 1).enter(|| {
-    ///     span!("parent 2", foo = 2, bar = 1).enter(|| {
-    ///         span!("my span", bar = 2).enter(|| {
-    ///             // do stuff...
-    ///         })
-    ///     })
-    /// });
-    /// # }
-    /// ```
-    /// If a `Subscriber` were to call `all_fields` on "my span" event, it will
-    /// receive an iterator with the values `("foo", 2)` and `("bar", 2)`.
-    pub fn all_fields<'a, R: Subscriber>(
-        &'a self,
-        registry: &'a R,
-    ) -> impl Iterator<Item = (&'a str, &'a dyn Value)> {
-        self.fields()
-            .chain(self.parents(registry).flat_map(|parent| parent.fields()))
-            .dedup_by(|(k, _)| k)
-    }
-
-    /// Returns the current [`State`] of this span.
-    pub fn state(&self) -> State {
-        // self.inner.state()
-        unimplemented!("may not come back")
-    }
-
-    /// Returns the span's identifier.
-    pub fn id(&self) -> Id {
-        // Id(self.inner.id.0)
-        unimplemented!("may not come back")
     }
 }
 

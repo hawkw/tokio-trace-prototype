@@ -351,12 +351,6 @@ pub enum Kind {
 
 type StaticMeta = Meta<'static>;
 
-/// Iterator over the parents of a span or event
-pub struct Parents<'a> {
-    next: Option<&'a span::Id>,
-    registry: &'a Subscriber
-}
-
 // ===== impl Meta =====
 
 impl<'a> Meta<'a> {
@@ -459,46 +453,6 @@ impl<'event, 'meta: 'event> Event<'event, 'meta> {
     pub fn debug_fields<'a: 'meta>(&'a self) -> DebugFields<'a, Self> {
         DebugFields(self)
     }
-
-    /// Returns an iterator over [`SpanData`] references to all the [`Span`]s
-    /// that are parents of this `Event`.
-    ///
-    /// The iterator will traverse the trace tree in ascending order from this
-    /// event's immediate parent to the root span of the trace.
-    pub fn parents<'a>(&'a self) -> Parents<'a> {
-        // Parents {
-        //     next: self.inner.parent.as_ref(),
-        //     registry: &self.inner.subscriber
-        // }
-        unimplemented!("todo fix")
-    }
-
-    /// Returns an iterator over all the field names and values of this `Event`
-    /// and all of its parent [`Span`]s.
-    ///
-    /// Fields with duplicate names are skipped, and the value defined lowest
-    /// in the tree is used. For example:
-    /// ```
-    /// # #[macro_use]
-    /// # extern crate tokio_trace;
-    /// # use tokio_trace::Level;
-    /// # fn main() {
-    /// span!("parent 1", foo = 1, bar = 1).enter(|| {
-    ///     span!("parent 2", foo = 2, bar = 1).enter(|| {
-    ///         event!(Level::Info, { bar = 2 }, "my event");
-    ///     })
-    /// });
-    /// # }
-    /// ```
-    /// If a `Subscriber` were to call `all_fields` on this event, it will
-    /// receive an iterator with the values `("foo", 2)` and `("bar", 2)`.
-    pub fn all_fields<'a>(
-        &'a self,
-    ) -> impl Iterator<Item = (&'a str, &'a dyn Value)> {
-        self.fields()
-            .chain(self.parents().flat_map(|parent| parent.fields()))
-            .dedup_by(|(k, _)| k)
-    }
 }
 
 impl<'a, 'm: 'a> IntoIterator for &'a Event<'a, 'm> {
@@ -525,19 +479,6 @@ where
             .finish()
     }
 }
-
-// ===== impl Parents =====
-
-impl<'a> Iterator for Parents<'a> {
-    type Item = &'a SpanData;
-    fn next(&mut self) -> Option<Self::Item> {
-        // let next = self.next.and_then(|id| self.registry.span_data(id));
-        // self.next = next.as_ref().and_then(|data| data.parent.as_ref());
-        // next
-        unimplemented!("make this work with with_span?")
-    }
-}
-
 
 // ===== impl Level =====
 
