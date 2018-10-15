@@ -63,15 +63,14 @@ impl<'a> AsLog for Meta<'a> {
 impl<'a> AsTrace for log::Record<'a> {
     type Trace = Meta<'a>;
     fn as_trace(&self) -> Self::Trace {
-        Meta {
-            name: None,
-            target: self.target(),
-            level: self.level().as_trace(),
-            module_path: self.module_path(),
-            line: self.line(),
-            file: self.file(),
-            field_names: &[],
-        }
+        Meta::new_event(
+            self.target(),
+            self.level().as_trace(),
+            self.module_path(),
+            self.file(),
+            self.line(),
+            &[],
+        )
     }
 }
 

@@ -117,49 +117,6 @@ use std::{fmt, slice};
 
 use self::dedup::IteratorDedup;
 
-#[doc(hidden)]
-#[macro_export]
-macro_rules! static_meta {
-    ($($k:ident),*) => (
-        static_meta!(@ None, module_path!(), $crate::Level::Trace, $($k),* )
-    );
-    (level: $lvl:expr, $($k:ident),*) => (
-        static_meta!(@ None, module_path!(), $lvl, $($k),* )
-    );
-    (target: $target:expr, level: $lvl:expr, $($k:ident),*) => (
-        static_meta!(@ None, $target, $lvl, $($k),* )
-    );
-    (target: $target:expr, $($k:ident),*) => (
-        static_meta!(@ None, $target, $crate::Level::Trace, $($k),* )
-    );
-    ($name:expr) => (
-        static_meta!(@ Some($name), module_path!(), $crate::Level::Trace, )
-    );
-    ($name:expr, $($k:ident),*) => (
-        static_meta!(@ Some($name), module_path!(), $crate::Level::Trace, $($k),* )
-    );
-    ($name:expr, level: $lvl:expr, $($k:ident),*) => (
-        static_meta!(@ Some($name), module_path!(), $lvl, $($k),* )
-    );
-    ($name:expr, target: $target:expr, level: $lvl:expr, $($k:ident),*) => (
-        static_meta!(@ Some($name), $target, $lvl, $($k),* )
-    );
-    ($name:expr, target: $target:expr, $($k:ident),*) => (
-        static_meta!(@ Some($name), Some($target), $crate::Level::Trace, $($k),* )
-    );
-    (@ $name:expr, $target:expr, $lvl:expr, $($k:ident),*) => (
-        $crate::Meta {
-            name: $name,
-            target: $target,
-            level: $lvl,
-            module_path: Some(module_path!()),
-            file: Some(file!()),
-            line: Some(line!()),
-            field_names: &[ $(stringify!($k)),* ],
-        }
-    )
-}
-
 // Cache the result of testing if a span or event with the given metadata is
 // enabled by the current subscriber, so the filter doesn't have to be
 // reapplied if we have already called `enabled`.
@@ -233,8 +190,16 @@ macro_rules! span {
     ($name:expr) => { span!($name,) };
     ($name:expr, $($k:ident = $val:expr),*) => {
         {
-            use $crate::{span, Subscriber, Dispatch, Meta};
-            static META: Meta<'static> = static_meta!($name, $($k),* );
+            use $crate::{span, Subscriber, Dispatch, Meta, Level};
+            static META: Meta<'static> = Meta::new_span(
+                Some($name),
+                module_path!(),
+                Level::Trace,
+                Some(module_path!()),
+                Some(file!()),
+                Some(line!()),
+                &[ $(stringify!($k)),* ],
+            );
             let dispatcher = Dispatch::current();
             if cached_filter!(&META, dispatcher) {
                 span::NewSpan::new(
@@ -254,7 +219,14 @@ macro_rules! event {
     (target: $target:expr, $lvl:expr, { $($k:ident = $val:expr),* }, $($arg:tt)+ ) => ({
         {
             use $crate::{Subscriber, Dispatch, Meta, SpanData, Event, Value};
-            static META: Meta<'static> = static_meta!(@ None, $target, $lvl, $($k),* );
+            static META: Meta<'static> = Meta::new_event(
+                $target,
+                $lvl,
+                Some(module_path!()),
+                Some(file!()),
+                Some(line!()),
+                &[ $(stringify!($k)),* ],
+            );
             let dispatcher = Dispatch::current();
             if cached_filter!(&META, dispatcher) {
                 let field_values: &[& dyn Value] = &[ $( & $val),* ];
@@ -345,6 +317,14 @@ pub struct Meta<'a> {
     pub line: Option<u32>,
 
     pub field_names: &'a [&'a str],
+
+    kind: Kind,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+enum Kind {
+    Span,
+    Event,
 }
 
 type StaticMeta = Meta<'static>;
@@ -353,6 +333,69 @@ type StaticMeta = Meta<'static>;
 pub struct Parents<'a> {
     next: Option<&'a SpanData>,
 }
+
+// ===== impl Meta =====
+impl<'a> Meta<'a> {
+    #[doc(hidden)]
+    pub const fn new_span(
+        name: Option<&'a str>,
+        target: &'a str,
+        level: Level,
+        module_path: Option<&'a str>,
+        file: Option<&'a str>,
+        line: Option<u32>,
+        field_names: &'a [&'a str],
+    ) -> Self {
+        Self {
+            name,
+            target,
+            level,
+            module_path,
+            file,
+            line,
+            field_names,
+            kind: Kind::Span,
+        }
+    }
+
+    #[doc(hidden)]
+    pub const fn new_event(
+        target: &'a str,
+        level: Level,
+        module_path: Option<&'a str>,
+        file: Option<&'a str>,
+        line: Option<u32>,
+        field_names: &'a [&'a str],
+    ) -> Self {
+        Self {
+            name: None,
+            target,
+            level,
+            module_path,
+            file,
+            line,
+            field_names,
+            kind: Kind::Event,
+        }
+    }
+
+    /// Returns true if this metadata corresponds to an event.
+    pub fn is_event(&self) -> bool {
+        match self.kind {
+            Kind::Event => true,
+            _ => false,
+        }
+    }
+
+    /// Returns true if this metadata corresponds to a span.
+    pub fn is_span(&self) -> bool {
+        match self.kind {
+            Kind::Span => true,
+            _ => false,
+        }
+    }
+}
+
 
 // ===== impl Event =====
 
