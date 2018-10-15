@@ -28,58 +28,6 @@ pub trait ObserveExt: Observe {
     /// ```
     /// #[macro_use]
     /// extern crate tokio_trace;
-    /// extern crate tokio_trace_log;
-    /// extern crate tokio_trace_subscriber;
-    /// use tokio_trace_subscriber::{registry, filter, Observe, ObserveExt};
-    /// # use tokio_trace::{Level, Meta};
-    /// # fn main() {
-    ///
-    /// let observer = tokio_trace_log::TraceLogger::new()
-    ///     // Subscribe *only* to spans named "foo".
-    ///     .with_filter(|meta: &Meta| {
-    ///         meta.name == Some("foo")
-    ///     });
-    ///
-    /// let subscriber = tokio_trace_subscriber::Composed::builder()
-    ///     .with_observer(observer)
-    ///     .with_registry(registry::increasing_counter());
-    ///
-    /// tokio_trace::Dispatch::to(subscriber).with(|| {
-    ///     /// // This span will be logged.
-    ///     span!("foo", enabled = true) .enter(|| {
-    ///         // do work;
-    ///     });
-    ///     // This span will *not* be logged.
-    ///     span!("bar", enabled = false).enter(|| {
-    ///         // This event also will not be logged.
-    ///         event!(Level::Debug, { enabled = false },"this won't be logged");
-    ///     });
-    /// });
-    /// # }
-    /// ```
-    ///
-    fn tee_to<I>(self, other: I) -> Tee<Self, I::Observer>
-    where
-        I: IntoObserver,
-        Self: Sized,
-    {
-        Tee {
-            a: self,
-            b: other.into_observer(),
-        }
-    }
-
-    /// Composes `self` with a [`Filter`].
-    ///
-    /// This function is intended to be used with composing observers from
-    /// external crates with user-defined filters, so that the resulting
-    /// observer is [`enabled`] only for a subset of the events and spans for
-    /// which the original observer would be enabled.
-    ///
-    /// For example:
-    /// ```
-    /// #[macro_use]
-    /// extern crate tokio_trace;
     /// extern crate tokio_trace_subscriber;
     /// use tokio_trace_subscriber::{registry, Event, Observe, ObserveExt, SpanRef};
     /// # use tokio_trace_subscriber::filter::{Filter, NoFilter};
@@ -124,6 +72,58 @@ pub trait ObserveExt: Observe {
     ///     span!("my great span").enter(|| {
     ///         // ...
     ///     })
+    /// });
+    /// # }
+    /// ```
+    fn tee_to<I>(self, other: I) -> Tee<Self, I::Observer>
+    where
+        I: IntoObserver,
+        Self: Sized,
+    {
+        Tee {
+            a: self,
+            b: other.into_observer(),
+        }
+    }
+
+    /// Composes `self` with a [`Filter`].
+    ///
+    /// This function is intended to be used with composing observers from
+    /// external crates with user-defined filters, so that the resulting
+    /// observer is [`enabled`] only for a subset of the events and spans for
+    /// which the original observer would be enabled.
+    ///
+    ///
+    /// For example:
+    /// ```
+    /// #[macro_use]
+    /// extern crate tokio_trace;
+    /// extern crate tokio_trace_log;
+    /// extern crate tokio_trace_subscriber;
+    /// use tokio_trace_subscriber::{registry, filter, Observe, ObserveExt};
+    /// # use tokio_trace::{Level, Meta};
+    /// # fn main() {
+    ///
+    /// let observer = tokio_trace_log::TraceLogger::new()
+    ///     // Subscribe *only* to spans named "foo".
+    ///     .with_filter(|meta: &Meta| {
+    ///         meta.name == Some("foo")
+    ///     });
+    ///
+    /// let subscriber = tokio_trace_subscriber::Composed::builder()
+    ///     .with_observer(observer)
+    ///     .with_registry(registry::increasing_counter());
+    ///
+    /// tokio_trace::Dispatch::to(subscriber).with(|| {
+    ///     /// // This span will be logged.
+    ///     span!("foo", enabled = true) .enter(|| {
+    ///         // do work;
+    ///     });
+    ///     // This span will *not* be logged.
+    ///     span!("bar", enabled = false).enter(|| {
+    ///         // This event also will not be logged.
+    ///         event!(Level::Debug, { enabled = false },"this won't be logged");
+    ///     });
     /// });
     /// # }
     /// ```
