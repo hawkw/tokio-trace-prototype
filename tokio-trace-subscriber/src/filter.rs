@@ -78,7 +78,7 @@ pub trait FilterExt: Filter {
     /// }
     ///
     /// let name_filter = |meta: &Meta| { meta.name == Some("foo") };
-    /// let mod_filter = |meta: &Meta| { meta.module_path == "my_module" };
+    /// let mod_filter = |meta: &Meta| { meta.module_path == Some("my_module") };
     ///
     /// let subscriber = tokio_trace_subscriber::Composed::builder()
     ///     .with_registry(tokio_trace_subscriber::registry::increasing_counter)
