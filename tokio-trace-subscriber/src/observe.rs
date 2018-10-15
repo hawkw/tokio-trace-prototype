@@ -42,7 +42,7 @@ pub trait ObserveExt: Observe {
     ///
     /// let subscriber = tokio_trace_subscriber::Composed::builder()
     ///     .with_observer(observer)
-    ///     .with_registry(registry::increasing_counter);
+    ///     .with_registry(registry::increasing_counter());
     ///
     /// tokio_trace::Dispatch::to(subscriber).with(|| {
     ///     /// // This span will be logged.
@@ -117,7 +117,7 @@ pub trait ObserveExt: Observe {
     ///
     /// let subscriber = tokio_trace_subscriber::Composed::builder()
     ///     .with_observer(observer)
-    ///     .with_registry(registry::increasing_counter);
+    ///     .with_registry(registry::increasing_counter());
     ///
     /// tokio_trace::Dispatch::to(subscriber).with(|| {
     ///     // This span will be seen by both `foo` and `bar`.
