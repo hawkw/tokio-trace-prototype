@@ -147,6 +147,19 @@ pub struct ModuleWhitelist {
     modules: HashSet<String>,
 }
 
+/// A filter that enables all spans and events, except those with a specified
+/// set of targets.
+#[derive(Debug)]
+pub struct TargetBlacklist {
+    targets: HashSet<String>,
+}
+
+/// A filter that enables onlu spans and events with a specified set of targets.
+#[derive(Debug)]
+pub struct TargetWhitelist {
+    targets: HashSet<String>,
+}
+
 /// Returns a filter that enables all spans and events, except those originating
 /// from a specified set of module paths.
 pub fn module_blacklist<I>(modules: I) -> ModuleBlacklist
@@ -167,6 +180,38 @@ where
 {
     let modules = modules.into_iter().map(String::from).collect();
     ModuleWhitelist { modules }
+}
+
+/// A filter which only enables spans.
+pub fn spans_only<'a, 'b>(metadata: &'a Meta<'b>) -> bool {
+    metadata.is_span()
+}
+
+/// A filter which only enables events.
+pub fn events_only<'a, 'b>(metadata: &'a Meta<'b>) -> bool {
+    metadata.is_event()
+}
+
+/// Returns a filter that enables all spans and events, except those originating
+/// with a specified set of targets.
+pub fn target_blacklist<I>(targets: I) -> TargetBlacklist
+where
+    I: IntoIterator,
+    String: From<<I as IntoIterator>::Item>,
+{
+    let targets = targets.into_iter().map(String::from).collect();
+    TargetBlacklist { targets }
+}
+
+/// Returns a filter that enables only spans and events with a specified set of
+/// targets.
+pub fn target_whitelist<I>(targets: I) -> TargetWhitelist
+where
+    I: IntoIterator,
+    String: From<<I as IntoIterator>::Item>,
+{
+    let targets = targets.into_iter().map(String::from).collect();
+    TargetWhitelist { targets }
 }
 
 impl<F> Filter for F
@@ -276,6 +321,27 @@ impl Filter for ModuleWhitelist {
         metadata.module_path
             .map(|module| self.modules.contains(module))
             .unwrap_or(false)
+    }
+
+    fn should_invalidate_filter(&self, _metadata: &Meta) -> bool {
+        false
+    }
+}
+
+
+impl Filter for TargetBlacklist {
+    fn enabled(&self, metadata: &Meta) -> bool {
+        !self.targets.contains(metadata.target)
+    }
+
+    fn should_invalidate_filter(&self, _metadata: &Meta) -> bool {
+        false
+    }
+}
+
+impl Filter for TargetWhitelist {
+    fn enabled(&self, metadata: &Meta) -> bool {
+        self.targets.contains(metadata.target)
     }
 
     fn should_invalidate_filter(&self, _metadata: &Meta) -> bool {
