@@ -356,7 +356,11 @@ pub struct Parents<'a> {
 }
 
 // ===== impl Meta =====
+
 impl<'a> Meta<'a> {
+
+    /// Construct new metadata for a span, with a name, target, level, field
+    /// names, and optional source code location.
     pub fn new_span(
         name: Option<&'a str>,
         target: &'a str,
@@ -378,6 +382,8 @@ impl<'a> Meta<'a> {
         }
     }
 
+    /// Construct new metadata for an event, with a target, level, field names,
+    /// and optional source code location.
     pub fn new_event(
         target: &'a str,
         level: Level,
