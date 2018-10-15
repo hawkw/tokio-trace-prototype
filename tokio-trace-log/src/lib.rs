@@ -55,7 +55,7 @@ impl<'a> AsLog for Meta<'a> {
     fn as_log(&self) -> Self::Log {
         log::Metadata::builder()
             .level(self.level.as_log())
-            .target(self.target.unwrap_or(""))
+            .target(self.target)
             .build()
     }
 }
@@ -65,14 +65,11 @@ impl<'a> AsTrace for log::Record<'a> {
     fn as_trace(&self) -> Self::Trace {
         Meta {
             name: None,
-            target: Some(self.target()),
+            target: self.target(),
             level: self.level().as_trace(),
-            module_path: self
-                .module_path()
-                // TODO: make symmetric
-                .unwrap_or_else(|| self.target()),
-            line: self.line().unwrap_or(0),
-            file: self.file().unwrap_or("???"),
+            module_path: self.module_path(),
+            line: self.line(),
+            file: self.file(),
             field_names: &[],
         }
     }
@@ -169,9 +166,9 @@ impl Subscriber for TraceLogger {
             logger.log(
                 &log::Record::builder()
                     .metadata(meta)
-                    .module_path(Some(event.meta.module_path))
-                    .file(Some(event.meta.file))
-                    .line(Some(event.meta.line))
+                    .module_path(event.meta.module_path)
+                    .file(event.meta.file)
+                    .line(event.meta.line)
                     .args(format_args!(
                         "[{}] {:?} {}",
                         parents.join(":"),

@@ -121,28 +121,28 @@ use self::dedup::IteratorDedup;
 #[macro_export]
 macro_rules! static_meta {
     ($($k:ident),*) => (
-        static_meta!(@ None, None, $crate::Level::Trace, $($k),* )
+        static_meta!(@ None, module_path!(), $crate::Level::Trace, $($k),* )
     );
     (level: $lvl:expr, $($k:ident),*) => (
-        static_meta!(@ None, None, $lvl, $($k),* )
+        static_meta!(@ None, module_path!(), $lvl, $($k),* )
     );
     (target: $target:expr, level: $lvl:expr, $($k:ident),*) => (
-        static_meta!(@ None, Some($target), $lvl, $($k),* )
+        static_meta!(@ None, $target, $lvl, $($k),* )
     );
     (target: $target:expr, $($k:ident),*) => (
-        static_meta!(@ None, Some($target), $crate::Level::Trace, $($k),* )
+        static_meta!(@ None, $target, $crate::Level::Trace, $($k),* )
     );
     ($name:expr) => (
-        static_meta!(@ Some($name), None, $crate::Level::Trace, )
+        static_meta!(@ Some($name), module_path!(), $crate::Level::Trace, )
     );
     ($name:expr, $($k:ident),*) => (
-        static_meta!(@ Some($name), None, $crate::Level::Trace, $($k),* )
+        static_meta!(@ Some($name), module_path!(), $crate::Level::Trace, $($k),* )
     );
     ($name:expr, level: $lvl:expr, $($k:ident),*) => (
-        static_meta!(@ Some($name),None, $lvl, $($k),* )
+        static_meta!(@ Some($name), module_path!(), $lvl, $($k),* )
     );
     ($name:expr, target: $target:expr, level: $lvl:expr, $($k:ident),*) => (
-        static_meta!(@ Some($name), Some($target), $lvl, $($k),* )
+        static_meta!(@ Some($name), $target, $lvl, $($k),* )
     );
     ($name:expr, target: $target:expr, $($k:ident),*) => (
         static_meta!(@ Some($name), Some($target), $crate::Level::Trace, $($k),* )
@@ -152,9 +152,9 @@ macro_rules! static_meta {
             name: $name,
             target: $target,
             level: $lvl,
-            module_path: module_path!(),
-            file: file!(),
-            line: line!(),
+            module_path: Some(module_path!()),
+            file: Some(file!()),
+            line: Some(line!()),
             field_names: &[ $(stringify!($k)),* ],
         }
     )
@@ -268,7 +268,9 @@ macro_rules! event {
             }
         }
     });
-    ($lvl:expr, { $($k:ident = $val:expr),* }, $($arg:tt)+ ) => (event!(target: None, $lvl, { $($k = $val),* }, $($arg)+))
+    ($lvl:expr, { $($k:ident = $val:expr),* }, $($arg:tt)+ ) => (
+        event!(target: module_path!(), $lvl, { $($k = $val),* }, $($arg)+)
+    )
 }
 
 #[repr(usize)]
@@ -335,12 +337,12 @@ pub struct Event<'event, 'meta> {
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct Meta<'a> {
     pub name: Option<&'a str>,
-    pub target: Option<&'a str>,
+    pub target: &'a str,
     pub level: Level,
 
-    pub module_path: &'a str,
-    pub file: &'a str,
-    pub line: u32,
+    pub module_path: Option<&'a str>,
+    pub file: Option<&'a str>,
+    pub line: Option<u32>,
 
     pub field_names: &'a [&'a str],
 }
