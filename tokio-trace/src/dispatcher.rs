@@ -1,4 +1,4 @@
-use {span, subscriber::Subscriber, Event, SpanData, Meta};
+use {span, subscriber::Subscriber, Event, Meta};
 
 use std::{
     cell::RefCell,
@@ -113,7 +113,7 @@ impl Subscriber for Dispatch {
 struct NoSubscriber;
 
 impl Subscriber for NoSubscriber {
-    fn new_span(&self, span: span::Data) -> span::Id {
+    fn new_span(&self, _span: span::Data) -> span::Id {
         span::Id::from_u64(0)
     }
 

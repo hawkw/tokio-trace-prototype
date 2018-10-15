@@ -375,9 +375,9 @@ where
 impl Observe for NoObserver {
     fn observe_event<'event, 'meta: 'event>(&self, _event: &'event Event<'event, 'meta>) {}
 
-    fn enter<'a>(&self, span: &SpanRef<'a>) {}
+    fn enter<'a>(&self, _span: &SpanRef<'a>) {}
 
-    fn exit<'a>(&self, span: &SpanRef<'a>) {}
+    fn exit<'a>(&self, _span: &SpanRef<'a>) {}
 
     fn filter(&self) -> &dyn Filter {
         self

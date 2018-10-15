@@ -139,7 +139,7 @@ impl tokio_trace::Subscriber for SloggishSubscriber {
     }
 
     #[inline]
-    fn enter(&self, span: tokio_trace::span::Id, state: tokio_trace::span::State) {
+    fn enter(&self, span: tokio_trace::span::Id, _state: tokio_trace::span::State) {
         let mut stderr = self.stderr.lock();
         let mut stack = self.stack.lock().unwrap();
         let spans = self.spans.lock().unwrap();
@@ -172,5 +172,5 @@ impl tokio_trace::Subscriber for SloggishSubscriber {
     }
 
     #[inline]
-    fn exit(&self, span: tokio_trace::span::Id, state: tokio_trace::span::State) {}
+    fn exit(&self, _span: tokio_trace::span::Id, _state: tokio_trace::span::State) {}
 }

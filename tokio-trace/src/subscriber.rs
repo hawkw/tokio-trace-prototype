@@ -60,7 +60,7 @@ pub trait Subscriber {
     /// only if _all_ such children return `false`. If the set of subscribers to
     /// which spans are broadcast may change dynamically, adding a new
     /// subscriber should also invalidate cached filters.
-    fn should_invalidate_filter(&self, metadata: &Meta) -> bool {
+    fn should_invalidate_filter(&self, _metadata: &Meta) -> bool {
         false
     }
 
@@ -86,7 +86,6 @@ mod test_support {
 
     use std::{
         collections::{HashMap, VecDeque},
-        thread,
         sync::{Mutex, atomic::{AtomicUsize, Ordering}},
     };
 
@@ -228,7 +227,7 @@ mod test_support {
 mod tests {
     use ::{
         span,
-        subscriber::{self, Subscriber},
+        subscriber,
         Span,
         Dispatch,
     };

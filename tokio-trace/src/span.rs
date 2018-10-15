@@ -405,11 +405,6 @@ impl Active {
         }
     }
 
-    fn data(&self) -> Option<&Data> {
-        // self.inner.subscriber.span_data(&self.inner.id)
-        unimplemented!("make this work with with_span?")
-    }
-
     /// Returns true if this is the last remaining handle with the capacity to
     /// enter the span.
     ///

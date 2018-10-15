@@ -31,7 +31,7 @@ use std::{
         Ordering
     },
 };
-use tokio_trace::{span, Subscriber, Event, SpanData, SpanId, Meta};
+use tokio_trace::{span, Subscriber, Event, Meta};
 use tokio_trace_subscriber::SpanRef;
 
 /// Format a log record as a trace event in the current span.
@@ -230,12 +230,12 @@ impl tokio_trace_subscriber::Observe for TraceLogger {
         <Self as Subscriber>::observe_event(&self, event)
     }
 
-    fn enter(&self, span: &SpanRef) {
+    fn enter(&self, _span: &SpanRef) {
         // <Self as Subscriber>::enter(&self, span)
         unimplemented!()
     }
 
-    fn exit(&self, span: &SpanRef) {
+    fn exit(&self, _span: &SpanRef) {
         // <Self as Subscriber>::exit(&self, span)
         unimplemented!()
     }

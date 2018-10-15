@@ -115,8 +115,6 @@ extern crate futures;
 
 use std::{fmt, slice};
 
-use self::dedup::IteratorDedup;
-
 #[doc(hidden)]
 #[macro_export]
 macro_rules! meta {
@@ -290,7 +288,6 @@ pub enum Level {
     Trace,
 }
 
-mod dedup;
 mod dispatcher;
 pub mod span;
 pub mod subscriber;
