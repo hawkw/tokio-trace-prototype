@@ -136,50 +136,50 @@ pub struct Sample {
 /// A filter that enables all spans and events, except those originating
 /// from a specified set of module paths.
 #[derive(Debug)]
-pub struct ModuleBlacklist {
+pub struct ExceptModules {
     modules: HashSet<String>,
 }
 
 /// A filter that enables only spans and events originating from a specified
 /// set of module paths.
 #[derive(Debug)]
-pub struct ModuleWhitelist {
+pub struct OnlyModules {
     modules: HashSet<String>,
 }
 
 /// A filter that enables all spans and events, except those with a specified
 /// set of targets.
 #[derive(Debug)]
-pub struct TargetBlacklist {
+pub struct ExceptTargets {
     targets: HashSet<String>,
 }
 
 /// A filter that enables onlu spans and events with a specified set of targets.
 #[derive(Debug)]
-pub struct TargetWhitelist {
+pub struct OnlyTargets {
     targets: HashSet<String>,
 }
 
 /// Returns a filter that enables all spans and events, except those originating
 /// from a specified set of module paths.
-pub fn module_blacklist<I>(modules: I) -> ModuleBlacklist
+pub fn except_modules<I>(modules: I) -> ExceptModules
 where
     I: IntoIterator,
     String: From<<I as IntoIterator>::Item>,
 {
     let modules = modules.into_iter().map(String::from).collect();
-    ModuleBlacklist { modules }
+    ExceptModules { modules }
 }
 
 /// Returns a filter that enables only spans and events originating from a
 /// specified set of module paths.
-pub fn module_whitelist<I>(modules: I) -> ModuleWhitelist
+pub fn only_modules<I>(modules: I) -> OnlyModules
 where
     I: IntoIterator,
     String: From<<I as IntoIterator>::Item>,
 {
     let modules = modules.into_iter().map(String::from).collect();
-    ModuleWhitelist { modules }
+    OnlyModules { modules }
 }
 
 /// A filter which only enables spans.
@@ -194,24 +194,24 @@ pub fn events_only<'a, 'b>(metadata: &'a Meta<'b>) -> bool {
 
 /// Returns a filter that enables all spans and events, except those originating
 /// with a specified set of targets.
-pub fn target_blacklist<I>(targets: I) -> TargetBlacklist
+pub fn except_targets<I>(targets: I) -> ExceptTargets
 where
     I: IntoIterator,
     String: From<<I as IntoIterator>::Item>,
 {
     let targets = targets.into_iter().map(String::from).collect();
-    TargetBlacklist { targets }
+    ExceptTargets { targets }
 }
 
 /// Returns a filter that enables only spans and events with a specified set of
 /// targets.
-pub fn target_whitelist<I>(targets: I) -> TargetWhitelist
+pub fn only_targets<I>(targets: I) -> OnlyTargets
 where
     I: IntoIterator,
     String: From<<I as IntoIterator>::Item>,
 {
     let targets = targets.into_iter().map(String::from).collect();
-    TargetWhitelist { targets }
+    OnlyTargets { targets }
 }
 
 impl<F> Filter for F
@@ -303,7 +303,7 @@ impl Filter for NoFilter {
     }
 }
 
-impl Filter for ModuleBlacklist {
+impl Filter for ExceptModules {
     fn enabled(&self, metadata: &Meta) -> bool {
         metadata.module_path
             .map(|module| !self.modules.contains(module))
@@ -316,7 +316,7 @@ impl Filter for ModuleBlacklist {
     }
 }
 
-impl Filter for ModuleWhitelist {
+impl Filter for OnlyModules {
     fn enabled(&self, metadata: &Meta) -> bool {
         metadata.module_path
             .map(|module| self.modules.contains(module))
@@ -329,7 +329,7 @@ impl Filter for ModuleWhitelist {
 }
 
 
-impl Filter for TargetBlacklist {
+impl Filter for ExceptTargets {
     fn enabled(&self, metadata: &Meta) -> bool {
         !self.targets.contains(metadata.target)
     }
@@ -339,7 +339,7 @@ impl Filter for TargetBlacklist {
     }
 }
 
-impl Filter for TargetWhitelist {
+impl Filter for OnlyTargets {
     fn enabled(&self, metadata: &Meta) -> bool {
         self.targets.contains(metadata.target)
     }
