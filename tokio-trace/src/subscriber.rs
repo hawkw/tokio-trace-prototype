@@ -1,4 +1,4 @@
-use super::{span, Event, Meta, SpanId};
+use ::{span, Event, Meta, SpanId, Value};
 
 pub trait Subscriber {
     // === Span registry methods ==============================================
@@ -24,8 +24,19 @@ pub trait Subscriber {
     // // XXX: should this be a subscriber method or should it have its own type???
     // fn span_data(&self, id: &span::Id) -> Option<&span::Data>;
 
-    /// Attach a field to a span.
-    fn add_field<T: Any + Debug>(&self, span: &span::Id, name: &'static str, value: T) -> Result<(), AddFieldError>;
+    /// Adds a new field to an existing span observed by this `Subscriber`.
+    ///
+    /// This is expected to return an error under the following conditions:
+    /// - The span ID does not correspond to a span which currently exists.
+    /// - The span does not have a field with the given name.
+    /// - The span has a field with the given name, but the value has already
+    ///   been set.
+    fn add_value(
+        &self,
+        span: &span::Id,
+        name: &'static str,
+        value: &dyn Value,
+    ) -> Result<(), AddValueError>;
 
     // === Filtering methods ==================================================
 
@@ -78,7 +89,7 @@ pub trait Subscriber {
 }
 
 #[derive(Clone, Debug)]
-pub enum AddFieldError {
+pub enum AddValueError {
     /// The span with the given ID does not exist.
     NoSpan,
     /// The span exists, but does not have the specified field.
@@ -92,9 +103,9 @@ pub use self::test_support::*;
 
 #[cfg(any(test, feature = "test-support"))]
 mod test_support {
-    use super::Subscriber;
+    use super::*;
     use span::{self, MockSpan};
-    use {Event, Meta, SpanData, SpanId};
+    use {Event, Meta, SpanData, SpanId, Value};
 
     use std::{
         collections::{HashMap, VecDeque},
@@ -168,6 +179,16 @@ mod test_support {
     impl<F: Fn(&Meta) -> bool> Subscriber for Running<F> {
         fn enabled(&self, meta: &Meta) -> bool {
             (self.filter)(meta)
+        }
+
+        fn add_value(
+            &self,
+            _span: &span::Id,
+            _name: &'static str,
+            _value: &dyn Value,
+        ) -> Result<(), AddValueError> {
+            // TODO: it should be possible to expect values...
+            Ok(())
         }
 
         fn new_span(&self, span: SpanData) -> span::Id {
