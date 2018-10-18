@@ -1,4 +1,7 @@
-use tokio_trace::span::{Id, Data, State};
+use tokio_trace::{
+    span::{Id, Data, State},
+    Value,
+};
 
 use std::{
     cmp,
@@ -59,7 +62,7 @@ impl<'a, 'b> cmp::PartialEq<SpanRef<'b>> for SpanRef<'a> {
 impl<'a> cmp::Eq for SpanRef<'a> { }
 
 impl<'a> IntoIterator for &'a SpanRef<'a> {
-    type Item = (&'a str, &'a dyn tokio_trace::Value);
+    type Item = (&'a str, &'a dyn Value);
     type IntoIter = Box<Iterator<Item = Self::Item> + 'a>; // TODO: unbox
     fn into_iter(self) -> Self::IntoIter {
         self.data.map(|data| {
