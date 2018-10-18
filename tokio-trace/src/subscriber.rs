@@ -24,6 +24,9 @@ pub trait Subscriber {
     // // XXX: should this be a subscriber method or should it have its own type???
     // fn span_data(&self, id: &span::Id) -> Option<&span::Data>;
 
+    /// Attach a field to a span.
+    fn add_field<T: Any + Debug>(&self, span: &span::Id, name: &'static str, value: T) -> Result<(), AddFieldError>;
+
     // === Filtering methods ==================================================
 
     /// Determines if a span or event with the specified metadata would be recorded.
@@ -72,6 +75,16 @@ pub trait Subscriber {
     fn observe_event<'event, 'meta: 'event>(&self, event: &'event Event<'event, 'meta>);
     fn enter(&self, span: SpanId, state: span::State);
     fn exit(&self, span: SpanId, state: span::State);
+}
+
+#[derive(Clone, Debug)]
+pub enum AddFieldError {
+    /// The span with the given ID does not exist.
+    NoSpan,
+    /// The span exists, but does not have the specified field.
+    NoField,
+    /// The named field already has a value.
+    FieldAlreadyExists,
 }
 
 #[cfg(any(test, feature = "test-support"))]

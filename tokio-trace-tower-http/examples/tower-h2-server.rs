@@ -7,8 +7,11 @@ extern crate tokio;
 extern crate tokio_trace;
 extern crate tokio_trace_futures;
 extern crate tokio_trace_tower_http;
+extern crate tokio_trace_subscriber;
+extern crate tokio_trace_log;
 extern crate tower_h2;
 extern crate tower_service;
+extern crate env_logger;
 
 use bytes::Bytes;
 use futures::*;
@@ -20,9 +23,9 @@ use tokio_trace_futures::Instrument;
 use tower_h2::{Body, RecvBody, Server};
 use tower_service::{NewService, Service};
 
-#[path = "../../tokio-trace/examples/sloggish/sloggish_subscriber.rs"]
-mod sloggish;
-use self::sloggish::SloggishSubscriber;
+// #[path = "../../tokio-trace/examples/sloggish/sloggish_subscriber.rs"]
+// mod sloggish;
+// use self::sloggish::SloggishSubscriber;
 
 type Response = http::Response<RspBody>;
 

@@ -104,7 +104,7 @@ pub struct Data {
 
     pub static_meta: &'static StaticMeta,
 
-    pub field_values: Vec<Box<dyn Value>>,
+    pub field_values: Vec<Box<Value>>,
 }
 
 /// Identifies a span within the context of a process.
@@ -194,7 +194,7 @@ impl Span {
     pub fn new(
         dispatch: Dispatch,
         static_meta: &'static StaticMeta,
-        field_values: Vec<Box<dyn Value>>,
+        field_values: Vec<Box<Value>>,
     ) -> Span {
         let parent = Active::current();
         let data = Data::new(parent.as_ref().map(Active::id), static_meta, field_values);
@@ -252,7 +252,7 @@ impl Data {
     fn new(
         parent: Option<Id>,
         static_meta: &'static StaticMeta,
-        field_values: Vec<Box<dyn Value>>,
+        field_values: Vec<Box<Value>>,
     ) -> Self {
         Data {
             parent,
@@ -283,7 +283,7 @@ impl Data {
 
     /// Borrows the value of the field named `name`, if it exists. Otherwise,
     /// returns `None`.
-    pub fn field<Q>(&self, key: Q) -> Option<&dyn Value>
+    pub fn field<Q>(&self, key: Q) -> Option<&Value>
     where
         &'static str: PartialEq<Q>,
     {
@@ -293,7 +293,7 @@ impl Data {
     }
 
     /// Returns an iterator over all the field names and values on this span.
-    pub fn fields<'a>(&'a self) -> impl Iterator<Item = (&'a str, &'a dyn Value)> {
+    pub fn fields<'a>(&'a self) -> impl Iterator<Item = (&'a str, &'a Value)> {
         self.field_names()
             .enumerate()
             .filter_map(move |(i, &name)| {
@@ -311,8 +311,8 @@ impl Data {
 }
 
 impl<'a> IntoIterator for &'a Data {
-    type Item = (&'a str, &'a dyn Value);
-    type IntoIter = Box<Iterator<Item = (&'a str, &'a dyn Value)> + 'a>; // TODO: unbox
+    type Item = (&'a str, &'a Value);
+    type IntoIter = Box<Iterator<Item = (&'a str, &'a Value)> + 'a>; // TODO: unbox
     fn into_iter(self) -> Self::IntoIter {
         Box::new(self.fields())
     }
@@ -477,7 +477,7 @@ mod test_support {
     pub struct MockSpan {
         pub name: Option<Option<&'static str>>,
         pub state: Option<State>,
-        pub fields: HashMap<String, Box<dyn Value>>,
+        pub fields: HashMap<String, Box<Value>>,
         // TODO: more
     }
 
