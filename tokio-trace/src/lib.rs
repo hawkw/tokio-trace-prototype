@@ -113,11 +113,7 @@
 
 extern crate futures;
 
-use std::{
-    any::Any,
-    fmt,
-    slice,
-};
+use std::{any::Any, fmt, slice};
 
 #[doc(hidden)]
 #[macro_export]
@@ -301,11 +297,13 @@ pub use self::{
 };
 
 // XXX: im using fmt::Debug for prototyping purposes, it should probably leave.
-pub type Value = Any + fmt::Debug + Send + Sync;
+pub trait Value: Any + fmt::Debug + Send + Sync { }
 
-enum ValueInner {
-    Borrowed(&'static (dyn Any + fmt::Debug + Send + Sync)),
-    Owned(Arc<dyn Any + fmt::Debug + Send + Sync>),
+impl<T> Value for T
+where
+    T: Any + fmt::Debug + Send + Sync,
+{
+
 }
 
 /// **Note**: `Event` must be generic over two lifetimes, that of `Event` itself
@@ -322,7 +320,7 @@ pub struct Event<'event, 'meta> {
 
     pub meta: &'meta Meta<'meta>,
     // TODO: agh box
-    pub field_values: &'event [&'event Value],
+    pub field_values: &'event [&'event dyn Value],
     pub message: fmt::Arguments<'event>,
 }
 
@@ -426,7 +424,7 @@ impl<'event, 'meta: 'event> Event<'event, 'meta> {
 
     /// Borrows the value of the field named `name`, if it exists. Otherwise,
     /// returns `None`.
-    pub fn field<Q>(&'event self, name: Q) -> Option<&'event Value>
+    pub fn field<Q>(&'event self, name: Q) -> Option<&'event dyn Value>
     where
         &'event str: PartialEq<Q>,
     {
@@ -450,8 +448,8 @@ impl<'event, 'meta: 'event> Event<'event, 'meta> {
 }
 
 impl<'a, 'm: 'a> IntoIterator for &'a Event<'a, 'm> {
-    type Item = (&'a str, &'a Value);
-    type IntoIter = Box<Iterator<Item = (&'a str, &'a Value)> + 'a>; // TODO: unbox
+    type Item = (&'a str, &'a dyn Value);
+    type IntoIter = Box<Iterator<Item = (&'a str, &'a dyn Value)> + 'a>; // TODO: unbox
     fn into_iter(self) -> Self::IntoIter {
         Box::new(self.fields())
     }
@@ -459,11 +457,11 @@ impl<'a, 'm: 'a> IntoIterator for &'a Event<'a, 'm> {
 
 pub struct DebugFields<'a, I: 'a>(&'a I)
 where
-    &'a I: IntoIterator<Item = (&'a str, &'a Value)>;
+    &'a I: IntoIterator<Item = (&'a str, &'a dyn Value)>;
 
 impl<'a, I: 'a> fmt::Debug for DebugFields<'a, I>
 where
-    &'a I: IntoIterator<Item = (&'a str, &'a Value)>,
+    &'a I: IntoIterator<Item = (&'a str, &'a dyn Value)>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.0
