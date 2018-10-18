@@ -294,6 +294,15 @@ impl Data {
         self.static_meta.field_names.iter()
     }
 
+    /// Returns true if a field named 'name' has been declared on this span,
+    /// even if the field does not currently have a value.
+    pub fn has_field<Q>(&self, key: Q) -> bool
+    where
+        &'static str: PartialEq<Q>,
+    {
+        self.field_names().any(|&name| name == key)
+    }
+
     /// Borrows the value of the field named `name`, if it exists. Otherwise,
     /// returns `None`.
     pub fn field<Q>(&self, key: Q) -> Option<&dyn Value>
