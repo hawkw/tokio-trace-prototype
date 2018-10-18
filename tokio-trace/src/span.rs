@@ -1,4 +1,4 @@
-use super::{DebugFields, Dispatch, StaticMeta, Subscriber, Value};
+use ::{DebugFields, Dispatch, StaticMeta, subscriber::{AddValueError, Subscriber}, Value};
 use std::{
     cell::RefCell,
     cmp, fmt,
@@ -104,7 +104,7 @@ pub struct Data {
 
     pub static_meta: &'static StaticMeta,
 
-    pub field_values: Vec<Box<Value>>,
+    pub field_values: Vec<Option<Box<dyn Value>>>,
 }
 
 /// Identifies a span within the context of a process.
@@ -194,7 +194,7 @@ impl Span {
     pub fn new(
         dispatch: Dispatch,
         static_meta: &'static StaticMeta,
-        field_values: Vec<Box<Value>>,
+        field_values: Vec<Option<Box<dyn Value>>>,
     ) -> Span {
         let parent = Active::current();
         let data = Data::new(parent.as_ref().map(Active::id), static_meta, field_values);
@@ -230,6 +230,19 @@ impl Span {
     pub fn parent(&self) -> Option<Id> {
         self.inner.as_ref().and_then(Active::parent)
     }
+
+    pub fn add_value(&self, field: &'static str, value: &dyn Value) -> Result<(), AddValueError> {
+        if let Some(ref inner) = self.inner {
+            let inner = &inner.inner;
+            match inner.subscriber.add_value(&inner.id, field, value) {
+                Ok(()) => Ok(()),
+                Err(AddValueError::NoSpan) => panic!("span should still exist!"),
+                Err(e) => Err(e),
+            }
+        } else {
+            Err(AddValueError::NoSpan)
+        }
+    }
 }
 
 impl fmt::Debug for Span {
@@ -252,7 +265,7 @@ impl Data {
     fn new(
         parent: Option<Id>,
         static_meta: &'static StaticMeta,
-        field_values: Vec<Box<Value>>,
+        field_values: Vec<Option<Box<dyn Value>>>,
     ) -> Self {
         Data {
             parent,
@@ -283,23 +296,25 @@ impl Data {
 
     /// Borrows the value of the field named `name`, if it exists. Otherwise,
     /// returns `None`.
-    pub fn field<Q>(&self, key: Q) -> Option<&Value>
+    pub fn field<Q>(&self, key: Q) -> Option<&dyn Value>
     where
         &'static str: PartialEq<Q>,
     {
         self.field_names()
             .position(|&field_name| field_name == key)
-            .and_then(|i| self.field_values.get(i).map(AsRef::as_ref))
+            .and_then(|i| {
+                self.field_values
+                    .get(i)?
+                    .as_ref()
+                    .map(Box::as_ref)
+            })
     }
 
     /// Returns an iterator over all the field names and values on this span.
-    pub fn fields<'a>(&'a self) -> impl Iterator<Item = (&'a str, &'a Value)> {
+    pub fn fields<'a>(&'a self) -> impl Iterator<Item = (&'a str, &'a dyn Value)> {
         self.field_names()
-            .enumerate()
-            .filter_map(move |(i, &name)| {
-                self.field_values
-                    .get(i)
-                    .map(move |val| (name, val.as_ref()))
+            .filter_map(move |&name| {
+                self.field(name).map(move |val| (name, val))
             })
     }
 
@@ -311,8 +326,8 @@ impl Data {
 }
 
 impl<'a> IntoIterator for &'a Data {
-    type Item = (&'a str, &'a Value);
-    type IntoIter = Box<Iterator<Item = (&'a str, &'a Value)> + 'a>; // TODO: unbox
+    type Item = (&'a str, &'a dyn Value);
+    type IntoIter = Box<Iterator<Item = (&'a str, &'a dyn Value)> + 'a>; // TODO: unbox
     fn into_iter(self) -> Self::IntoIter {
         Box::new(self.fields())
     }
@@ -477,7 +492,7 @@ mod test_support {
     pub struct MockSpan {
         pub name: Option<Option<&'static str>>,
         pub state: Option<State>,
-        pub fields: HashMap<String, Box<Value>>,
+        pub fields: HashMap<String, Box<dyn Value>>,
         // TODO: more
     }
 
