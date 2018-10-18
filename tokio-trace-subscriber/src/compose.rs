@@ -1,4 +1,4 @@
-use tokio_trace::{span, Event, Meta, SpanData, Subscriber};
+use tokio_trace::{span, Event, Meta, SpanData, subscriber::{AddValueError, Subscriber}, Value};
 use {filter::NoFilter, observe::NoObserver, Filter, Observe, RegisterSpan};
 
 #[derive(Debug, Clone)]
@@ -101,6 +101,15 @@ where
 
     fn new_span(&self, new_span: SpanData) -> span::Id {
         self.registry.new_span(new_span)
+    }
+
+    fn add_value(
+        &self,
+        span: &span::Id,
+        name: &'static str,
+        value: &dyn Value,
+    ) -> Result<(), AddValueError> {
+        self.registry.add_value(span, name, value)
     }
 
     fn observe_event<'event, 'meta: 'event>(&self, event: &'event Event<'event, 'meta>) {
