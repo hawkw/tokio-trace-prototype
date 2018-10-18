@@ -300,13 +300,18 @@ pub use self::{
 };
 
 // XXX: im using fmt::Debug for prototyping purposes, it should probably leave.
-pub trait Value: Any + fmt::Debug + Send + Sync { }
+pub trait Value: Any + fmt::Debug + Send + Sync {
+    // like `Clone`, but "different"
+    fn duplicate(&self) -> Box<dyn Value>;
+}
 
 impl<T> Value for T
 where
-    T: Any + fmt::Debug + Send + Sync,
+    T: Any + Clone + fmt::Debug + Send + Sync,
 {
-
+    fn duplicate(&self) -> Box<dyn Value> {
+        Box::new(self.clone())
+    }
 }
 
 /// **Note**: `Event` must be generic over two lifetimes, that of `Event` itself

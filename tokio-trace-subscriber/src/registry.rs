@@ -108,12 +108,15 @@ impl RegisterSpan for IncreasingCounter {
     }
 
     fn add_value(&self, span: &Id, name: &'static str, value: &dyn Value) -> Result<(), AddValueError> {
-        let spans = self.spans.lock().expect("mutex poisoned!");
+        let mut spans = self.spans.lock().expect("mutex poisoned!");
         let mut span = spans.get_mut(span).ok_or(AddValueError::NoSpan)?;
-        if !span.static_meta.field_names.contains(name) {
-            return Err(AddValueError::NoField);
+        if let Some(i) = span.field_names().position(|field| field == &name) {
+            span.field_values[i] = Some(value.duplicate());
+            Ok(())
+        } else {
+             Err(AddValueError::NoField)
         }
-        span.field_values
+
     }
 
     fn with_span<F>(&self, id: &Id, state: State, f: F)
