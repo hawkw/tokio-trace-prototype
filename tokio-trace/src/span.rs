@@ -194,10 +194,9 @@ impl Span {
     pub fn new(
         dispatch: Dispatch,
         static_meta: &'static StaticMeta,
-        field_values: Vec<Option<Box<dyn Value>>>,
     ) -> Span {
         let parent = Active::current();
-        let data = Data::new(parent.as_ref().map(Active::id), static_meta, field_values);
+        let data = Data::new(parent.as_ref().map(Active::id), static_meta);
         let id = dispatch.new_span(data);
         let inner = Some(Active::new(id, dispatch, parent));
         Self { inner }
@@ -265,12 +264,11 @@ impl Data {
     fn new(
         parent: Option<Id>,
         static_meta: &'static StaticMeta,
-        field_values: Vec<Option<Box<dyn Value>>>,
     ) -> Self {
         Data {
             parent,
             static_meta,
-            field_values,
+            field_values: Vec::new(),
         }
     }
 

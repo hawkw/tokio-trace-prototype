@@ -40,7 +40,7 @@ where
         let span = self.span.clone();
         let inner = &mut self.inner;
         span.enter(|| {
-            let request_span = span!("request", request = request.clone());
+            let request_span = span!("request", request = &request);
             request_span
                 .clone()
                 .enter(move || inner.call(request).instrument(request_span))

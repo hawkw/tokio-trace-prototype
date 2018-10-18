@@ -215,20 +215,23 @@ macro_rules! cached_filter {
 #[macro_export]
 macro_rules! span {
     ($name:expr) => { span!($name,) };
-    ($name:expr, $($k:ident = $val:expr),*) => {
+    ($name:expr, $($k:ident $( = $val:expr )* ) ,*) => {
         {
             use $crate::{Span, Subscriber, Dispatch, Meta};
             static META: Meta<'static> = meta! { span: $name, $( $k ),* };
             let dispatcher = Dispatch::current();
-            if cached_filter!(&META, dispatcher) {
+            let span = if cached_filter!(&META, dispatcher) {
                 Span::new(
                     dispatcher,
                     &META,
-                    vec![ $(Box::new($val)),* ], // todo: wish this wasn't double-boxed...
                 )
             } else {
                 Span::new_disabled()
-            }
+            };
+            $(
+                span.add_value(stringify!($k), $( $val )* );
+            )*
+            span
         }
     }
 }
