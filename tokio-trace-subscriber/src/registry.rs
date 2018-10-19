@@ -1,7 +1,7 @@
 use tokio_trace::{
     span::{Data, Id, State},
     subscriber::AddValueError,
-    Value, ToValue,
+    OwnedValue, Value,
 };
 
 use std::{
@@ -37,7 +37,7 @@ pub trait RegisterSpan {
     /// [span ID]: ../span/struct.Id.html
     fn new_span(&self, new_span: Data) -> Id;
 
-    fn add_value(&self, span: &Id, name: &'static str, value: &dyn Value) -> Result<(), AddValueError>;
+    fn add_value(&self, span: &Id, name: &'static str, value: &dyn OwnedValue) -> Result<(), AddValueError>;
 
     fn with_span<F>(&self, id: &Id, state: State, f: F)
     where
@@ -67,7 +67,7 @@ impl<'a, 'b> cmp::PartialEq<SpanRef<'b>> for SpanRef<'a> {
 impl<'a> cmp::Eq for SpanRef<'a> {}
 
 impl<'a> IntoIterator for &'a SpanRef<'a> {
-    type Item = (&'a str, &'a dyn Value);
+    type Item = (&'a str, &'a dyn OwnedValue);
     type IntoIter = Box<Iterator<Item = Self::Item> + 'a>; // TODO: unbox
     fn into_iter(self) -> Self::IntoIter {
         self.data
@@ -107,7 +107,7 @@ impl RegisterSpan for IncreasingCounter {
         id
     }
 
-    fn add_value(&self, span: &Id, name: &'static str, value: &dyn Value) -> Result<(), AddValueError> {
+    fn add_value(&self, span: &Id, name: &'static str, value: &dyn OwnedValue) -> Result<(), AddValueError> {
         let mut spans = self.spans.lock().expect("mutex poisoned!");
         let span = spans.get_mut(span).ok_or(AddValueError::NoSpan)?;
         if let Some(i) = span.field_names().position(|field| field == &name) {

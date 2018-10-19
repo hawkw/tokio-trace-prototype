@@ -1,4 +1,4 @@
-use ::{DebugFields, Dispatch, StaticMeta, subscriber::{AddValueError, Subscriber}, ToValue, Value};
+use ::{DebugFields, Dispatch, StaticMeta, subscriber::{AddValueError, Subscriber}, Value, OwnedValue};
 use std::{
     borrow::Borrow,
     cell::RefCell,
@@ -105,7 +105,7 @@ pub struct Data {
 
     pub static_meta: &'static StaticMeta,
 
-    pub field_values: Vec<Option<Box<dyn Value>>>,
+    pub field_values: Vec<Option<Box<dyn OwnedValue>>>,
 }
 
 /// Identifies a span within the context of a process.
@@ -231,7 +231,7 @@ impl Span {
         self.inner.as_ref().and_then(Active::parent)
     }
 
-    pub fn add_value(&self, field: &'static str, value: &dyn Value) -> Result<(), AddValueError> {
+    pub fn add_value(&self, field: &'static str, value: &dyn OwnedValue) -> Result<(), AddValueError> {
         if let Some(ref inner) = self.inner {
             let inner = &inner.inner;
             match inner.subscriber.add_value(&inner.id, field, value) {
@@ -304,7 +304,7 @@ impl Data {
 
     /// Borrows the value of the field named `name`, if it exists. Otherwise,
     /// returns `None`.
-    pub fn field<Q>(&self, key: Q) -> Option<&dyn Value>
+    pub fn field<Q>(&self, key: Q) -> Option<&dyn OwnedValue>
     where
         &'static str: PartialEq<Q>,
     {
@@ -319,7 +319,7 @@ impl Data {
     }
 
     /// Returns an iterator over all the field names and values on this span.
-    pub fn fields<'a>(&'a self) -> impl Iterator<Item = (&'a str, &'a dyn Value)> {
+    pub fn fields<'a>(&'a self) -> impl Iterator<Item = (&'a str, &'a dyn OwnedValue)> {
         self.field_names()
             .filter_map(move |&name| {
                 self.field(name).map(move |val| (name, val))
@@ -328,14 +328,14 @@ impl Data {
 
     /// Returns a struct that can be used to format all the fields on this
     /// span ith `fmt::Debug`.
-    pub fn debug_fields<'a>(&'a self) -> DebugFields<'a, Self, &'a dyn Value> {
+    pub fn debug_fields<'a>(&'a self) -> DebugFields<'a, Self, &'a dyn OwnedValue> {
         DebugFields(self)
     }
 }
 
 impl<'a> IntoIterator for &'a Data {
-    type Item = (&'a str, &'a dyn Value);
-    type IntoIter = Box<Iterator<Item = (&'a str, &'a dyn Value)> + 'a>; // TODO: unbox
+    type Item = (&'a str, &'a dyn OwnedValue);
+    type IntoIter = Box<Iterator<Item = (&'a str, &'a dyn OwnedValue)> + 'a>; // TODO: unbox
     fn into_iter(self) -> Self::IntoIter {
         Box::new(self.fields())
     }
@@ -495,12 +495,12 @@ pub use self::test_support::*;
 #[cfg(any(test, feature = "test-support"))]
 mod test_support {
     use std::collections::HashMap;
-    use {span::State, Value};
+    use {span::State, OwnedValue};
 
     pub struct MockSpan {
         pub name: Option<Option<&'static str>>,
         pub state: Option<State>,
-        pub fields: HashMap<String, Box<dyn Value>>,
+        pub fields: HashMap<String, Box<dyn OwnedValue>>,
         // TODO: more
     }
 
