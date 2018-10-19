@@ -104,7 +104,7 @@ pub struct Data {
 
     pub static_meta: &'static StaticMeta,
 
-    pub field_values: Vec<Option<Box<dyn OwnedValue>>>,
+    pub field_values: Vec<Option<OwnedValue>>,
 }
 
 /// Identifies a span within the context of a process.
@@ -303,7 +303,7 @@ impl Data {
 
     /// Borrows the value of the field named `name`, if it exists. Otherwise,
     /// returns `None`.
-    pub fn field<Q>(&self, key: Q) -> Option<&dyn OwnedValue>
+    pub fn field<Q>(&self, key: Q) -> Option<&OwnedValue>
     where
         &'static str: PartialEq<Q>,
     {
@@ -313,12 +313,11 @@ impl Data {
                 self.field_values
                     .get(i)?
                     .as_ref()
-                    .map(Box::as_ref)
             })
     }
 
     /// Returns an iterator over all the field names and values on this span.
-    pub fn fields<'a>(&'a self) -> impl Iterator<Item = (&'a str, &'a dyn OwnedValue)> {
+    pub fn fields<'a>(&'a self) -> impl Iterator<Item = (&'a str, &'a OwnedValue)> {
         self.field_names()
             .filter_map(move |&name| {
                 self.field(name).map(move |val| (name, val))
@@ -343,14 +342,14 @@ impl Data {
 
     /// Returns a struct that can be used to format all the fields on this
     /// span ith `fmt::Debug`.
-    pub fn debug_fields<'a>(&'a self) -> DebugFields<'a, Self, &'a dyn OwnedValue> {
+    pub fn debug_fields<'a>(&'a self) -> DebugFields<'a, Self, &'a OwnedValue> {
         DebugFields(self)
     }
 }
 
 impl<'a> IntoIterator for &'a Data {
-    type Item = (&'a str, &'a dyn OwnedValue);
-    type IntoIter = Box<Iterator<Item = (&'a str, &'a dyn OwnedValue)> + 'a>; // TODO: unbox
+    type Item = (&'a str, &'a OwnedValue);
+    type IntoIter = Box<Iterator<Item = (&'a str, &'a OwnedValue)> + 'a>; // TODO: unbox
     fn into_iter(self) -> Self::IntoIter {
         Box::new(self.fields())
     }
@@ -515,7 +514,7 @@ mod test_support {
     pub struct MockSpan {
         pub name: Option<Option<&'static str>>,
         pub state: Option<State>,
-        pub fields: HashMap<String, Box<dyn OwnedValue>>,
+        pub fields: HashMap<String, Box<OwnedValue>>,
         // TODO: more
     }
 
