@@ -1,8 +1,12 @@
-use std::{any::Any, fmt};
+use std::{any::Any, fmt, borrow::Borrow};
 
 pub trait Value: fmt::Debug + Send + Sync { }
 
-pub struct OwnedValue(Box<dyn Any + Send + Sync>);
+pub struct OwnedValue {
+    my_debug_impl: fn(&(), &mut fmt::Formatter) -> fmt::Result,
+    any: Box<dyn Any + Send + Sync>,
+}
+
 
 impl<T> Value for T
 where
@@ -15,30 +19,37 @@ pub trait IntoValue {
     fn into_value(&self) -> OwnedValue;
 }
 
-impl<T> IntoValue for T
+impl<T, V> IntoValue for T
 where
-    T: ToOwned,
-    <T as ToOwned>::Owned: Value + 'static,
+    T: ToOwned<Owned = V>,
+    V: Borrow<T> + Value + 'static,
 {
     fn into_value(&self) -> OwnedValue {
-        OwnedValue(Box::new(self.to_owned()))
+        let owned = self.to_owned();
+        // I'll just make the damn vtable *myself*!
+        let my_debug_impl = |me: &(), f: &mut fmt::Formatter| unsafe {
+            let me = &*(me as *const () as *const V);
+            fmt::Debug::fmt(me, f)
+        };
+        let boxed = OwnedValue {
+            my_debug_impl,
+            any: Box::new(owned),
+        };
+        boxed
     }
 }
 
 impl OwnedValue {
     pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
-        self.0.downcast_ref()
+        self.any.downcast_ref()
     }
 }
 
 impl fmt::Debug for OwnedValue {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let this = unsafe {
-            // An impl of `Debug` for the boxed type is known to exist, because
-            // the `OwnedValue` constructor requires a type implementing
-            // `Debug`.
-            ::std::mem::transmute::<&dyn Any, &dyn fmt::Debug>(self.0.as_ref())
+        let me = unsafe {
+            &*(self.any.as_ref() as *const _ as *const ())
         };
-        fmt::Debug::fmt(this, f)
+        (self.my_debug_impl)(me, f)
     }
 }
