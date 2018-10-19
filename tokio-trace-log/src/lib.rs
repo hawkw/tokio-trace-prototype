@@ -180,7 +180,7 @@ impl Subscriber for TraceLogger {
         id
     }
 
-    fn add_value(&self, span: &span::Id, name: &'static str, value: &dyn IntoValue) -> Result<(), subscriber::AddValueError> {
+    fn add_value(&self, _span: &span::Id, _name: &'static str, _value: &dyn IntoValue) -> Result<(), subscriber::AddValueError> {
         // XXX eventually this should Do Something...
         Ok(())
     }

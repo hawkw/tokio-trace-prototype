@@ -1,6 +1,5 @@
-use ::{DebugFields, Dispatch, StaticMeta, subscriber::{AddValueError, Subscriber}, Value, OwnedValue, IntoValue};
+use ::{DebugFields, Dispatch, StaticMeta, subscriber::{AddValueError, Subscriber}, IntoValue, OwnedValue};
 use std::{
-    borrow::Borrow,
     cell::RefCell,
     cmp, fmt,
     hash::{Hash, Hasher},

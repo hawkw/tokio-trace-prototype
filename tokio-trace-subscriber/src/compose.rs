@@ -1,4 +1,4 @@
-use tokio_trace::{span, Event, Meta, SpanData, subscriber::{AddValueError, Subscriber}, OwnedValue, IntoValue};
+use tokio_trace::{span, Event, Meta, SpanData, subscriber::{AddValueError, Subscriber}, IntoValue};
 use {filter::NoFilter, observe::NoObserver, Filter, Observe, RegisterSpan};
 
 #[derive(Debug, Clone)]

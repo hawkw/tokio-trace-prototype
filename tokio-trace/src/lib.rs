@@ -229,7 +229,8 @@ macro_rules! span {
                 Span::new_disabled()
             };
             $(
-                span.add_value(stringify!($k), $( $val )* );
+                span.add_value(stringify!($k), $( $val )* )
+                    .expect(concat!("adding value for field ", stringify!($k), " failed!"));
             )*
             span
         }
