@@ -15,7 +15,11 @@ fn main() {
 
         let span = span!("my_great_span", foo = &4, baz = &5);
         span.enter(|| {
-            event!(Level::Info, { yak_shaved = &true }, "hi from inside my span");
+            event!(
+                Level::Info,
+                { yak_shaved = &true },
+                "hi from inside my span"
+            );
         });
     });
 }

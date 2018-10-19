@@ -13,7 +13,11 @@
 extern crate ansi_term;
 extern crate humantime;
 use self::ansi_term::{Color, Style};
-use super::tokio_trace::{self, Level, SpanData, SpanId, subscriber::{self, Subscriber}};
+use super::tokio_trace::{
+    self,
+    subscriber::{self, Subscriber},
+    Level, SpanData, SpanId,
+};
 
 use std::{
     collections::HashMap,
@@ -109,9 +113,16 @@ impl Subscriber for SloggishSubscriber {
         id
     }
 
-    fn add_value(&self, span: &tokio_trace::SpanId, name: &'static str, value: &dyn tokio_trace::IntoValue) -> Result<(), subscriber::AddValueError> {
+    fn add_value(
+        &self,
+        span: &tokio_trace::SpanId,
+        name: &'static str,
+        value: &dyn tokio_trace::IntoValue,
+    ) -> Result<(), subscriber::AddValueError> {
         let mut spans = self.spans.lock().expect("mutex poisoned!");
-        let span = spans.get_mut(span).ok_or(subscriber::AddValueError::NoSpan)?;
+        let span = spans
+            .get_mut(span)
+            .ok_or(subscriber::AddValueError::NoSpan)?;
         span.add_value(name, value)
     }
 

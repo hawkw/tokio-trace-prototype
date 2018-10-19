@@ -1,16 +1,19 @@
 #[macro_use]
 extern crate tokio_trace;
 
-use tokio_trace::{Level, Event, span, subscriber::{self, Subscriber}, Meta, IntoValue};
+use tokio_trace::{
+    span,
+    subscriber::{self, Subscriber},
+    Event, IntoValue, Level, Meta,
+};
 
 use std::{
     any::Any,
     collections::HashMap,
     sync::{
-        Arc,
-        RwLock,
         atomic::{AtomicUsize, Ordering},
-    }
+        Arc, RwLock,
+    },
 };
 
 #[derive(Clone)]
@@ -29,22 +32,31 @@ impl Subscriber for CounterSubscriber {
         let mut registry = self.counters.0.write().unwrap();
         for name in new_span.meta().field_names {
             if name.contains("count") {
-                let _ = registry.entry(name)
-                    .or_insert_with(|| AtomicUsize::new(0));
+                let _ = registry.entry(name).or_insert_with(|| AtomicUsize::new(0));
             }
         }
         self.spans.write().unwrap().insert(id.clone(), new_span);
         id
     }
 
-    fn add_value(&self, span: &span::Id, name: &'static str, value: &dyn IntoValue) -> Result<(), subscriber::AddValueError> {
-        self.spans.write().unwrap().get_mut(span)
+    fn add_value(
+        &self,
+        span: &span::Id,
+        name: &'static str,
+        value: &dyn IntoValue,
+    ) -> Result<(), subscriber::AddValueError> {
+        self.spans
+            .write()
+            .unwrap()
+            .get_mut(span)
             .ok_or(subscriber::AddValueError::NoSpan)?
             .add_value(name, value)
     }
 
     fn enabled(&self, metadata: &Meta) -> bool {
-        metadata.is_span() && metadata.field_names.iter()
+        metadata.is_span() && metadata
+            .field_names
+            .iter()
             .any(|name| name.contains("count"))
     }
 
@@ -61,17 +73,15 @@ impl Subscriber for CounterSubscriber {
         }
         let registry = self.counters.0.read().unwrap();
         if let Some(span) = self.spans.read().unwrap().get(&span) {
-            for (counter, value) in span.fields()
-                .filter_map(|(k, v)| {
-                    if !k.contains("count") {
-                        return None;
-                    }
-                    let any: &(dyn Any + 'static) = v;
-                    let v = Any::downcast_ref::<usize>(any)?;
-                    let c = registry.get(k)?;
-                    Some((c, v))
-                })
-            {
+            for (counter, value) in span.fields().filter_map(|(k, v)| {
+                if !k.contains("count") {
+                    return None;
+                }
+                let any: &(dyn Any + 'static) = v;
+                let v = Any::downcast_ref::<usize>(any)?;
+                let c = registry.get(k)?;
+                Some((c, v))
+            }) {
                 counter.fetch_add(*value, Ordering::Release);
             }
         }
@@ -96,18 +106,19 @@ impl Counters {
     }
 }
 
-
 fn main() {
     let (counters, subscriber) = Counters::new();
 
     tokio_trace::Dispatch::to(subscriber).with(|| {
         let mut foo = 2;
         span!("my_great_span", foo_count = &foo).enter(|| {
-            event!(Level::Info, { yak_shaved = &true }, "hi from inside my span");
+            event!(
+                Level::Info,
+                { yak_shaved = &true },
+                "hi from inside my span"
+            );
             foo += 1;
-            span!("my other span", foo_count = &foo, baz_count = &5).enter(|| {
-
-            })
+            span!("my other span", foo_count = &foo, baz_count = &5).enter(|| {})
         });
     });
 

@@ -1,14 +1,16 @@
-use ::{DebugFields, Dispatch, StaticMeta, subscriber::{AddValueError, Subscriber}, IntoValue, OwnedValue};
 use std::{
-    iter,
     cell::RefCell,
     cmp, fmt,
     hash::{Hash, Hasher},
-    slice,
+    iter, slice,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
     },
+};
+use {
+    subscriber::{AddValueError, Subscriber},
+    DebugFields, Dispatch, IntoValue, OwnedValue, StaticMeta,
 };
 
 thread_local! {
@@ -192,10 +194,7 @@ pub enum State {
 
 impl Span {
     #[doc(hidden)]
-    pub fn new(
-        dispatch: Dispatch,
-        static_meta: &'static StaticMeta,
-    ) -> Span {
+    pub fn new(dispatch: Dispatch, static_meta: &'static StaticMeta) -> Span {
         let parent = Active::current();
         let data = Data::new(parent.as_ref().map(Active::id), static_meta);
         let id = dispatch.new_span(data);
@@ -231,7 +230,11 @@ impl Span {
         self.inner.as_ref().and_then(Active::parent)
     }
 
-    pub fn add_value(&self, field: &'static str, value: &dyn IntoValue) -> Result<(), AddValueError> {
+    pub fn add_value(
+        &self,
+        field: &'static str,
+        value: &dyn IntoValue,
+    ) -> Result<(), AddValueError> {
         if let Some(ref inner) = self.inner {
             let inner = &inner.inner;
             match inner.subscriber.add_value(&inner.id, field, value) {
@@ -262,10 +265,7 @@ impl fmt::Debug for Span {
 // ===== impl Data =====
 
 impl Data {
-    fn new(
-        parent: Option<Id>,
-        static_meta: &'static StaticMeta,
-    ) -> Self {
+    fn new(parent: Option<Id>, static_meta: &'static StaticMeta) -> Self {
         // Preallocate enough `None`s to hold the unset state of every field
         // name.
         let field_values = iter::repeat(())
@@ -316,23 +316,22 @@ impl Data {
     {
         self.field_names()
             .position(|&field_name| field_name == key)
-            .and_then(|i| {
-                self.field_values
-                    .get(i)?
-                    .as_ref()
-            })
+            .and_then(|i| self.field_values.get(i)?.as_ref())
     }
 
     /// Returns an iterator over all the field names and values on this span.
     pub fn fields<'a>(&'a self) -> impl Iterator<Item = (&'a str, &'a OwnedValue)> {
         self.field_names()
-            .filter_map(move |&name| {
-                self.field(name).map(move |val| (name, val))
-            })
+            .filter_map(move |&name| self.field(name).map(move |val| (name, val)))
     }
 
-    pub fn add_value(&mut self, name: &'static str, value: &dyn IntoValue) -> Result<(), AddValueError> {
-        if let Some(i) = self.field_names()
+    pub fn add_value(
+        &mut self,
+        name: &'static str,
+        value: &dyn IntoValue,
+    ) -> Result<(), AddValueError> {
+        if let Some(i) = self
+            .field_names()
             .position(|&field_name| field_name == name)
         {
             let field = &mut self.field_values[i];

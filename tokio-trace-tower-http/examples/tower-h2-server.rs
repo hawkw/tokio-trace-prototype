@@ -124,7 +124,8 @@ fn main() {
                 .incoming()
                 .fold((h2, reactor), |(h2, reactor), sock| {
                     let addr = sock.peer_addr().expect("can't get addr");
-                    let conn_span = span!("conn", remote_ip = &addr.ip(), remote_port = &addr.port());
+                    let conn_span =
+                        span!("conn", remote_ip = &addr.ip(), remote_port = &addr.port());
                     conn_span.clone().enter(|| {
                         if let Err(e) = sock.set_nodelay(true) {
                             return Err(e);

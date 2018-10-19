@@ -1,17 +1,13 @@
-use std::{any::Any, fmt, borrow::Borrow};
+use std::{any::Any, borrow::Borrow, fmt};
 
-pub trait Value: fmt::Debug + Send + Sync { }
+pub trait Value: fmt::Debug + Send + Sync {}
 
 pub struct OwnedValue {
     my_debug_impl: fn(&(), &mut fmt::Formatter) -> fmt::Result,
     any: Box<dyn Any + Send + Sync>,
 }
 
-
-impl<T> Value for T
-where
-    T: fmt::Debug + Send + Sync,
-{ }
+impl<T> Value for T where T: fmt::Debug + Send + Sync {}
 
 // TODO: should `IntoValue` also be `Value`?
 pub trait IntoValue {
@@ -47,9 +43,7 @@ impl OwnedValue {
 
 impl fmt::Debug for OwnedValue {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let me = unsafe {
-            &*(self.any.as_ref() as *const _ as *const ())
-        };
+        let me = unsafe { &*(self.any.as_ref() as *const _ as *const ()) };
         (self.my_debug_impl)(me, f)
     }
 }

@@ -1,4 +1,8 @@
-use {span, subscriber::{self, Subscriber}, Event, Meta, IntoValue};
+use {
+    span,
+    subscriber::{self, Subscriber},
+    Event, IntoValue, Meta,
+};
 
 use std::{
     cell::RefCell,
@@ -84,7 +88,12 @@ impl Subscriber for Dispatch {
     }
 
     #[inline]
-    fn add_value(&self, span: &span::Id, name: &'static str, value: &dyn IntoValue) -> Result<(), subscriber::AddValueError> {
+    fn add_value(
+        &self,
+        span: &span::Id,
+        name: &'static str,
+        value: &dyn IntoValue,
+    ) -> Result<(), subscriber::AddValueError> {
         self.0.add_value(span, name, value)
     }
 
@@ -116,7 +125,12 @@ impl Subscriber for NoSubscriber {
         span::Id::from_u64(0)
     }
 
-    fn add_value(&self, _span: &span::Id, _name: &'static str, _value: &dyn IntoValue) -> Result<(), subscriber::AddValueError> {
+    fn add_value(
+        &self,
+        _span: &span::Id,
+        _name: &'static str,
+        _value: &dyn IntoValue,
+    ) -> Result<(), subscriber::AddValueError> {
         Ok(())
     }
 

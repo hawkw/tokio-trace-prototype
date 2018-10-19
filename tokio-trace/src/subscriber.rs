@@ -1,4 +1,4 @@
-use ::{span, Event, Meta, SpanId, IntoValue};
+use {span, Event, IntoValue, Meta, SpanId};
 
 pub trait Subscriber {
     // === Span registry methods ==============================================
@@ -105,7 +105,7 @@ pub use self::test_support::*;
 mod test_support {
     use super::*;
     use span::{self, MockSpan};
-    use {Event, Meta, SpanData, SpanId, IntoValue};
+    use {Event, IntoValue, Meta, SpanData, SpanId};
 
     use std::{
         collections::{HashMap, VecDeque},
