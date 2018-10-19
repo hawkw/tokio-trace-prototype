@@ -32,7 +32,7 @@ thread_local! {
 /// # #[macro_use] extern crate tokio_trace;
 /// # fn main() {
 /// let my_var = 5;
-/// let my_span = span!("my_span", my_var = my_var);
+/// let my_span = span!("my_span", my_var = &my_var);
 ///
 /// my_span.clone().enter(|| {
 ///     // perform some work in the context of `my_span`...
