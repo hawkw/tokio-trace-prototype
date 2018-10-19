@@ -1,5 +1,6 @@
 use ::{DebugFields, Dispatch, StaticMeta, subscriber::{AddValueError, Subscriber}, IntoValue, OwnedValue};
 use std::{
+    iter,
     cell::RefCell,
     cmp, fmt,
     hash::{Hash, Hasher},
@@ -265,10 +266,16 @@ impl Data {
         parent: Option<Id>,
         static_meta: &'static StaticMeta,
     ) -> Self {
+        // Preallocate enough `None`s to hold the unset state of every field
+        // name.
+        let field_values = iter::repeat(())
+            .map(|_| None)
+            .take(static_meta.field_names.len())
+            .collect();
         Data {
             parent,
             static_meta,
-            field_values: Vec::new(),
+            field_values,
         }
     }
 
@@ -325,10 +332,10 @@ impl Data {
     }
 
     pub fn add_value(&mut self, name: &'static str, value: &dyn IntoValue) -> Result<(), AddValueError> {
-        if let Some(field) = self.field_names()
+        if let Some(i) = self.field_names()
             .position(|&field_name| field_name == name)
-            .and_then(|idx| self.field_values.get_mut(idx))
         {
+            let field = &mut self.field_values[i];
             if field.is_some() {
                 Err(AddValueError::FieldAlreadyExists)
             } else {
