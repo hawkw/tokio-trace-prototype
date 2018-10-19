@@ -8,13 +8,12 @@ pub trait OwnedValue: Value + Any {
 impl<T> Value for T
 where
     T: fmt::Debug + Send + Sync,
-{
+{ }
 
-}
-
-pub trait Duplicate: Value {
+// TODO: should `IntoValue` also be `Value`?
+pub trait IntoValue {
     // like `Clone`, but "different"
-    fn duplicate(&self) -> Box<dyn OwnedValue>;
+    fn into_value(&self) -> Box<dyn OwnedValue>;
 }
 
 impl<T> OwnedValue for T
@@ -22,12 +21,12 @@ where
     T: Any + Value,
 { }
 
-impl<T> Duplicate for T
+impl<T> IntoValue for T
 where
-    T: Value + ToOwned,
+    T: ToOwned,
     <T as ToOwned>::Owned: OwnedValue,
 {
-    fn duplicate(&self) -> Box<dyn OwnedValue> {
+    fn into_value(&self) -> Box<dyn OwnedValue> {
         Box::new(self.to_owned())
     }
 }

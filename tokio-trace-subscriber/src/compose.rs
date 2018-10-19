@@ -1,4 +1,4 @@
-use tokio_trace::{span, Event, Meta, SpanData, subscriber::{AddValueError, Subscriber}, OwnedValue, Duplicate};
+use tokio_trace::{span, Event, Meta, SpanData, subscriber::{AddValueError, Subscriber}, OwnedValue, IntoValue};
 use {filter::NoFilter, observe::NoObserver, Filter, Observe, RegisterSpan};
 
 #[derive(Debug, Clone)]
@@ -107,7 +107,7 @@ where
         &self,
         span: &span::Id,
         name: &'static str,
-        value: &dyn Duplicate,
+        value: &dyn IntoValue,
     ) -> Result<(), AddValueError> {
         self.registry.add_value(span, name, value)
     }
