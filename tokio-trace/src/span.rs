@@ -1,4 +1,4 @@
-use ::{DebugFields, Dispatch, StaticMeta, subscriber::{AddValueError, Subscriber}, Value, OwnedValue};
+use ::{DebugFields, Dispatch, StaticMeta, subscriber::{AddValueError, Subscriber}, Value, OwnedValue, Duplicate};
 use std::{
     borrow::Borrow,
     cell::RefCell,
@@ -231,7 +231,7 @@ impl Span {
         self.inner.as_ref().and_then(Active::parent)
     }
 
-    pub fn add_value(&self, field: &'static str, value: &dyn OwnedValue) -> Result<(), AddValueError> {
+    pub fn add_value(&self, field: &'static str, value: &dyn Duplicate) -> Result<(), AddValueError> {
         if let Some(ref inner) = self.inner {
             let inner = &inner.inner;
             match inner.subscriber.add_value(&inner.id, field, value) {

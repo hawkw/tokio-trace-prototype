@@ -1,7 +1,7 @@
 use tokio_trace::{
     span::{Data, Id, State},
     subscriber::AddValueError,
-    OwnedValue, Value,
+    OwnedValue, Duplicate,
 };
 
 use std::{
@@ -37,7 +37,7 @@ pub trait RegisterSpan {
     /// [span ID]: ../span/struct.Id.html
     fn new_span(&self, new_span: Data) -> Id;
 
-    fn add_value(&self, span: &Id, name: &'static str, value: &dyn OwnedValue) -> Result<(), AddValueError>;
+    fn add_value(&self, span: &Id, name: &'static str, value: &dyn Duplicate) -> Result<(), AddValueError>;
 
     fn with_span<F>(&self, id: &Id, state: State, f: F)
     where
@@ -107,7 +107,7 @@ impl RegisterSpan for IncreasingCounter {
         id
     }
 
-    fn add_value(&self, span: &Id, name: &'static str, value: &dyn OwnedValue) -> Result<(), AddValueError> {
+    fn add_value(&self, span: &Id, name: &'static str, value: &dyn Duplicate) -> Result<(), AddValueError> {
         let mut spans = self.spans.lock().expect("mutex poisoned!");
         let span = spans.get_mut(span).ok_or(AddValueError::NoSpan)?;
         if let Some(i) = span.field_names().position(|field| field == &name) {

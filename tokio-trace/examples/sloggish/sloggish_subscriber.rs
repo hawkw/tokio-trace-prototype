@@ -109,7 +109,7 @@ impl Subscriber for SloggishSubscriber {
         id
     }
 
-    fn add_value(&self, span: &tokio_trace::SpanId, name: &'static str, value: &dyn tokio_trace::Value) -> Result<(), subscriber::AddValueError> {
+    fn add_value(&self, span: &tokio_trace::SpanId, name: &'static str, value: &dyn tokio_trace::Duplicate) -> Result<(), subscriber::AddValueError> {
         let mut spans = self.spans.lock().expect("mutex poisoned!");
         let span = spans.get_mut(span).ok_or(subscriber::AddValueError::NoSpan)?;
         if let Some(i) = span.field_names().position(|field| field == &name) {

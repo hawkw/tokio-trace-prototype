@@ -302,10 +302,7 @@ pub use self::{
 // XXX: im using fmt::Debug for prototyping purposes, it should probably leave.
 pub trait Value: fmt::Debug + Send + Sync { }
 
-
 pub trait OwnedValue: Value + Any {
-    // like `Clone`, but "different"
-    fn duplicate(&self) -> Box<dyn OwnedValue>;
 }
 
 impl<T> Value for T
@@ -315,14 +312,23 @@ where
 
 }
 
+pub trait Duplicate: Value {
+    // like `Clone`, but "different"
+    fn duplicate(&self) -> Box<dyn OwnedValue>;
+}
+
 impl<T> OwnedValue for T
 where
-    T: Any + fmt::Debug + Send + Sync,
-    T: Clone,
-    // <T as Clone>::Owned: Any + Value,
+    T: Any + Value,
+{ }
+
+impl<T> Duplicate for T
+where
+    T: Value + ToOwned,
+    <T as ToOwned>::Owned: OwnedValue,
 {
     fn duplicate(&self) -> Box<dyn OwnedValue> {
-        Box::new(self.clone())
+        Box::new(self.to_owned())
     }
 }
 

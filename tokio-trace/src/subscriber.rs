@@ -1,4 +1,4 @@
-use ::{span, Event, Meta, SpanId, OwnedValue};
+use ::{span, Event, Meta, SpanId, Duplicate};
 
 pub trait Subscriber {
     // === Span registry methods ==============================================
@@ -35,7 +35,7 @@ pub trait Subscriber {
         &self,
         span: &span::Id,
         name: &'static str,
-        value: &dyn OwnedValue,
+        value: &dyn Duplicate,
     ) -> Result<(), AddValueError>;
 
     // === Filtering methods ==================================================
@@ -105,7 +105,7 @@ pub use self::test_support::*;
 mod test_support {
     use super::*;
     use span::{self, MockSpan};
-    use {Event, Meta, SpanData, SpanId, OwnedValue};
+    use {Event, Meta, SpanData, SpanId, Duplicate};
 
     use std::{
         collections::{HashMap, VecDeque},
@@ -185,7 +185,7 @@ mod test_support {
             &self,
             _span: &span::Id,
             _name: &'static str,
-            _value: &dyn OwnedValue,
+            _value: &dyn Duplicate,
         ) -> Result<(), AddValueError> {
             // TODO: it should be possible to expect values...
             Ok(())

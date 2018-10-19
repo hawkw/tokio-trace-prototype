@@ -27,7 +27,7 @@ use std::{
     fmt, io,
     sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT},
 };
-use tokio_trace::{span, subscriber::{self, Subscriber}, Event, Meta, Value};
+use tokio_trace::{span, subscriber::{self, Subscriber}, Event, Meta, Duplicate};
 use tokio_trace_subscriber::SpanRef;
 
 /// Format a log record as a trace event in the current span.
@@ -180,7 +180,7 @@ impl Subscriber for TraceLogger {
         id
     }
 
-    fn add_value(&self, span: &span::Id, name: &'static str, value: &dyn Value) -> Result<(), subscriber::AddValueError> {
+    fn add_value(&self, span: &span::Id, name: &'static str, value: &dyn Duplicate) -> Result<(), subscriber::AddValueError> {
         // XXX eventually this should Do Something...
         Ok(())
     }
