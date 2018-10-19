@@ -1,7 +1,7 @@
 use tokio_trace::{
     span::{Data, Id, State},
     subscriber::AddValueError,
-    Value,
+    Value, ToValue,
 };
 
 use std::{
@@ -109,12 +109,12 @@ impl RegisterSpan for IncreasingCounter {
 
     fn add_value(&self, span: &Id, name: &'static str, value: &dyn Value) -> Result<(), AddValueError> {
         let mut spans = self.spans.lock().expect("mutex poisoned!");
-        let mut span = spans.get_mut(span).ok_or(AddValueError::NoSpan)?;
+        let span = spans.get_mut(span).ok_or(AddValueError::NoSpan)?;
         if let Some(i) = span.field_names().position(|field| field == &name) {
             span.field_values[i] = Some(value.duplicate());
             Ok(())
         } else {
-             Err(AddValueError::NoField)
+            Err(AddValueError::NoField)
         }
 
     }

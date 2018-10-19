@@ -240,7 +240,7 @@ macro_rules! span {
 macro_rules! event {
     (target: $target:expr, $lvl:expr, { $($k:ident = $val:expr),* }, $($arg:tt)+ ) => ({
         {
-            use $crate::{SpanId, Subscriber, Dispatch, Meta, SpanData, Event, Value};
+            use $crate::{SpanId, Subscriber, Dispatch, Meta, SpanData, Event, ToValue};
             static META: Meta<'static> = meta! { event:
                 $lvl,
                 target:
@@ -248,7 +248,7 @@ macro_rules! event {
             };
             let dispatcher = Dispatch::current();
             if cached_filter!(&META, dispatcher) {
-                let field_values: &[& Value] = &[ $( & $val),* ];
+                let field_values: &[& dyn ToValue] = &[ $( & $val),* ];
                 dispatcher.observe_event(&Event {
                     parent: SpanId::current(),
                     follows_from: &[],
@@ -300,14 +300,26 @@ pub use self::{
 };
 
 // XXX: im using fmt::Debug for prototyping purposes, it should probably leave.
-pub trait Value: Any + fmt::Debug + Send + Sync {
+pub trait ToValue: fmt::Debug + Send + Sync { }
+
+
+pub trait Value: ToValue + Any {
     // like `Clone`, but "different"
     fn duplicate(&self) -> Box<dyn Value>;
 }
 
+impl<T> ToValue for T
+where
+    T: fmt::Debug + Send + Sync,
+{
+
+}
+
 impl<T> Value for T
 where
-    T: Any + Clone + fmt::Debug + Send + Sync,
+    T: Any + fmt::Debug + Send + Sync,
+    T: Clone,
+    // <T as Clone>::Owned: Any + ToValue,
 {
     fn duplicate(&self) -> Box<dyn Value> {
         Box::new(self.clone())
@@ -328,7 +340,7 @@ pub struct Event<'event, 'meta> {
 
     pub meta: &'meta Meta<'meta>,
     // TODO: agh box
-    pub field_values: &'event [&'event dyn Value],
+    pub field_values: &'event [&'event dyn ToValue],
     pub message: fmt::Arguments<'event>,
 }
 
@@ -432,7 +444,7 @@ impl<'event, 'meta: 'event> Event<'event, 'meta> {
 
     /// Borrows the value of the field named `name`, if it exists. Otherwise,
     /// returns `None`.
-    pub fn field<Q>(&'event self, name: Q) -> Option<&'event dyn Value>
+    pub fn field<Q>(&'event self, name: Q) -> Option<&'event dyn ToValue>
     where
         &'event str: PartialEq<Q>,
     {
@@ -442,7 +454,7 @@ impl<'event, 'meta: 'event> Event<'event, 'meta> {
     }
 
     /// Returns an iterator over all the field names and values on this event.
-    pub fn fields(&'event self) -> impl Iterator<Item = (&'event str, &'event dyn Value)> {
+    pub fn fields(&'event self) -> impl Iterator<Item = (&'event str, &'event dyn ToValue)> {
         self.field_names()
             .enumerate()
             .filter_map(move |(idx, &name)| self.field_values.get(idx).map(|&val| (name, val)))
@@ -450,26 +462,27 @@ impl<'event, 'meta: 'event> Event<'event, 'meta> {
 
     /// Returns a struct that can be used to format all the fields on this
     /// `Event` with `fmt::Debug`.
-    pub fn debug_fields<'a: 'meta>(&'a self) -> DebugFields<'a, Self> {
+    pub fn debug_fields<'a: 'meta>(&'a self) -> DebugFields<'a, Self, &'a dyn ToValue> {
         DebugFields(self)
     }
 }
 
 impl<'a, 'm: 'a> IntoIterator for &'a Event<'a, 'm> {
-    type Item = (&'a str, &'a dyn Value);
-    type IntoIter = Box<Iterator<Item = (&'a str, &'a dyn Value)> + 'a>; // TODO: unbox
+    type Item = (&'a str, &'a dyn ToValue);
+    type IntoIter = Box<Iterator<Item = (&'a str, &'a dyn ToValue)> + 'a>; // TODO: unbox
     fn into_iter(self) -> Self::IntoIter {
         Box::new(self.fields())
     }
 }
 
-pub struct DebugFields<'a, I: 'a>(&'a I)
+pub struct DebugFields<'a, I: 'a, T: 'a>(&'a I)
 where
-    &'a I: IntoIterator<Item = (&'a str, &'a dyn Value)>;
+    &'a I: IntoIterator<Item = (&'a str, T)>;
 
-impl<'a, I: 'a> fmt::Debug for DebugFields<'a, I>
+impl<'a, I: 'a, T: 'a> fmt::Debug for DebugFields<'a, I, T>
 where
-    &'a I: IntoIterator<Item = (&'a str, &'a dyn Value)>,
+    &'a I: IntoIterator<Item = (&'a str, T)>,
+    T: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.0

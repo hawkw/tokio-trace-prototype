@@ -1,5 +1,6 @@
-use ::{DebugFields, Dispatch, StaticMeta, subscriber::{AddValueError, Subscriber}, Value};
+use ::{DebugFields, Dispatch, StaticMeta, subscriber::{AddValueError, Subscriber}, ToValue, Value};
 use std::{
+    borrow::Borrow,
     cell::RefCell,
     cmp, fmt,
     hash::{Hash, Hasher},
@@ -327,7 +328,7 @@ impl Data {
 
     /// Returns a struct that can be used to format all the fields on this
     /// span ith `fmt::Debug`.
-    pub fn debug_fields<'a>(&'a self) -> DebugFields<'a, Self> {
+    pub fn debug_fields<'a>(&'a self) -> DebugFields<'a, Self, &'a dyn Value> {
         DebugFields(self)
     }
 }
@@ -657,8 +658,8 @@ mod tests {
         Dispatch::to(subscriber::mock().run()).with(|| {
             // Even though these spans have the same name and fields, they will have
             // differing metadata, since they were created on different lines.
-            let foo1 = span!("foo", bar = 1, baz = false);
-            let foo2 = span!("foo", bar = 1, baz = false);
+            let foo1 = span!("foo", bar = &1, baz = &false);
+            let foo2 = span!("foo", bar = &1, baz = &false);
 
             assert_ne!(foo1, foo2);
             // assert_ne!(foo1.data(), foo2.data());
@@ -670,7 +671,7 @@ mod tests {
         // Every time time this function is called, it will return a _new
         // instance_ of a span with the same metadata, name, and fields.
         fn make_span() -> Span {
-            span!("foo", bar = 1, baz = false)
+            span!("foo", bar = &1, baz = &false)
         }
 
         Dispatch::to(subscriber::mock().run()).with(|| {
