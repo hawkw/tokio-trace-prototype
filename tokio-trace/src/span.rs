@@ -325,6 +325,22 @@ impl Data {
             })
     }
 
+    pub fn add_value(&mut self, name: &'static str, value: &dyn IntoValue) -> Result<(), AddValueError> {
+        if let Some(field) = self.field_names()
+            .position(|&field_name| field_name == name)
+            .and_then(|idx| self.field_values.get_mut(idx))
+        {
+            if field.is_some() {
+                Err(AddValueError::FieldAlreadyExists)
+            } else {
+                *field = Some(value.into_value());
+                Ok(())
+            }
+        } else {
+            Err(AddValueError::NoField)
+        }
+    }
+
     /// Returns a struct that can be used to format all the fields on this
     /// span ith `fmt::Debug`.
     pub fn debug_fields<'a>(&'a self) -> DebugFields<'a, Self, &'a dyn OwnedValue> {
