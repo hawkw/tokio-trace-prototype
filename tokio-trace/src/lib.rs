@@ -230,7 +230,7 @@ macro_rules! span {
             };
             $(
                 span.add_value(stringify!($k), $( $val )* )
-                    .expect(concat!("adding value for field ", stringify!($k), " failed!"));
+                    .expect(concat!("adding value for field ", stringify!($k), " failed"));
             )*
             span
         }
