@@ -3,7 +3,7 @@ use std::{any::Any, borrow::Borrow, fmt};
 pub trait Value: fmt::Debug + Send + Sync {}
 
 pub struct OwnedValue {
-    my_debug_impl: fn(&(), &mut fmt::Formatter) -> fmt::Result,
+    my_debug_impl: fn(&Any, &mut fmt::Formatter) -> fmt::Result,
     any: Box<dyn Any + Send + Sync>,
 }
 
@@ -21,17 +21,18 @@ where
     V: Borrow<T> + Value + 'static,
 {
     fn into_value(&self) -> OwnedValue {
-        let owned = self.to_owned();
+        let any: Box<dyn Any + Send + Sync> = Box::new(self.to_owned());
+        debug_assert!(any.as_ref().downcast_ref::<V>().is_some());
         // I'll just make the damn vtable *myself*!
-        let my_debug_impl = |me: &(), f: &mut fmt::Formatter| unsafe {
-            let me = &*(me as *const () as *const V);
+        let my_debug_impl = |me: &Any, f: &mut fmt::Formatter| {
+            let me = me.downcast_ref::<V>()
+                .expect("type should downcast to its pre-erasure type");
             fmt::Debug::fmt(me, f)
         };
-        let boxed = OwnedValue {
+        OwnedValue {
             my_debug_impl,
-            any: Box::new(owned),
-        };
-        boxed
+            any,
+        }
     }
 }
 
@@ -43,7 +44,6 @@ impl OwnedValue {
 
 impl fmt::Debug for OwnedValue {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let me = unsafe { &*(self.any.as_ref() as *const _ as *const ()) };
-        (self.my_debug_impl)(me, f)
+        (self.my_debug_impl)(self.any.as_ref(), f)
     }
 }
