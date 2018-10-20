@@ -47,6 +47,10 @@ impl OwnedValue {
     pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
         self.any.downcast_ref()
     }
+
+    pub fn is<T: Any>(&self) -> bool {
+        self.any.is::<T>()
+    }
 }
 
 impl fmt::Debug for OwnedValue {
