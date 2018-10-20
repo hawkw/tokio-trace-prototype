@@ -243,7 +243,8 @@ impl Span {
                 Err(e) => Err(e),
             }
         } else {
-            Err(AddValueError::NoSpan)
+            // If the span doesn't exist, silently do nothing.
+            Ok(())
         }
     }
 }
