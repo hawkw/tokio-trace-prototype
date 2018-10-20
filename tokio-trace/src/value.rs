@@ -2,6 +2,13 @@ use std::{any::Any, borrow::Borrow, fmt};
 
 pub trait Value: fmt::Debug + Send + Sync {}
 
+/// An owned, dynamically-typed value.
+///
+/// Like `Any`, references to `OwnedValue` may attempt to downcast the value to
+/// a concrete type. However, unlike `Any`, `OwnedValue`s are constructed from
+/// types known to implement `fmt::Debug`. This means that arbitrary
+/// `OwnedValue`s may be formatted using the erased type's `fmt::Debug`
+/// implementation, _even when the erased type is no longer known_.
 pub struct OwnedValue {
     my_debug_impl: fn(&Any, &mut fmt::Formatter) -> fmt::Result,
     any: Box<dyn Any + Send + Sync>,
