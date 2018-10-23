@@ -53,10 +53,21 @@
 //! indefinitely, they are not heap-allocated by default, to avoid unnecessary
 //! allocations, but the `IntoValue` trait presents `Subscriber`s with the
 //! _option_ to box values should they need to do so.
-use std::{any::Any, borrow::Borrow, fmt};
+//!
+//! `OwnedValue`s also provide the capacity to optionally _downcast_ the erased
+//! type to a concrete type, similarly to
+use std::{any::{Any, TypeId}, borrow::Borrow, fmt};
 
 /// A formattable field value of an erased type.
-pub trait Value: fmt::Debug + Send + Sync {}
+pub trait Value: fmt::Debug + Send + Sync {
+    #[doc(hidden)]
+    fn type_id(&self) -> TypeId
+    where
+        Self: 'static,
+    {
+        TypeId::of::<Self>()
+    }
+}
 
 /// An owned value of an erased type.
 ///
@@ -77,6 +88,34 @@ impl<T> Value for T
 where
     T: fmt::Debug + Send + Sync
 {}
+
+// Copied from `std::any::Any`.
+impl Value + 'static {
+    /// Returns true if the boxed type is the same as `T`
+    #[inline]
+    pub fn is<T: Value + 'static>(&self) -> bool {
+        // Get TypeId of the type this function is instantiated with
+        let t = TypeId::of::<T>();
+
+        // Get TypeId of the type in the trait object
+        let boxed = self.type_id();
+
+        // Compare both TypeIds on equality
+        t == boxed
+    }
+
+    /// Returns some reference to the boxed value if it is of type `T`, or
+    /// `None` if it isn't.
+    pub fn downcast_ref<T: Value + 'static>(&self) -> Option<&T> {
+        if self.is::<T>() {
+            unsafe {
+                Some(&*(self as *const Value as *const T))
+            }
+        } else {
+            None
+        }
+    }
+}
 
 /// Trait representing a value which may be converted into an `OwnedValue`.
 ///
