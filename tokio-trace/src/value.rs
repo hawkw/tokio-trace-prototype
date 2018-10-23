@@ -6,7 +6,53 @@
 //!
 //! # Value Type Erasure
 //!
-//! Rather than restricting `Value`s to a set of Rust primitives,
+//! Rather than restricting `Value`s to a set of Rust primitives, `tokio-trace`
+//! allows values to be of any type. This means that arbitrary user-defined
+//! types may be attached to spans or events, provided they meet certain
+//! requirements.
+//!
+//! Typically, we might accept arbitrarily-typed values by making the
+//! `Subscriber` APIs that accept them generic. However, as the `Dispatch` type
+//! holds a subscriber as a boxed trait object, the `Subscriber` trait must be
+//! object-safe --- it cannot have trait methods that accept a generic
+//! parameter. Thus, we represent `Value`s as trait objects, instead.
+//!
+//! # `Value`s and `Subscriber`s
+//!
+//! `Subscriber`s consume `Value`s as fields attached to `Event`s or `Span`s.
+//! These cases are handled somewhat differently.
+//!
+//! When a field is attached to an `Event`, the `Subscriber::observe_event`
+//! method is passed a slice --- called `field_values` --- of `&dyn Value`
+//! references to the event's values. The ordering of `field_values` corresponds
+//! to the `field_names` slice in the `Event`'s metadata, so for any given index
+//! _i_, the field named `event.meta.field_names[i]` has the value at
+//! `event.field_values[i]`. Since an `Event` represents a _moment_ in time, it
+//! does not expect to outlive the scope that created it. Thus, the values
+//! attached to an `Event` are _borrowed_ from the scope where the `Event`
+//! originated.
+//!
+//! `Span`s, on the other hand, are somewhat more complex. A `Span` may outlive
+//! scope in which it was created, and as `Span`s are not instantaneous, the
+//! values of their fields may be discovered and added to the span _during_ the
+//! `Span`'s execution. Thus, rather than receiving all the field values when
+//! the span is initially created, subscribers are instead notified of each
+//! field as it is added to the span, via the `Subscriber::add_value` method.
+//! That method is called with the span's ID, the name of the field whose value
+//! is being added, and the value to add.
+//!
+//! Since spans may have arbitrarily long lifetimes, passing the subscriber a
+//! `&dyn Value` isn't sufficient. Instead, if a subscriber wishes to persist a
+//! span value for the entire lifetime of the span, it needs the ability to
+//! convert the value into a form in which it is owned by the _subscriber_,
+//! rather than the scope in which it was added to the span. For this reason,
+//! span values are passed as `&dyn IntoValue`. The `IntoValue` trait is an
+//! extension of the `Value` trait that allows conversion into an `OwnedValue`,
+//! a type which represents an owned value allocated on the heap. Since some
+//! subscriber implementations may _not_ need to persist span field values
+//! indefinitely, they are not heap-allocated by default, to avoid unnecessary
+//! allocations, but the `IntoValue` trait presents `Subscriber`s with the
+//! _option_ to box values should they need to do so.
 use std::{any::Any, borrow::Borrow, fmt};
 
 /// A formattable field value of an erased type.
@@ -24,6 +70,7 @@ pub struct OwnedValue {
     any: Box<dyn Any + Send + Sync>,
 }
 
+/// A `Value` which is formatted using `fmt::Display` rather than `fmt::Debug`.
 pub struct DisplayValue<T: fmt::Display>(T);
 
 impl<T> Value for T
@@ -47,11 +94,6 @@ where
     V: Borrow<T> + Value + 'static,
 {
     fn into_value(&self) -> OwnedValue {
-        let any: Box<dyn Any + Send + Sync> = Box::new(self.to_owned());
-        debug_assert!(
-            any.as_ref().downcast_ref::<V>().is_some(),
-            "Box<Any> must be downcastable for OwnedValue to work",
-        );
         // This closure "remembers" the original type `V` before it is erased, and
         // can thus format the `Any` by downcasting it back to `V` and calling
         // `V`'s debug impl.
@@ -60,15 +102,35 @@ where
                 .expect("type should downcast to its pre-erasure type")
                 .fmt(f)
         };
-        OwnedValue { my_debug_impl, any }
+        OwnedValue::new(self, my_debug_impl)
     }
 }
 
+// ===== impl OwnedValue =====
+
 impl OwnedValue {
+    fn new<T, V>(value: &T, my_debug_impl: fn(&Any, &mut fmt::Formatter) -> fmt::Result) -> Self
+    where
+        T: ToOwned<Owned = V> + Send + Sync,
+        V: Borrow<T> + Send + Sync + 'static,
+    {
+        let any: Box<dyn Any + Send + Sync> = Box::new(value.to_owned());
+        debug_assert!(
+            any.as_ref().downcast_ref::<V>().is_some(),
+            "Box<Any> must be downcastable for OwnedValue to work",
+        );
+        OwnedValue { my_debug_impl, any }
+    }
+
+    /// Attempts to downcast the `OwnedValue` to a given _concrete_ type.
+    ///
+    /// Returns a reference to a `T` if the boxed type is `T`, or `None` if it
+    /// is not.
     pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
         self.any.downcast_ref()
     }
 
+    /// Returns `true` if the boxed type is the same as `T`.
     pub fn is<T: Any>(&self) -> bool {
         self.any.is::<T>()
     }
@@ -150,20 +212,12 @@ where
     V: Borrow<T> + fmt::Display + Send + Sync + 'static,
 {
     fn into_value(&self) -> OwnedValue {
-        let any: Box<dyn Any + Send + Sync> = Box::new(self.0.to_owned());
-        debug_assert!(
-            any.as_ref().downcast_ref::<V>().is_some(),
-            "Box<Any> must be downcastable for OwnedValue to work",
-        );
-        // This closure "remembers" the original type `V` before it is erased, and
-        // can thus format the `Any` by downcasting it back to `V` and calling
-        // `V`'s debug impl.
         let my_debug_impl = |me: &Any, f: &mut fmt::Formatter| {
             let me = me.downcast_ref::<V>()
                 .expect("type should downcast to its pre-erasure type");
             fmt::Display::fmt(me, f)
         };
-        OwnedValue { my_debug_impl, any }
+        OwnedValue::new(&self.0, my_debug_impl)
     }
 }
 
