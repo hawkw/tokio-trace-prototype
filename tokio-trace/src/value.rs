@@ -4,7 +4,7 @@
 //! as _fields_. These fields consist of a mapping from a `&'static str` to a
 //! piece of data, known as a `Value`.
 //!
-//! # Value Type Erasure
+//! # AsValue Type Erasure
 //!
 //! Rather than restricting `Value`s to a set of Rust primitives, `tokio-trace`
 //! allows values to be of any type. This means that arbitrary user-defined
@@ -23,7 +23,7 @@
 //! These cases are handled somewhat differently.
 //!
 //! When a field is attached to an `Event`, the `Subscriber::observe_event`
-//! method is passed a slice --- called `field_values` --- of `&dyn Value`
+//! method is passed a slice --- called `field_values` --- of `&dyn AsValue`
 //! references to the event's values. The ordering of `field_values` corresponds
 //! to the `field_names` slice in the `Event`'s metadata, so for any given index
 //! _i_, the field named `event.meta.field_names[i]` has the value at
@@ -42,7 +42,7 @@
 //! is being added, and the value to add.
 //!
 //! Since spans may have arbitrarily long lifetimes, passing the subscriber a
-//! `&dyn Value` isn't sufficient. Instead, if a subscriber wishes to persist a
+//! `&dyn AsValue` isn't sufficient. Instead, if a subscriber wishes to persist a
 //! span value for the entire lifetime of the span, it needs the ability to
 //! convert the value into a form in which it is owned by the _subscriber_,
 //! rather than the scope in which it was added to the span. For this reason,
@@ -59,7 +59,9 @@
 use std::{any::{Any, TypeId}, borrow::Borrow, fmt};
 
 /// A formattable field value of an erased type.
-pub trait Value: fmt::Debug + Send + Sync {
+pub trait AsValue: Send + Sync {
+    fn fmt_value(&self, f: &mut fmt::Formatter) -> fmt::Result;
+
     #[doc(hidden)]
     fn type_id(&self) -> TypeId
     where
@@ -69,31 +71,27 @@ pub trait Value: fmt::Debug + Send + Sync {
     }
 }
 
-/// An owned value of an erased type.
-///
-/// Like `Any`, references to `OwnedValue` may attempt to downcast the value to
-/// a concrete type. However, unlike `Any`, `OwnedValue`s are constructed from
-/// types known to implement `fmt::Debug`. This means that arbitrary
-/// `OwnedValue`s may be formatted using the erased type's `fmt::Debug`
-/// implementation, _even when the erased type is no longer known_.
-pub struct OwnedValue {
-    my_debug_impl: fn(&Any, &mut fmt::Formatter) -> fmt::Result,
-    any: Box<dyn Any + Send + Sync>,
+pub trait Value: fmt::Debug + Send + Sync {
+    /// Returns true if the boxed type is the same as `T`
+    fn is<T: AsValue + 'static>(&self) -> bool
+    where
+        Self: 'static;
+
+    /// Returns some reference to the boxed value if it is of type `T`, or
+    /// `None` if it isn't.
+    fn downcast_ref<T: AsValue + 'static>(&self) -> Option<&T>
+    where
+        Self: 'static;
 }
 
-/// A `Value` which is formatted using `fmt::Display` rather than `fmt::Debug`.
-pub struct DisplayValue<T: fmt::Display>(T);
-
-impl<T> Value for T
-where
-    T: fmt::Debug + Send + Sync
-{}
-
 // Copied from `std::any::Any`.
-impl Value + 'static {
+impl AsValue + 'static {
     /// Returns true if the boxed type is the same as `T`
     #[inline]
-    pub fn is<T: Value + 'static>(&self) -> bool {
+    fn is<T: AsValue + 'static>(&self) -> bool
+    where
+        Self: 'static
+    {
         // Get TypeId of the type this function is instantiated with
         let t = TypeId::of::<T>();
 
@@ -106,14 +104,42 @@ impl Value + 'static {
 
     /// Returns some reference to the boxed value if it is of type `T`, or
     /// `None` if it isn't.
-    pub fn downcast_ref<T: Value + 'static>(&self) -> Option<&T> {
+    fn downcast_ref<T: AsValue + 'static>(&self) -> Option<&T>
+    where
+        Self: 'static,
+    {
         if self.is::<T>() {
             unsafe {
-                Some(&*(self as *const Value as *const T))
+                Some(&*(self as *const AsValue as *const T))
             }
         } else {
             None
         }
+    }
+}
+
+pub struct BorrowedValue<'a>(&'a dyn AsValue);
+
+/// An owned value of an erased type.
+///
+/// Like `Any`, references to `OwnedValue` may attempt to downcast the value to
+/// a concrete type. However, unlike `Any`, `OwnedValue`s are constructed from
+/// types known to implement `fmt::Debug`. This means that arbitrary
+/// `OwnedValue`s may be formatted using the erased type's `fmt::Debug`
+/// implementation, _even when the erased type is no longer known_.
+pub struct OwnedValue(Box<dyn AsValue>);
+
+/// A `Value` which is formatted using `fmt::Display` rather than `fmt::Debug`.
+#[repr(transparent)]
+#[derive(Clone)]
+pub struct DisplayValue<T: fmt::Display>(T);
+
+impl<T> AsValue for T
+where
+    T: fmt::Debug + Send + Sync
+{
+    fn fmt_value(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Debug::fmt(self, f)
     }
 }
 
@@ -122,62 +148,45 @@ impl Value + 'static {
 /// References to types implementing `IntoValue` may be formatted (as `Value`s),
 /// _or_ may be converted into owned `OwnedValue`s. In addition to being owned,
 /// instances of `OwnedValue` may also be downcast to their original erased type.
-pub trait IntoValue: Value {
+pub trait IntoValue: AsValue {
     // like `Clone`, but "different"
     fn into_value(&self) -> OwnedValue;
 }
 
 impl<T, V> IntoValue for T
 where
-    T: ToOwned<Owned = V> + Value,
-    V: Borrow<T> + Value + 'static,
+    T: ToOwned<Owned = V> + AsValue,
+    V: Borrow<T> + AsValue + 'static,
 {
     fn into_value(&self) -> OwnedValue {
-        // This closure "remembers" the original type `V` before it is erased, and
-        // can thus format the `Any` by downcasting it back to `V` and calling
-        // `V`'s debug impl.
-        let my_debug_impl = |me: &Any, f: &mut fmt::Formatter| {
-            me.downcast_ref::<V>()
-                .expect("type should downcast to its pre-erasure type")
-                .fmt(f)
-        };
-        OwnedValue::new(self, my_debug_impl)
+        OwnedValue(Box::new(self.to_owned()))
     }
 }
 
 // ===== impl OwnedValue =====
 
-impl OwnedValue {
-    fn new<T, V>(value: &T, my_debug_impl: fn(&Any, &mut fmt::Formatter) -> fmt::Result) -> Self
+impl Value for OwnedValue {
+    #[inline]
+    fn downcast_ref<T: AsValue + 'static>(&self) -> Option<&T>
     where
-        T: ToOwned<Owned = V> + Send + Sync,
-        V: Borrow<T> + Send + Sync + 'static,
+        Self: 'static,
     {
-        let any: Box<dyn Any + Send + Sync> = Box::new(value.to_owned());
-        debug_assert!(
-            any.as_ref().downcast_ref::<V>().is_some(),
-            "Box<Any> must be downcastable for OwnedValue to work",
-        );
-        OwnedValue { my_debug_impl, any }
-    }
-
-    /// Attempts to downcast the `OwnedValue` to a given _concrete_ type.
-    ///
-    /// Returns a reference to a `T` if the boxed type is `T`, or `None` if it
-    /// is not.
-    pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
-        self.any.downcast_ref()
+        self.0.as_ref().downcast_ref::<T>()
     }
 
     /// Returns `true` if the boxed type is the same as `T`.
-    pub fn is<T: Any>(&self) -> bool {
-        self.any.is::<T>()
+    #[inline]
+    fn is<T: AsValue + 'static>(&self) -> bool
+    where
+        Self: 'static,
+    {
+        self.0.as_ref().is::<T>()
     }
 }
 
 impl fmt::Debug for OwnedValue {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        (self.my_debug_impl)(self.any.as_ref(), f)
+        self.0.fmt_value(f)
     }
 }
 
@@ -223,7 +232,7 @@ impl fmt::Debug for OwnedValue {
 /// #       f.pad("Hello, I'm Foo")
 /// #   }
 /// # }
-/// use tokio_trace::value::{self, IntoValue};
+/// use tokio_trace::value::{self, Value, IntoValue};
 /// let foo = value::display(Foo);
 ///
 /// let owned_value = foo.into_value();
@@ -234,29 +243,59 @@ impl fmt::Debug for OwnedValue {
 /// ```
 pub fn display<T>(t: T) -> DisplayValue<T>
 where
-    T: fmt::Display + Send + Sync,
+    T: AsValue + fmt::Display,
 {
     DisplayValue(t)
 }
 
-impl<T: fmt::Display> fmt::Debug for DisplayValue<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0)
+impl<T: AsValue + fmt::Display> AsValue for DisplayValue<T> {
+    fn fmt_value(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(&self.0, f)
+    }
+
+    #[doc(hidden)]
+    fn type_id(&self) -> TypeId
+    where
+        Self: 'static,
+    {
+        self.0.type_id()
     }
 }
 
-impl<T, V> IntoValue for DisplayValue<T>
-where
-    T: ToOwned<Owned = V> + fmt::Display + Send + Sync,
-    V: Borrow<T> + fmt::Display + Send + Sync + 'static,
-{
-    fn into_value(&self) -> OwnedValue {
-        let my_debug_impl = |me: &Any, f: &mut fmt::Formatter| {
-            let me = me.downcast_ref::<V>()
-                .expect("type should downcast to its pre-erasure type");
-            fmt::Display::fmt(me, f)
-        };
-        OwnedValue::new(&self.0, my_debug_impl)
+// ===== impl BorrowedValue =====
+
+impl<'a> fmt::Debug for BorrowedValue<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.0.fmt_value(f)
+    }
+}
+
+impl<'a> Value for BorrowedValue<'a> {
+    /// Attempts to downcast the `OwnedValue` to a given _concrete_ type.
+    ///
+    /// Returns a reference to a `T` if the boxed type is `T`, or `None` if it
+    /// is not.
+    #[inline]
+    fn downcast_ref<T: AsValue + 'static>(&self) -> Option<&T>
+    where
+        Self: 'static,
+    {
+        self.0.downcast_ref::<T>()
+    }
+
+    /// Returns `true` if the boxed type is the same as `T`.
+    fn is<T: AsValue + 'static>(&self) -> bool
+    where
+        Self: 'static,
+    {
+        self.0.is::<T>()
+    }
+}
+
+use std::convert::AsRef;
+impl<'a> BorrowedValue<'a> {
+    pub fn new(value: &'a dyn AsValue) -> Self {
+        BorrowedValue(value)
     }
 }
 
@@ -280,8 +319,8 @@ mod tests {
         let foo = Foo { bar: "foo" };
         let display_foo = display(foo.clone());
 
-        assert_eq!(format!("{:?}", foo), "Foo { bar: \"foo\" }".to_owned());
-        assert_eq!(format!("{:?}", display_foo), format!("{}", foo));
+        assert_eq!(format!("{:?}", BorrowedValue(&foo)), "Foo { bar: \"foo\" }".to_owned());
+        assert_eq!(format!("{:?}", BorrowedValue(&display_foo)), format!("{}", foo));
     }
 
     #[test]

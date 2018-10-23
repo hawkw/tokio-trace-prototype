@@ -10,7 +10,8 @@ use std::{
 };
 use {
     subscriber::{AddValueError, Subscriber},
-    DebugFields, Dispatch, IntoValue, OwnedValue, StaticMeta,
+    value::{IntoValue, OwnedValue},
+    DebugFields, Dispatch, StaticMeta,
 };
 
 thread_local! {
@@ -516,7 +517,7 @@ pub use self::test_support::*;
 #[cfg(any(test, feature = "test-support"))]
 mod test_support {
     use std::collections::HashMap;
-    use {span::State, OwnedValue};
+    use {span::State, value::OwnedValue};
 
     pub struct MockSpan {
         pub name: Option<Option<&'static str>>,
