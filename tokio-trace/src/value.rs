@@ -24,7 +24,6 @@ pub struct OwnedValue {
     any: Box<dyn Any + Send + Sync>,
 }
 
-#[derive(Clone)]
 pub struct DisplayValue<T: fmt::Display>(T);
 
 impl<T> Value for T
@@ -127,7 +126,9 @@ impl fmt::Debug for OwnedValue {
 /// let foo = value::display(Foo);
 ///
 /// let owned_value = foo.into_value();
-/// assert_eq!("Hello, I'm Foo".to_owned(), format!("{:?}", owned_value))
+/// assert_eq!("Hello, I'm Foo".to_owned(), format!("{:?}", owned_value));
+///
+/// assert!(owned_value.downcast_ref::<Foo>().is_some());
 /// # }
 /// ```
 pub fn display<T>(t: T) -> DisplayValue<T>
@@ -140,5 +141,28 @@ where
 impl<T: fmt::Display> fmt::Debug for DisplayValue<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+impl<T, V> IntoValue for DisplayValue<T>
+where
+    T: ToOwned<Owned = V> + fmt::Display + Send + Sync,
+    V: Borrow<T> + fmt::Display + Send + Sync + 'static,
+{
+    fn into_value(&self) -> OwnedValue {
+        let any: Box<dyn Any + Send + Sync> = Box::new(self.0.to_owned());
+        debug_assert!(
+            any.as_ref().downcast_ref::<V>().is_some(),
+            "Box<Any> must be downcastable for OwnedValue to work",
+        );
+        // This closure "remembers" the original type `V` before it is erased, and
+        // can thus format the `Any` by downcasting it back to `V` and calling
+        // `V`'s debug impl.
+        let my_debug_impl = |me: &Any, f: &mut fmt::Formatter| {
+            let me = me.downcast_ref::<V>()
+                .expect("type should downcast to its pre-erasure type");
+            fmt::Display::fmt(me, f)
+        };
+        OwnedValue { my_debug_impl, any }
     }
 }
