@@ -1,4 +1,12 @@
-//! Arbitrarily typed field values.
+//! Arbitrarily-typed field values.
+//!
+//! Spans and events may be annotated with key-value data, referred to as known
+//! as _fields_. These fields consist of a mapping from a `&'static str` to a
+//! piece of data, known as a `Value`.
+//!
+//! # Value Type Erasure
+//!
+//! Rather than restricting `Value`s to a set of Rust primitives,
 use std::{any::Any, borrow::Borrow, fmt};
 
 /// A formattable field value of an erased type.
@@ -16,7 +24,13 @@ pub struct OwnedValue {
     any: Box<dyn Any + Send + Sync>,
 }
 
-impl<T> Value for T where T: fmt::Debug + Send + Sync {}
+#[derive(Clone)]
+pub struct DisplayValue<T: fmt::Display>(T);
+
+impl<T> Value for T
+where
+    T: fmt::Debug + Send + Sync
+{}
 
 /// Trait representing a value which may be converted into an `OwnedValue`.
 ///
@@ -64,5 +78,67 @@ impl OwnedValue {
 impl fmt::Debug for OwnedValue {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         (self.my_debug_impl)(self.any.as_ref(), f)
+    }
+}
+
+// ===== impl DisplayValue =====
+
+/// Wraps a type implementing `fmt::Display` so that its `Display`
+/// implementation will be used when formatting it as a `Value`.
+///
+/// # Examples
+/// ```
+/// # extern crate tokio_trace;
+/// use tokio_trace::value;
+/// # use std::fmt;
+/// # fn main() {
+///
+/// #[derive(Clone, Debug)]
+/// struct Foo;
+///
+/// impl fmt::Display for Foo {
+///     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+///         f.pad("Hello, I'm Foo")
+///     }
+/// }
+///
+/// let foo = Foo;
+/// assert_eq!("Foo".to_owned(), format!("{:?}", foo));
+///
+/// let foo = value::display(foo);
+/// assert_eq!("Hello, I'm Foo".to_owned(), format!("{:?}", foo));
+/// # }
+/// ```
+///
+/// ```
+/// # extern crate tokio_trace;
+/// # use std::fmt;
+/// # fn main() {
+/// #
+/// # #[derive(Clone, Debug)]
+/// # struct Foo;
+/// #
+/// # impl fmt::Display for Foo {
+/// #   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+/// #       f.pad("Hello, I'm Foo")
+/// #   }
+/// # }
+/// use tokio_trace::value::{self, IntoValue};
+/// let foo = value::display(Foo);
+///
+/// let owned_value = foo.into_value();
+/// assert_eq!("Hello, I'm Foo".to_owned(), format!("{:?}", owned_value))
+/// # }
+/// ```
+pub fn display<T>(t: T) -> DisplayValue<T>
+where
+    T: fmt::Display + Send + Sync,
+{
+    DisplayValue(t)
+}
+
+impl<T: fmt::Display> fmt::Debug for DisplayValue<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
