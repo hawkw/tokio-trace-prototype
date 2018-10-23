@@ -98,6 +98,11 @@ impl Subscriber for Dispatch {
     }
 
     #[inline]
+    fn add_follows_from(&self, span: &span::Id, follows: span::Id) {
+        self.0.add_follows_from(span, follows)
+    }
+
+    #[inline]
     fn enabled(&self, metadata: &Meta) -> bool {
         self.0.enabled(metadata)
     }
@@ -132,6 +137,10 @@ impl Subscriber for NoSubscriber {
         _value: &dyn IntoValue,
     ) -> Result<(), subscriber::AddValueError> {
         Ok(())
+    }
+
+    fn add_follows_from(&self, _span: &span::Id, _follows: span::Id) {
+
     }
 
     fn enabled(&self, _metadata: &Meta) -> bool {

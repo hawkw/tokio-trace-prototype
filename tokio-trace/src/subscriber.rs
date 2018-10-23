@@ -38,6 +38,8 @@ pub trait Subscriber {
         value: &dyn IntoValue,
     ) -> Result<(), AddValueError>;
 
+    fn add_follows_from(&self, span: &span::Id, follows: span::Id);
+
     // === Filtering methods ==================================================
 
     /// Determines if a span or event with the specified metadata would be recorded.
@@ -189,6 +191,10 @@ mod test_support {
         ) -> Result<(), AddValueError> {
             // TODO: it should be possible to expect values...
             Ok(())
+        }
+
+        fn add_follows_from(&self, _span: &span::Id, _follows: span::Id) {
+            // TODO: it should be possible to expect spans to follow from other spans
         }
 
         fn new_span(&self, span: SpanData) -> span::Id {

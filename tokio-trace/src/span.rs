@@ -124,6 +124,10 @@ pub struct Data {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Id(u64);
 
+pub trait AsId {
+    fn as_id(&self) -> Option<Id>;
+}
+
 #[derive(Clone, Debug, PartialEq, Hash)]
 struct Active {
     inner: Arc<ActiveInner>,
@@ -248,6 +252,16 @@ impl Span {
             Ok(())
         }
     }
+
+    pub fn follows<I: AsId>(&self, from: I) {
+        if let Some(ref inner) = self.inner {
+            if let Some(id) = from.as_id() {
+                 let inner = &inner.inner;
+                 inner.subscriber
+                    .add_follows_from(&inner.id, id)
+            }
+        }
+    }
 }
 
 impl fmt::Debug for Span {
@@ -261,6 +275,12 @@ impl fmt::Debug for Span {
         } else {
             span.field("disabled", &true)
         }.finish()
+    }
+}
+
+impl AsId for Span {
+    fn as_id(&self) -> Option<Id> {
+        self.inner.as_ref().map(Active::id)
     }
 }
 
@@ -386,6 +406,13 @@ impl Id {
         Active::current().as_ref().map(Active::id)
     }
 }
+
+impl AsId for Id {
+    fn as_id(&self) -> Option<Id> {
+        Some(self.clone())
+    }
+}
+
 
 // ===== impl Active =====
 
