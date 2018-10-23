@@ -166,3 +166,54 @@ where
         OwnedValue { my_debug_impl, any }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Clone, Debug)]
+    struct Foo {
+        bar: &'static str,
+    }
+
+    impl fmt::Display for Foo {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            write!(f, "hello, I'm {}", self.bar)
+        }
+    }
+
+    #[test]
+    fn display_value_formats_with_display() {
+        let foo = Foo { bar: "foo" };
+        let display_foo = display(foo.clone());
+
+        assert_eq!(format!("{:?}", foo), "Foo { bar: \"foo\" }".to_owned());
+        assert_eq!(format!("{:?}", display_foo), format!("{}", foo));
+    }
+
+    #[test]
+    fn display_value_is_into_value() {
+        let foo = Foo { bar: "foo" };
+        let display_foo = display(foo.clone());
+
+        let owned_value: OwnedValue = display_foo.into_value();
+        assert_eq!(format!("{:?}", owned_value), format!("{}", foo));
+    }
+
+    #[test]
+    fn display_value_downcasts_to_original_type() {
+        let foo = Foo { bar: "foo" };
+        let display_foo = display(foo);
+
+        let owned_value: OwnedValue = display_foo.into_value();
+        assert!(owned_value.downcast_ref::<Foo>().is_some());
+    }
+
+    #[test]
+    fn owned_value_downcasts_to_original_type() {
+        let foo = Foo { bar: "foo" };
+
+        let owned_value: OwnedValue = foo.into_value();
+        assert!(owned_value.downcast_ref::<Foo>().is_some());
+    }
+}
