@@ -427,7 +427,7 @@ impl<'event, 'meta: 'event> Event<'event, 'meta> {
     {
         self.field_names()
             .position(|&field_name| field_name == name)
-            .and_then(|i| self.field_values.get(i).map(|&val| BorrowedValue::new(val)))
+            .and_then(|i| self.field_values.get(i).map(|&val| value::borrowed(val)))
     }
 
     /// Returns an iterator over all the field names and values on this event.
@@ -437,7 +437,7 @@ impl<'event, 'meta: 'event> Event<'event, 'meta> {
             .filter_map(move |(idx, &name)| {
                 self.field_values
                     .get(idx)
-                    .map(|&val| (name, BorrowedValue::new(val)))
+                    .map(|&val| (name, value::borrowed(val)))
             })
     }
 
