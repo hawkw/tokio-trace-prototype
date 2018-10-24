@@ -115,7 +115,7 @@ fn main() {
             foo += 1;
             event!(
                 Level::Info,
-                { yak_shaved = &true, },
+                { yak_shaved = &true },
                 "hi from inside my span"
             );
             span!("my other span", foo_count = &foo, baz_count = &5usize).enter(|| {})
