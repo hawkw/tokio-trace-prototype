@@ -305,6 +305,24 @@ impl Value for OwnedValue {
     }
 }
 
+impl<'a> Value for &'a OwnedValue {
+    #[inline]
+    fn downcast_ref<T: AsValue + 'static>(&self) -> Option<&T>
+    where
+        Self: 'static,
+    {
+        (*self).downcast_ref()
+    }
+
+    #[inline]
+    fn is<T: AsValue + 'static>(&self) -> bool
+    where
+        Self: 'static,
+    {
+        (*self).is::<T>()
+    }
+}
+
 impl fmt::Debug for OwnedValue {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.0.fmt_value(f)

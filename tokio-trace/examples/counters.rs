@@ -4,7 +4,7 @@ extern crate tokio_trace;
 use tokio_trace::{
     span,
     subscriber::{self, Subscriber},
-    Event, IntoValue, Level, Meta,
+    Event, IntoValue, Level, Meta, Value,
 };
 
 use std::{
@@ -63,7 +63,8 @@ impl Subscriber for CounterSubscriber {
     fn should_invalidate_filter(&self, _metadata: &Meta) -> bool {
         false
     }
-    fn observe_event<'event, 'meta: 'event>(&self, _event: &'event Event<'event, 'meta>) {}
+
+    fn observe_event<'event, 'meta: 'event>(&self, event: &'event Event<'event, 'meta>) {}
 
     fn enter(&self, span: span::Id, state: span::State) {}
 
@@ -71,14 +72,13 @@ impl Subscriber for CounterSubscriber {
         if state != span::State::Done {
             return;
         }
-        let registry = self.counters.0.read().unwrap();
         if let Some(span) = self.spans.read().unwrap().get(&span) {
-            for (counter, value) in span.fields().filter_map(|(k, v)| {
+            let registry = self.counters.0.read().unwrap();
+            for (counter, value) in span.fields().into_iter().filter_map(|(k, v)| {
                 if !k.contains("count") {
                     return None;
                 }
-                let any: &(dyn Any + 'static) = v;
-                let v = Any::downcast_ref::<usize>(any)?;
+                let v = v.downcast_ref::<usize>()?;
                 let c = registry.get(k)?;
                 Some((c, v))
             }) {
@@ -110,15 +110,15 @@ fn main() {
     let (counters, subscriber) = Counters::new();
 
     tokio_trace::Dispatch::to(subscriber).with(|| {
-        let mut foo = 2;
+        let mut foo: usize = 2;
         span!("my_great_span", foo_count = &foo).enter(|| {
+            foo += 1;
             event!(
                 Level::Info,
-                { yak_shaved = &true },
+                { yak_shaved = &true, },
                 "hi from inside my span"
             );
-            foo += 1;
-            span!("my other span", foo_count = &foo, baz_count = &5).enter(|| {})
+            span!("my other span", foo_count = &foo, baz_count = &5usize).enter(|| {})
         });
     });
 
