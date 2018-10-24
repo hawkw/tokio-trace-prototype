@@ -44,6 +44,8 @@ pub trait RegisterSpan {
         value: &dyn IntoValue,
     ) -> Result<(), AddValueError>;
 
+    fn add_follows_from(&self, span: &Id, follows: Id);
+
     fn with_span<F>(&self, id: &Id, state: State, f: F)
     where
         F: for<'a> Fn(&'a SpanRef<'a>);
@@ -121,6 +123,10 @@ impl RegisterSpan for IncreasingCounter {
         let mut spans = self.spans.lock().expect("mutex poisoned!");
         let span = spans.get_mut(span).ok_or(AddValueError::NoSpan)?;
         span.add_value(name, value)
+    }
+
+    fn add_follows_from(&self, span: &Id, follows: Id) {
+        // unimplemented
     }
 
     fn with_span<F>(&self, id: &Id, state: State, f: F)

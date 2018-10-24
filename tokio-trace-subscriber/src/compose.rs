@@ -116,6 +116,10 @@ where
         self.registry.add_value(span, name, value)
     }
 
+    fn add_follows_from(&self, span: &span::Id, follows: span::Id) {
+        self.registry.add_follows_from(span, follows)
+    }
+
     fn observe_event<'event, 'meta: 'event>(&self, event: &'event Event<'event, 'meta>) {
         self.observer.observe_event(event)
     }
