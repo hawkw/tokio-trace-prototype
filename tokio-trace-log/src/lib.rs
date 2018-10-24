@@ -194,6 +194,15 @@ impl Subscriber for TraceLogger {
         Ok(())
     }
 
+    fn add_follows_from(&self, span: &span::Id, follows: span::Id) {
+        log::logger().log(
+            &log::Record::builder()
+                .level(log::Level::Trace)
+                .args(format_args!("span {:?} follows_from={:?};", span, follows))
+                .build(),
+        );
+    }
+
     fn observe_event<'event, 'meta: 'event>(&self, event: &'event Event<'event, 'meta>) {
         let meta = event.meta.as_log();
         let logger = log::logger();
