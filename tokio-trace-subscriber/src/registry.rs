@@ -8,6 +8,7 @@ use std::{
     cmp,
     collections::HashMap,
     hash::{Hash, Hasher},
+    iter,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Mutex,
@@ -19,6 +20,8 @@ use std::{
 /// Implementations of this trait represent the logic run on span creation. They
 /// handle span ID generation.
 pub trait RegisterSpan {
+    type FollowsFrom: Iterator<Item=Id>;
+
     /// Record the construction of a new [`Span`], returning a a new [span ID] for
     /// the span being constructed.
     ///
@@ -44,7 +47,12 @@ pub trait RegisterSpan {
         value: &dyn IntoValue,
     ) -> Result<(), AddValueError>;
 
+    /// Indicates that `span` follows from `follows.
     fn add_follows_from(&self, span: &Id, follows: Id);
+
+    /// Queries the registry for an iterator over the IDs of the spans that
+    /// `span` follows from.
+    fn get_follows_from(&self, span: &Id) -> Self::FollowsFrom;
 
     fn with_span<F>(&self, id: &Id, state: State, f: F)
     where
@@ -105,6 +113,8 @@ pub fn increasing_counter() -> IncreasingCounter {
 }
 
 impl RegisterSpan for IncreasingCounter {
+    type FollowsFrom = iter::Empty<Id>;
+
     fn new_span(&self, new_span: Data) -> Id {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
         let id = Id::from_u64(id as u64);
@@ -127,6 +137,11 @@ impl RegisterSpan for IncreasingCounter {
 
     fn add_follows_from(&self, span: &Id, follows: Id) {
         // unimplemented
+    }
+
+    fn get_follows_from(&self, span: &Id) -> Self::FollowsFrom {
+        unimplemented!();
+        iter::empty()
     }
 
     fn with_span<F>(&self, id: &Id, state: State, f: F)
