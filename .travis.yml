@@ -7,6 +7,5 @@ jobs:
     script: cargo test --all
     name: "tests"
   - script: cargo fmt --all -- --check
-    install: rustup component add rustfmt-preview --toolchain nightly
+    install: rustup component add rustfmt-preview
     name: "rustfmt"
-    rust: nightly
