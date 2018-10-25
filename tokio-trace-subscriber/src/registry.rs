@@ -1,6 +1,6 @@
 use tokio_trace::{
     span::{Data, Id, State},
-    subscriber::AddValueError,
+    subscriber::{AddValueError, FollowsFromError},
     value::{IntoValue, OwnedValue},
 };
 
@@ -48,7 +48,7 @@ pub trait RegisterSpan {
     ) -> Result<(), AddValueError>;
 
     /// Indicates that `span` follows from `follows.
-    fn add_follows_from(&self, span: &Id, follows: Id);
+    fn add_follows_from(&self, span: &Id, follows: Id) -> Result<(), FollowsFromError>;
 
     /// Queries the registry for an iterator over the IDs of the spans that
     /// `span` follows from.
@@ -135,8 +135,9 @@ impl RegisterSpan for IncreasingCounter {
         span.add_value(name, value)
     }
 
-    fn add_follows_from(&self, span: &Id, follows: Id) {
+    fn add_follows_from(&self, span: &Id, follows: Id) -> Result<(), FollowsFromError> {
         // unimplemented
+        Ok(())
     }
 
     fn get_follows_from(&self, span: &Id) -> Self::FollowsFrom {

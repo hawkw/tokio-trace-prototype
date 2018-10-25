@@ -194,13 +194,15 @@ impl Subscriber for TraceLogger {
         Ok(())
     }
 
-    fn add_follows_from(&self, span: &span::Id, follows: span::Id) {
+    fn add_follows_from(&self, span: &span::Id, follows: span::Id) -> Result<(), subscriber::FollowsFromError> {
+        // TODO: this should eventually track the relationship?
         log::logger().log(
             &log::Record::builder()
                 .level(log::Level::Trace)
                 .args(format_args!("span {:?} follows_from={:?};", span, follows))
                 .build(),
         );
+        Ok(())
     }
 
     fn observe_event<'event, 'meta: 'event>(&self, event: &'event Event<'event, 'meta>) {

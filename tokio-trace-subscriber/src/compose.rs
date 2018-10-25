@@ -1,6 +1,6 @@
 use tokio_trace::{
     span,
-    subscriber::{AddValueError, Subscriber},
+    subscriber::{AddValueError, FollowsFromError, Subscriber},
     Event, IntoValue, Meta, SpanData,
 };
 use {filter::NoFilter, observe::NoObserver, Filter, Observe, RegisterSpan};
@@ -116,7 +116,7 @@ where
         self.registry.add_value(span, name, value)
     }
 
-    fn add_follows_from(&self, span: &span::Id, follows: span::Id) {
+    fn add_follows_from(&self, span: &span::Id, follows: span::Id) -> Result<(), FollowsFromError>  {
         self.registry.add_follows_from(span, follows)
     }
 

@@ -53,8 +53,9 @@ impl Subscriber for CounterSubscriber {
             .add_value(name, value)
     }
 
-    fn add_follows_from(&self, _span: &span::Id, _follows: span::Id) {
+    fn add_follows_from(&self, _span: &span::Id, _follows: span::Id) -> Result<(), subscriber::FollowsFromError> {
         // unimplemented
+        Ok(())
     }
 
     fn enabled(&self, metadata: &Meta) -> bool {
