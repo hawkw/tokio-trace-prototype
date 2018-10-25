@@ -20,7 +20,7 @@ use std::{
 /// Implementations of this trait represent the logic run on span creation. They
 /// handle span ID generation.
 pub trait RegisterSpan {
-    type FollowsFrom: Iterator<Item=Id>;
+    type FollowsFrom: Iterator<Item = Id>;
 
     /// Record the construction of a new [`Span`], returning a a new [span ID] for
     /// the span being constructed.

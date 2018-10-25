@@ -114,7 +114,6 @@ pub enum FollowsFromError {
     NoPreceedingId,
 }
 
-
 #[cfg(any(test, feature = "test-support"))]
 pub use self::test_support::*;
 
@@ -208,7 +207,11 @@ mod test_support {
             Ok(())
         }
 
-        fn add_follows_from(&self, _span: &span::Id, _follows: span::Id) -> Result<(), FollowsFromError> {
+        fn add_follows_from(
+            &self,
+            _span: &span::Id,
+            _follows: span::Id,
+        ) -> Result<(), FollowsFromError> {
             // TODO: it should be possible to expect spans to follow from other spans
             Ok(())
         }

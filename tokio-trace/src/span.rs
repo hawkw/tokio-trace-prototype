@@ -257,12 +257,11 @@ impl Span {
         if let Some(ref inner) = self.inner {
             let from_id = from.as_id().ok_or(FollowsFromError::NoPreceedingId)?;
             let inner = &inner.inner;
-            match inner.subscriber
-                .add_follows_from(&inner.id, from_id)
-            {
+            match inner.subscriber.add_follows_from(&inner.id, from_id) {
                 Ok(()) => Ok(()),
-                Err(FollowsFromError::NoSpan(ref id)) if id == &inner.id =>
-                    panic!("span {:?} should exist to add a preceeding span", inner.id),
+                Err(FollowsFromError::NoSpan(ref id)) if id == &inner.id => {
+                    panic!("span {:?} should exist to add a preceeding span", inner.id)
+                }
                 Err(e) => Err(e),
             }
         } else {
@@ -420,7 +419,6 @@ impl AsId for Id {
         Some(self.clone())
     }
 }
-
 
 // ===== impl Active =====
 

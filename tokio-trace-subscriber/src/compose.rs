@@ -116,7 +116,7 @@ where
         self.registry.add_value(span, name, value)
     }
 
-    fn add_follows_from(&self, span: &span::Id, follows: span::Id) -> Result<(), FollowsFromError>  {
+    fn add_follows_from(&self, span: &span::Id, follows: span::Id) -> Result<(), FollowsFromError> {
         self.registry.add_follows_from(span, follows)
     }
 

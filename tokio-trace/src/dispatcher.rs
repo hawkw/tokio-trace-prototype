@@ -98,7 +98,11 @@ impl Subscriber for Dispatch {
     }
 
     #[inline]
-    fn add_follows_from(&self, span: &span::Id, follows: span::Id) -> Result<(), subscriber::FollowsFromError> {
+    fn add_follows_from(
+        &self,
+        span: &span::Id,
+        follows: span::Id,
+    ) -> Result<(), subscriber::FollowsFromError> {
         self.0.add_follows_from(span, follows)
     }
 
@@ -139,7 +143,11 @@ impl Subscriber for NoSubscriber {
         Ok(())
     }
 
-    fn add_follows_from(&self, _span: &span::Id, _follows: span::Id) -> Result<(), subscriber::FollowsFromError> {
+    fn add_follows_from(
+        &self,
+        _span: &span::Id,
+        _follows: span::Id,
+    ) -> Result<(), subscriber::FollowsFromError> {
         Ok(())
     }
 
