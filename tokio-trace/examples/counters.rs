@@ -53,11 +53,11 @@ impl Subscriber for CounterSubscriber {
             .add_value(name, value)
     }
 
-    fn add_follows_from(
+    fn add_prior_span(
         &self,
         _span: &span::Id,
         _follows: span::Id,
-    ) -> Result<(), subscriber::FollowsFromError> {
+    ) -> Result<(), subscriber::PriorError> {
         // unimplemented
         Ok(())
     }

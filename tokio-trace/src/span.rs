@@ -9,7 +9,7 @@ use std::{
     },
 };
 use {
-    subscriber::{AddValueError, FollowsFromError, Subscriber},
+    subscriber::{AddValueError, PriorError, Subscriber},
     value::{IntoValue, OwnedValue},
     DebugFields, Dispatch, StaticMeta,
 };
@@ -253,13 +253,13 @@ impl Span {
         }
     }
 
-    pub fn follows<I: AsId>(&self, from: I) -> Result<(), FollowsFromError> {
+    pub fn proceeds<I: AsId>(&self, from: I) -> Result<(), PriorError> {
         if let Some(ref inner) = self.inner {
-            let from_id = from.as_id().ok_or(FollowsFromError::NoPreceedingId)?;
+            let from_id = from.as_id().ok_or(PriorError::NoPreceedingId)?;
             let inner = &inner.inner;
-            match inner.subscriber.add_follows_from(&inner.id, from_id) {
+            match inner.subscriber.add_prior_span(&inner.id, from_id) {
                 Ok(()) => Ok(()),
-                Err(FollowsFromError::NoSpan(ref id)) if id == &inner.id => {
+                Err(PriorError::NoSpan(ref id)) if id == &inner.id => {
                     panic!("span {:?} should exist to add a preceeding span", inner.id)
                 }
                 Err(e) => Err(e),

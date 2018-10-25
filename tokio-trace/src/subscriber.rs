@@ -38,7 +38,7 @@ pub trait Subscriber {
         value: &dyn IntoValue,
     ) -> Result<(), AddValueError>;
 
-    fn add_follows_from(&self, span: &span::Id, follows: span::Id) -> Result<(), FollowsFromError>;
+    fn add_prior_span(&self, span: &span::Id, follows: span::Id) -> Result<(), PriorError>;
 
     // === Filtering methods ==================================================
 
@@ -105,9 +105,9 @@ pub enum AddValueError {
 // TODO: before releasing core 0.1 this needs to be made private, to avoid
 // future breaking changes.
 #[derive(Clone, Debug)]
-pub enum FollowsFromError {
+pub enum PriorError {
     /// The span with the given ID does not exist.
-    /// TODO: can this error type be generalized between `FollowsFromError` and
+    /// TODO: can this error type be generalized between `PriorError` and
     /// `AddValueError`?
     NoSpan(SpanId),
     /// The span that this span follows from does not exist (it has no ID).
@@ -207,11 +207,11 @@ mod test_support {
             Ok(())
         }
 
-        fn add_follows_from(
+        fn add_prior_span(
             &self,
             _span: &span::Id,
             _follows: span::Id,
-        ) -> Result<(), FollowsFromError> {
+        ) -> Result<(), PriorError> {
             // TODO: it should be possible to expect spans to follow from other spans
             Ok(())
         }

@@ -126,11 +126,11 @@ impl Subscriber for SloggishSubscriber {
         span.add_value(name, value)
     }
 
-    fn add_follows_from(
+    fn add_prior_span(
         &self,
         _span: &tokio_trace::SpanId,
         _follows: tokio_trace::SpanId,
-    ) -> Result<(), subscriber::FollowsFromError> {
+    ) -> Result<(), subscriber::PriorError> {
         // unimplemented
         Ok(())
     }

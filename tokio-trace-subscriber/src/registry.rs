@@ -1,6 +1,6 @@
 use tokio_trace::{
     span::{Data, Id, State},
-    subscriber::{AddValueError, FollowsFromError},
+    subscriber::{AddValueError, PriorError},
     value::{IntoValue, OwnedValue},
 };
 
@@ -20,7 +20,7 @@ use std::{
 /// Implementations of this trait represent the logic run on span creation. They
 /// handle span ID generation.
 pub trait RegisterSpan {
-    type FollowsFrom: Iterator<Item = Id>;
+    type PriorSpans: Iterator<Item = Id>;
 
     /// Record the construction of a new [`Span`], returning a a new [span ID] for
     /// the span being constructed.
@@ -48,11 +48,11 @@ pub trait RegisterSpan {
     ) -> Result<(), AddValueError>;
 
     /// Indicates that `span` follows from `follows.
-    fn add_follows_from(&self, span: &Id, follows: Id) -> Result<(), FollowsFromError>;
+    fn add_prior_span(&self, span: &Id, follows: Id) -> Result<(), PriorError>;
 
     /// Queries the registry for an iterator over the IDs of the spans that
     /// `span` follows from.
-    fn get_follows_from(&self, span: &Id) -> Self::FollowsFrom;
+    fn prior_spans(&self, span: &Id) -> Self::PriorSpans;
 
     fn with_span<F>(&self, id: &Id, state: State, f: F)
     where
@@ -113,7 +113,7 @@ pub fn increasing_counter() -> IncreasingCounter {
 }
 
 impl RegisterSpan for IncreasingCounter {
-    type FollowsFrom = iter::Empty<Id>;
+    type PriorSpans = iter::Empty<Id>;
 
     fn new_span(&self, new_span: Data) -> Id {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
@@ -135,12 +135,12 @@ impl RegisterSpan for IncreasingCounter {
         span.add_value(name, value)
     }
 
-    fn add_follows_from(&self, span: &Id, follows: Id) -> Result<(), FollowsFromError> {
+    fn add_prior_span(&self, span: &Id, follows: Id) -> Result<(), PriorError> {
         // unimplemented
         Ok(())
     }
 
-    fn get_follows_from(&self, span: &Id) -> Self::FollowsFrom {
+    fn prior_spans(&self, span: &Id) -> Self::PriorSpans {
         unimplemented!();
         iter::empty()
     }
