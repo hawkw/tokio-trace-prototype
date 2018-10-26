@@ -41,6 +41,5 @@ pub fn trace(_args: TokenStream, item: TokenStream) -> TokenStream {
                 #block
             })
         }
-    )
-    .into()
+    ).into()
 }
