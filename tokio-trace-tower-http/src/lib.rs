@@ -1,12 +1,13 @@
-extern crate tower_service;
 extern crate http;
+extern crate tower_service;
 #[macro_use]
 extern crate tokio_trace;
 extern crate futures;
+extern crate tokio_trace_futures;
 
 use futures::{Future, Poll};
-use tokio_trace::instrument::{Instrumented, Instrument};
-use tower_service::{Service, NewService};
+use tokio_trace_futures::{Instrument, Instrumented};
+use tower_service::{NewService, Service};
 
 #[derive(Clone, Debug)]
 pub struct InstrumentedHttpService<T> {
@@ -17,7 +18,7 @@ pub struct InstrumentedHttpService<T> {
 impl<T> InstrumentedHttpService<T> {
     pub fn new<B>(inner: T, span: tokio_trace::Span) -> Self
     where
-        T: Service<Request = http::Request<B>>
+        T: Service<Request = http::Request<B>>,
     {
         Self { inner, span }
     }
@@ -39,7 +40,7 @@ impl<T> InstrumentedNewService<T> {
 
 impl<T, B> NewService for InstrumentedNewService<T>
 where
-    T: NewService<Request = http::Request<B>>
+    T: NewService<Request = http::Request<B>>,
 {
     type Request = T::Request;
     type Response = T::Response;
@@ -51,10 +52,7 @@ where
     fn new_service(&self) -> Self::Future {
         let span = tokio_trace::Span::current();
         let inner = self.inner.new_service();
-        InstrumentedNewServiceFuture {
-            inner,
-            span,
-        }
+        InstrumentedNewServiceFuture { inner, span }
     }
 }
 
@@ -68,7 +66,7 @@ where
 
 impl<T, B> Future for InstrumentedNewServiceFuture<T>
 where
-    T: NewService<Request = http::Request<B>>
+    T: NewService<Request = http::Request<B>>,
 {
     type Item = InstrumentedHttpService<T::Service>;
     type Error = T::InitError;
@@ -76,8 +74,9 @@ where
         let span = self.span.clone();
         let inner = &mut self.inner;
         span.clone().enter(move || {
-            inner.poll().map(|ready|
-                ready.map(|svc| InstrumentedHttpService::new(svc, span.clone())))
+            inner
+                .poll()
+                .map(|ready| ready.map(|svc| InstrumentedHttpService::new(svc, span.clone())))
         })
     }
 }
@@ -94,7 +93,7 @@ where
     fn poll_ready(&mut self) -> futures::Poll<(), Self::Error> {
         let span = self.span.clone();
         let inner = &mut self.inner;
-        span.enter(move || { inner.poll_ready() })
+        span.enter(move || inner.poll_ready())
     }
 
     fn call(&mut self, request: Self::Request) -> Self::Future {
@@ -103,15 +102,14 @@ where
         span.enter(move || {
             let request_span = span!(
                 "request",
-                method = request.method().clone(),
-                version = request.version().clone(),
-                uri = request.uri().clone(),
-                headers = request.headers().clone()
+                method = request.method(),
+                version = &request.version(),
+                uri = request.uri(),
+                headers = request.headers()
             );
-            request_span.clone()
-                .enter(move || { inner.call(request).instrument(request_span) })
-
+            request_span
+                .clone()
+                .enter(move || inner.call(request).instrument(request_span))
         })
-
     }
 }

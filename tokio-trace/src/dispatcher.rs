@@ -1,120 +1,165 @@
-use {subscriber::Subscriber, Event, SpanData};
-
-use std::{
-    sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT},
-    time::Instant,
+use {
+    span,
+    subscriber::{self, Subscriber},
+    Event, IntoValue, Meta,
 };
 
-static STATE: AtomicUsize = ATOMIC_USIZE_INIT;
+use std::{
+    cell::RefCell,
+    collections::{hash_map::DefaultHasher, HashSet},
+    fmt,
+    hash::{Hash, Hasher},
+    sync::Arc,
+};
 
-// There are three different states that we care about: the logger's
-// uninitialized, the logger's initializing (set_logger's been called but
-// LOGGER hasn't actually been set yet), or the logger's active.
-const UNINITIALIZED: usize = 0;
-const INITIALIZING: usize = 1;
-const INITIALIZED: usize = 2;
-static mut DISPATCHER: &'static Subscriber = &NoDispatcher;
-
-#[derive(Default)]
-pub struct Builder {
-    subscribers: Vec<Box<dyn Subscriber>>,
+thread_local! {
+    static CURRENT_DISPATCH: RefCell<Current> = RefCell::new(Dispatch::none().with_invalidate());
 }
 
-impl Builder {
-    pub fn new() -> Self {
-        Self::default()
+struct Current {
+    dispatch: Dispatch,
+    seen: HashSet<u64>,
+}
+
+#[derive(Clone)]
+pub struct Dispatch(Arc<dyn Subscriber + Send + Sync>);
+
+impl Dispatch {
+    pub fn none() -> Self {
+        Dispatch(Arc::new(NoSubscriber))
     }
 
-    pub fn add_subscriber<T: Subscriber + 'static>(mut self, subscriber: T) -> Self {
-        self.subscribers.push(Box::new(subscriber));
-        self
+    pub fn current() -> Dispatch {
+        CURRENT_DISPATCH.with(|current| current.borrow().dispatch.clone())
     }
 
-    pub fn try_init(self) -> Result<(), InitError> {
-        unsafe {
-            match STATE.compare_and_swap(UNINITIALIZED, INITIALIZING, Ordering::SeqCst) {
-                UNINITIALIZED => {
-                    DISPATCHER = &*Box::into_raw(Box::new(self));
-                    STATE.store(INITIALIZED, Ordering::SeqCst);
-                    Ok(())
-                }
-                INITIALIZING => {
-                    while STATE.load(Ordering::SeqCst) == INITIALIZING {}
-                    Err(InitError)
-                }
-                _ => Err(InitError),
+    pub fn to<S>(subscriber: S) -> Self
+    // TODO: Add some kind of `UnsyncDispatch`?
+    // TODO: agh, dispatchers really need not be sync, _only_ the exit part
+    // really has to be Send + Sync. if this were in the subscriber crate, we
+    // could slice and dice the sync requirement a little better...hmmm...
+    where
+        S: Subscriber + Send + Sync + 'static,
+    {
+        Dispatch(Arc::new(subscriber))
+    }
+
+    pub fn with<T>(&self, f: impl FnOnce() -> T) -> T {
+        CURRENT_DISPATCH.with(|current| {
+            let prior = current.replace(self.with_invalidate()).dispatch;
+            let result = f();
+            *current.borrow_mut() = prior.with_invalidate();
+            result
+        })
+    }
+
+    fn with_invalidate(&self) -> Current {
+        Current {
+            dispatch: self.clone(),
+            seen: HashSet::new(),
+        }
+    }
+}
+
+impl fmt::Debug for Dispatch {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.pad("Dispatch(...)")
+    }
+}
+
+impl Subscriber for Dispatch {
+    fn new_span(&self, span: span::Data) -> span::Id {
+        self.0.new_span(span)
+    }
+
+    fn should_invalidate_filter(&self, metadata: &Meta) -> bool {
+        CURRENT_DISPATCH.with(|current| {
+            let mut hasher = DefaultHasher::new();
+            metadata.hash(&mut hasher);
+            let hash = hasher.finish();
+
+            if current.borrow().seen.contains(&hash) {
+                self.0.should_invalidate_filter(metadata)
+            } else {
+                current.borrow_mut().seen.insert(hash);
+                true
             }
-        }
-    }
-
-    pub fn init(self) {
-        self.try_init().unwrap()
-    }
-}
-
-impl Subscriber for Builder {
-    fn observe_event<'event, 'meta: 'event>(&self, event: &'event Event<'event, 'meta>) {
-        for subscriber in &self.subscribers {
-            subscriber.observe_event(event)
-        }
+        })
     }
 
     #[inline]
-    fn enter(&self, span: &SpanData, at: Instant) {
-        for subscriber in &self.subscribers {
-            subscriber.enter(span, at)
-        }
+    fn add_value(
+        &self,
+        span: &span::Id,
+        name: &'static str,
+        value: &dyn IntoValue,
+    ) -> Result<(), subscriber::AddValueError> {
+        self.0.add_value(span, name, value)
     }
 
     #[inline]
-    fn exit(&self, span: &SpanData, at: Instant) {
-        for subscriber in &self.subscribers {
-            subscriber.exit(span, at)
-        }
-    }
-}
-
-pub struct Dispatcher(&'static Subscriber);
-
-impl Dispatcher {
-    pub fn current() -> Dispatcher {
-        Dispatcher(unsafe { DISPATCHER })
+    fn add_prior_span(
+        &self,
+        span: &span::Id,
+        follows: span::Id,
+    ) -> Result<(), subscriber::PriorError> {
+        self.0.add_prior_span(span, follows)
     }
 
-    pub fn builder() -> Builder {
-        Builder::new()
+    #[inline]
+    fn enabled(&self, metadata: &Meta) -> bool {
+        self.0.enabled(metadata)
     }
-}
 
-impl Subscriber for Dispatcher {
     #[inline]
     fn observe_event<'event, 'meta: 'event>(&self, event: &'event Event<'event, 'meta>) {
         self.0.observe_event(event)
     }
 
     #[inline]
-    fn enter(&self, span: &SpanData, at: Instant) {
-        self.0.enter(span, at)
+    fn enter(&self, span: span::Id, state: span::State) {
+        self.0.enter(span, state)
     }
 
     #[inline]
-    fn exit(&self, span: &SpanData, at: Instant) {
-        self.0.exit(span, at)
+    fn exit(&self, span: span::Id, state: span::State) {
+        self.0.exit(span, state)
     }
 }
 
-struct NoDispatcher;
+struct NoSubscriber;
 
-#[derive(Debug)]
-pub struct InitError;
-
-impl Subscriber for NoDispatcher {
-    fn observe_event<'event, 'meta: 'event>(&self, _event: &'event Event<'event, 'meta>) {
-        // Do nothing.
-        // TODO: should this panic instead?
+impl Subscriber for NoSubscriber {
+    fn new_span(&self, _span: span::Data) -> span::Id {
+        span::Id::from_u64(0)
     }
 
-    fn enter(&self, _span: &SpanData, _at: Instant) {}
+    fn add_value(
+        &self,
+        _span: &span::Id,
+        _name: &'static str,
+        _value: &dyn IntoValue,
+    ) -> Result<(), subscriber::AddValueError> {
+        Ok(())
+    }
 
-    fn exit(&self, _span: &SpanData, _at: Instant) {}
+    fn add_prior_span(
+        &self,
+        _span: &span::Id,
+        _follows: span::Id,
+    ) -> Result<(), subscriber::PriorError> {
+        Ok(())
+    }
+
+    fn enabled(&self, _metadata: &Meta) -> bool {
+        false
+    }
+
+    fn observe_event<'event, 'meta: 'event>(&self, _event: &'event Event<'event, 'meta>) {
+        // Do nothing.
+    }
+
+    fn enter(&self, _span: span::Id, _state: span::State) {}
+
+    fn exit(&self, _span: span::Id, _state: span::State) {}
 }

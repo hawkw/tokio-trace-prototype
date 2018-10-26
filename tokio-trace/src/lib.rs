@@ -1,12 +1,12 @@
 //!
 //! # Core Concepts
 //!
-//! The core of `tokio-trace`'s API is composed of `Events`, `Spans`, and
-//! `Subscribers`. We'll cover these in turn.
+//! The core of `tokio-trace`'s API is composed of `Event`s, `Span`s, and
+//! `Subscriber`s. We'll cover these in turn.
 //!
-//! # Spans
+//! # `Span`s
 //!
-//! A `Span` represents a _period of time_ during which a program was executing
+//! A [`Span`] represents a _period of time_ during which a program was executing
 //! in some context. A thread of execution is said to _enter_ a span when it
 //! begins executing in that context and _exit_s the span when switching to
 //! another context. The span in which a thread is currently executing is
@@ -59,7 +59,7 @@
 //!
 //! # Events
 //!
-//! An `Event` represents a _point_ in time. It signifies something that
+//! An [`Event`] represents a _point_ in time. It signifies something that
 //! happened while the trace was executing. `Event`s are comparable to the log
 //! records emitted by unstructured logging code, but unlike a typical log line,
 //! an `Event` always occurs within the context of a `Span`. Like a `Span`, it
@@ -73,43 +73,117 @@
 //! may be recorded at a number of levels, and can have unstructured,
 //! human-readable messages; however, they also carry key-value data and exist
 //! within the context of the tree of spans that comprise a trase. Thus,
-//! individual log record-like events can be pinpointed not only in time, but in
-//! the logical execution flow of the system.
+//! individual log record-like events can be pinpointed not only in time, but
+//! in the logical execution flow of the system.
+//!
+//! # `Subscriber`s
+//!
+//! As `Span`s and `Event`s occur, they are recorded or aggregated by
+//! implementations of the [`Subscriber`] trait. `Subscriber`s are notified
+//! when an `Event` takes place and when a `Span` is entered or exited. These
+//! notifications are represented by the following `Subscriber` trait methods:
+//! + [`observe_event`], called when an `Event` takes place,
+//! + [`enter`], called when execution enters a `Span`,
+//! + [`exit`], called when execution exits a `Span`
+//!
+//! In addition, subscribers may implement the [`enabled`] function to _filter_
+//! the notifications they receive based on [metadata] describing each `Span`
+//! or `Event`. If a call to `Subscriber::enabled` returns `false` for a given
+//! set of metadata, that `Subscriber` will *not* be notified about the
+//! corresponding `Span` or `Event`. For performance reasons, if no currently
+//! active subscribers express  interest in a given set of metadata by returning
+//! `true`, then the corresponding `Span` or `Event` will never be constructed.
+//!
+//! `Event`s and `Span`s are broadcast to `Subscriber`s by the [`Dispatcher`], a
+//! special `Subscriber` implementation which broadcasts the notifications it
+//! receives to a list of attached `Subscriber`s. The [`Dispatcher::builder`]
+//! function returns a builder that can be used to attach `Subscriber`s to a
+//! `Dispatcher` and initialize it.
+//!
+//! [`Span`]: span/struct.Span
+//! [`Event`]: struct.Event.html
+//! [`Subscriber`]: subscriber/trait.Subscriber.html
+//! [`observe_event`]: subscriber/trait.Subscriber.html#tymethod.observe_event
+//! [`enter`]: subscriber/trait.Subscriber.html#tymethod.enter
+//! [`exit`]: subscriber/trait.Subscriber.html#tymethod.exit
+//! [`enabled`]: subscriber/trait.Subscriber.html#tymethod.enabled
+//! [metadata]: struct.Meta.html
+//! [`Dispatcher`]: struct.Dispatcher.html
+//! [`Dispatcher::builder`]: struct.Dispatcher.html#method.builder
+
 extern crate futures;
-extern crate log;
-#[macro_use]
-extern crate lazy_static;
-pub use log::Level;
 
-use std::{fmt, slice, time::Instant};
-
-use self::dedup::IteratorDedup;
+use std::{fmt, slice};
 
 #[doc(hidden)]
 #[macro_export]
-macro_rules! static_meta {
-    ($($k:ident),*) => (
-        static_meta!(@ None, $crate::Level::Trace, $($k),* )
-    );
-    (level: $lvl:expr, $($k:ident),*) => (
-        static_meta!(@ None, $lvl, $($k),* )
-    );
-    (target: $target:expr, level: $lvl:expr, $($k:ident),*) => (
-        static_meta!(@ Some($target), $lvl, $($k),* )
-    );
-    (target: $target:expr, $($k:ident),*) => (
-        static_meta!(@ Some($target), $crate::Level::Trace, $($k),* )
-    );
-    (@ $target:expr, $lvl:expr, $($k:ident),*) => (
+macro_rules! meta {
+    (span: $name:expr, $( $field_name:ident ),*) => ({
         $crate::Meta {
+            name: Some($name),
+            target: module_path!(),
+            level: $crate::Level::Trace,
+            module_path: Some(module_path!()),
+            file: Some(file!()),
+            line: Some(line!()),
+            field_names: &[ $(stringify!($field_name)),* ],
+            kind: $crate::Kind::Span,
+        }
+    });
+    (event: $lvl:expr, $( $field_name:ident ),*) =>
+        (meta!(event: $lvl, target: module_path!(), $( $field_name ),* ));
+    (event: $lvl:expr, target: $target:expr, $( $field_name:ident ),*) => ({
+        $crate::Meta {
+            name: None,
             target: $target,
             level: $lvl,
-            module_path: module_path!(),
-            file: file!(),
-            line: line!(),
-            field_names: &[ $(stringify!($k)),* ],
+            module_path: Some(module_path!()),
+            file: Some(file!()),
+            line: Some(line!()),
+            field_names: &[ $(stringify!($field_name)),* ],
+            kind: $crate::Kind::Event,
         }
-    )
+    });
+}
+
+// Cache the result of testing if a span or event with the given metadata is
+// enabled by the current subscriber, so the filter doesn't have to be
+// reapplied if we have already called `enabled`.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! cached_filter {
+    ($meta:expr, $dispatcher:expr) => {{
+        use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+        static FILTERED: AtomicUsize = ATOMIC_USIZE_INIT;
+        const ENABLED: usize = 1;
+        const DISABLED: usize = 2;
+        if $dispatcher.should_invalidate_filter($meta) {
+            let enabled = $dispatcher.enabled(&META);
+            if enabled {
+                FILTERED.store(ENABLED, Ordering::Relaxed);
+            } else {
+                FILTERED.store(DISABLED, Ordering::Relaxed);
+            }
+            enabled
+        } else {
+            match FILTERED.load(Ordering::Relaxed) {
+                // If there's a cached result, use that.
+                ENABLED => true,
+                DISABLED => false,
+                // Otherwise, this span has not yet been filtered, so call
+                // `enabled` now and store the result.
+                _ => {
+                    let enabled = $dispatcher.enabled(&META);
+                    if enabled {
+                        FILTERED.store(ENABLED, Ordering::Relaxed);
+                    } else {
+                        FILTERED.store(DISABLED, Ordering::Relaxed);
+                    }
+                    enabled
+                }
+            }
+        }
+    }};
 }
 
 /// Constructs a new span.
@@ -133,7 +207,7 @@ macro_rules! static_meta {
 /// # #[macro_use]
 /// # extern crate tokio_trace;
 /// # fn main() {
-/// span!("my span", foo = 2, bar = "a string").enter(|| {
+/// span!("my span", foo = &2, bar = &"a string").enter(|| {
 ///     // do work inside the span...
 /// });
 /// # }
@@ -141,54 +215,93 @@ macro_rules! static_meta {
 #[macro_export]
 macro_rules! span {
     ($name:expr) => { span!($name,) };
-    ($name:expr, $($k:ident = $val:expr),*) => {
-        $crate::Span::new(
-            Some($name),
-            ::std::time::Instant::now(),
-            Some($crate::Span::current()),
-            &static_meta!( $($k),* ),
-            vec![ $(Box::new($val)),* ], // todo: wish this wasn't double-boxed...
-        )
+    ($name:expr, $($k:ident $( = $val:expr )* ) ,*) => {
+        {
+            use $crate::{Span, Subscriber, Dispatch, Meta};
+            static META: Meta<'static> = meta! { span: $name, $( $k ),* };
+            let dispatcher = Dispatch::current();
+            let span = if cached_filter!(&META, dispatcher) {
+                Span::new(
+                    dispatcher,
+                    &META,
+                )
+            } else {
+                Span::new_disabled()
+            };
+            $(
+                span.add_value(stringify!($k), $( $val )* )
+                    .expect(concat!("adding value for field ", stringify!($k), " failed"));
+            )*
+            span
+        }
     }
 }
 
 #[macro_export]
 macro_rules! event {
     (target: $target:expr, $lvl:expr, { $($k:ident = $val:expr),* }, $($arg:tt)+ ) => ({
-    {       let field_values: &[& dyn $crate::Value] = &[ $( & $val),* ];
-            use $crate::Subscriber;
-            $crate::Dispatcher::current().observe_event(&$crate::Event {
-                timestamp: ::std::time::Instant::now(),
-                parent: $crate::Span::current().into(),
-                follows_from: &[],
-                meta: &static_meta!(@ $target, $lvl, $($k),* ),
-                field_values: &field_values[..],
-                message: format_args!( $($arg)+ ),
-            });
+        {
+            use $crate::{SpanId, Subscriber, Dispatch, Meta, SpanData, Event, value::AsValue};
+            static META: Meta<'static> = meta! { event:
+                $lvl,
+                target:
+                $target, $( $k ),*
+            };
+            let dispatcher = Dispatch::current();
+            if cached_filter!(&META, dispatcher) {
+                let field_values: &[ &dyn AsValue ] = &[ $( &$val ),* ];
+                dispatcher.observe_event(&Event {
+                    parent: SpanId::current(),
+                    follows_from: &[],
+                    meta: &META,
+                    field_values: &field_values[..],
+                    message: format_args!( $($arg)+ ),
+                });
+            }
         }
-
     });
-    ($lvl:expr, { $($k:ident = $val:expr),* }, $($arg:tt)+ ) => (event!(target: None, $lvl, { $($k = $val),* }, $($arg)+))
+    ($lvl:expr, { $($k:ident = $val:expr),* }, $($arg:tt)+ ) => (
+        event!(target: module_path!(), $lvl, { $($k = $val),* }, $($arg)+)
+    )
 }
 
-mod dedup;
+#[repr(usize)]
+#[derive(Copy, Eq, Debug, Hash)]
+pub enum Level {
+    /// The "error" level.
+    ///
+    /// Designates very serious errors.
+    Error = 1, // This way these line up with the discriminants for LevelFilter below
+    /// The "warn" level.
+    ///
+    /// Designates hazardous situations.
+    Warn,
+    /// The "info" level.
+    ///
+    /// Designates useful information.
+    Info,
+    /// The "debug" level.
+    ///
+    /// Designates lower priority information.
+    Debug,
+    /// The "trace" level.
+    ///
+    /// Designates very low priority, often extremely verbose, information.
+    Trace,
+}
+
 mod dispatcher;
-pub mod instrument;
 pub mod span;
 pub mod subscriber;
+pub mod value;
 
 pub use self::{
-    dispatcher::{Builder as DispatcherBuilder, Dispatcher},
-    span::{Data as SpanData, Span},
+    dispatcher::Dispatch,
+    span::{Data as SpanData, Id as SpanId, Span},
     subscriber::Subscriber,
+    value::{AsValue, IntoValue, Value},
 };
-
-// XXX: im using fmt::Debug for prototyping purposes, it should probably leave.
-pub trait Value: fmt::Debug + Send + Sync {
-    // ... ?
-}
-
-impl<T> Value for T where T: fmt::Debug + Send + Sync {}
+use value::BorrowedValue;
 
 /// **Note**: `Event` must be generic over two lifetimes, that of `Event` itself
 /// (the `'event` lifetime) *and* the lifetime of the event's metadata (the
@@ -199,34 +312,103 @@ impl<T> Value for T where T: fmt::Debug + Send + Sync {}
 /// macro). Consumers of `Event` probably do not need to actually care about
 /// these lifetimes, however.
 pub struct Event<'event, 'meta> {
-    pub timestamp: Instant,
-
-    pub parent: SpanData,
-    pub follows_from: &'event [SpanData],
+    pub parent: Option<SpanId>,
+    pub follows_from: &'event [SpanId],
 
     pub meta: &'meta Meta<'meta>,
-    // TODO: agh box
-    pub field_values: &'event [&'event dyn Value],
+
+    pub field_values: &'event [&'event dyn AsValue],
     pub message: fmt::Arguments<'event>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct Meta<'a> {
-    pub target: Option<&'a str>,
-    pub level: log::Level,
+    pub name: Option<&'a str>,
+    pub target: &'a str,
+    pub level: Level,
 
-    pub module_path: &'a str,
-    pub file: &'a str,
-    pub line: u32,
+    pub module_path: Option<&'a str>,
+    pub file: Option<&'a str>,
+    pub line: Option<u32>,
 
     pub field_names: &'a [&'a str],
+
+    #[doc(hidden)]
+    pub kind: Kind,
+}
+
+#[doc(hidden)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub enum Kind {
+    Span,
+    Event,
 }
 
 type StaticMeta = Meta<'static>;
 
-/// Iterator over the parents of a span or event
-pub struct Parents<'a> {
-    next: Option<&'a SpanData>,
+// ===== impl Meta =====
+
+impl<'a> Meta<'a> {
+    /// Construct new metadata for a span, with a name, target, level, field
+    /// names, and optional source code location.
+    pub fn new_span(
+        name: Option<&'a str>,
+        target: &'a str,
+        level: Level,
+        module_path: Option<&'a str>,
+        file: Option<&'a str>,
+        line: Option<u32>,
+        field_names: &'a [&'a str],
+    ) -> Self {
+        Self {
+            name,
+            target,
+            level,
+            module_path,
+            file,
+            line,
+            field_names,
+            kind: Kind::Span,
+        }
+    }
+
+    /// Construct new metadata for an event, with a target, level, field names,
+    /// and optional source code location.
+    pub fn new_event(
+        target: &'a str,
+        level: Level,
+        module_path: Option<&'a str>,
+        file: Option<&'a str>,
+        line: Option<u32>,
+        field_names: &'a [&'a str],
+    ) -> Self {
+        Self {
+            name: None,
+            target,
+            level,
+            module_path,
+            file,
+            line,
+            field_names,
+            kind: Kind::Event,
+        }
+    }
+
+    /// Returns true if this metadata corresponds to an event.
+    pub fn is_event(&self) -> bool {
+        match self.kind {
+            Kind::Event => true,
+            _ => false,
+        }
+    }
+
+    /// Returns true if this metadata corresponds to a span.
+    pub fn is_span(&self) -> bool {
+        match self.kind {
+            Kind::Span => true,
+            _ => false,
+        }
+    }
 }
 
 // ===== impl Event =====
@@ -239,115 +421,71 @@ impl<'event, 'meta: 'event> Event<'event, 'meta> {
 
     /// Borrows the value of the field named `name`, if it exists. Otherwise,
     /// returns `None`.
-    pub fn field<Q>(&'event self, name: Q) -> Option<&'event dyn Value>
+    pub fn field<Q>(&self, name: Q) -> Option<value::BorrowedValue>
     where
         &'event str: PartialEq<Q>,
     {
         self.field_names()
             .position(|&field_name| field_name == name)
-            .and_then(|i| self.field_values.get(i).map(|&val| val))
+            .and_then(|i| self.field_values.get(i).map(|&val| value::borrowed(val)))
     }
 
     /// Returns an iterator over all the field names and values on this event.
-    pub fn fields(
-        &'event self,
-    ) -> impl Iterator<Item = (&'event str, &'event dyn Value)> {
+    pub fn fields<'a: 'event>(&'a self) -> impl Iterator<Item = (&'event str, BorrowedValue<'a>)> {
         self.field_names()
             .enumerate()
             .filter_map(move |(idx, &name)| {
-                self.field_values.get(idx).map(|&val| (name, val))
+                self.field_values
+                    .get(idx)
+                    .map(|&val| (name, value::borrowed(val)))
             })
     }
 
     /// Returns a struct that can be used to format all the fields on this
     /// `Event` with `fmt::Debug`.
-    pub fn debug_fields<'a: 'meta>(&'a self) -> DebugFields<'a, Self> {
+    pub fn debug_fields<'a: 'event>(&'a self) -> DebugFields<'a, Self, BorrowedValue<'event>> {
         DebugFields(self)
-    }
-
-    /// Returns an iterator over [`SpanData`] references to all the [`Span`]s
-    /// that are parents of this `Event`.
-    ///
-    /// The iterator will traverse the trace tree in ascending order from this
-    /// event's immediate parent to the root span of the trace.
-    pub fn parents<'a>(&'a self) -> Parents<'a> {
-        Parents {
-            next: Some(&self.parent),
-        }
-    }
-
-    /// Returns an iterator over all the field names and values of this `Event`
-    /// and all of its parent [`Span`]s.
-    ///
-    /// Fields with duplicate names are skipped, and the value defined lowest
-    /// in the tree is used. For example:
-    /// ```
-    /// # #[macro_use]
-    /// # extern crate tokio_trace;
-    /// # use tokio_trace::Level;
-    /// # fn main() {
-    /// span!("parent 1", foo = 1, bar = 1).enter(|| {
-    ///     span!("parent 2", foo = 2, bar = 1).enter(|| {
-    ///         event!(Level::Info, { bar = 2 }, "my event");
-    ///     })
-    /// });
-    /// # }
-    /// ```
-    /// If a `Subscriber` were to call `all_fields` on this event, it will
-    /// receive an iterator with the values `("foo", 2)` and `("bar", 2)`.
-    pub fn all_fields<'a>(
-        &'a self,
-    ) -> impl Iterator<Item = (&'a str, &'a dyn Value)> {
-        self.fields()
-            .chain(self.parents().flat_map(|parent| parent.fields()))
-            .dedup_by(|(k, _)| k)
     }
 }
 
 impl<'a, 'm: 'a> IntoIterator for &'a Event<'a, 'm> {
-    type Item = (&'a str, &'a dyn Value);
-    type IntoIter = Box<Iterator<Item = (&'a str, &'a dyn Value)> + 'a>; // TODO: unbox
+    type Item = (&'a str, BorrowedValue<'a>);
+    type IntoIter = Box<Iterator<Item = (&'a str, BorrowedValue<'a>)> + 'a>; // TODO: unbox
     fn into_iter(self) -> Self::IntoIter {
         Box::new(self.fields())
     }
 }
 
-pub struct DebugFields<'a, I: 'a>(&'a I)
+pub struct DebugFields<'a, I: 'a, T: 'a>(&'a I)
 where
-    &'a I: IntoIterator<Item = (&'a str, &'a dyn Value)>;
+    &'a I: IntoIterator<Item = (&'a str, T)>;
 
-impl<'a, I: 'a> fmt::Debug for DebugFields<'a, I>
+impl<'a, I: 'a, T: 'a> fmt::Debug for DebugFields<'a, I, T>
 where
-    &'a I: IntoIterator<Item = (&'a str, &'a dyn Value)>,
+    &'a I: IntoIterator<Item = (&'a str, T)>,
+    T: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_map().entries(self.0.into_iter()).finish()
+        self.0
+            .into_iter()
+            .fold(&mut f.debug_struct(""), |s, (name, value)| {
+                s.field(name, &value)
+            }).finish()
     }
 }
 
-// ===== impl Parents =====
+// ===== impl Level =====
 
-impl<'a> Iterator for Parents<'a> {
-    type Item = &'a SpanData;
-    fn next(&mut self) -> Option<Self::Item> {
-        let next = self.next;
-        self.next = self.next.and_then(SpanData::parent);
-        next
+impl Clone for Level {
+    #[inline]
+    fn clone(&self) -> Level {
+        *self
     }
 }
 
-impl<'a, 'meta> From<&'a log::Record<'meta>> for Meta<'meta> {
-    fn from(record: &'a log::Record<'meta>) -> Self {
-        Meta {
-            target: Some(record.target()),
-            level: record.level(),
-            module_path: record
-                .module_path()
-                // TODO: make symmetric
-                .unwrap_or_else(|| record.target()),
-            line: record.line().unwrap_or(0),
-            file: record.file().unwrap_or("???"),
-            field_names: &[],
-        }
+impl PartialEq for Level {
+    #[inline]
+    fn eq(&self, other: &Level) -> bool {
+        *self as usize == *other as usize
     }
 }

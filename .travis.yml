@@ -1,9 +1,11 @@
 language: rust
-rust:
-  - stable
-  - beta
-  - nightly
-matrix:
-  allow_failures:
-    - rust: nightly
-script: cargo test --all
+sudo: false
+
+jobs:
+  include:
+  - stage: test
+    script: cargo test --all
+    name: "tests"
+  - script: cargo fmt --all -- --check
+    install: rustup component add rustfmt-preview
+    name: "rustfmt"

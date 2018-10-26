@@ -2,11 +2,13 @@
 
 members = [
     "tokio-trace",
+    "tokio-trace-futures",
     "tokio-trace-tower",
     "tokio-trace-tower-http",
     "tokio-trace-log",
     "tokio-trace-env-logger",
     "tokio-trace-slog",
     "tokio-trace-macros/tokio-trace-macros",
-    "tokio-trace-macros/example"
+    "tokio-trace-macros/example",
+    "tokio-trace-subscriber"
 ]

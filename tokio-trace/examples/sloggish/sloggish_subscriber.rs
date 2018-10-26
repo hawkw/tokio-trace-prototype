@@ -10,28 +10,32 @@
 //!
 //! [`slog-term`]: https://docs.rs/slog-term/2.4.0/slog_term/
 //! [`slog` README]: https://github.com/slog-rs/slog#terminal-output-example
-extern crate humantime;
 extern crate ansi_term;
+extern crate humantime;
 use self::ansi_term::{Color, Style};
-use super::tokio_trace::{self, Level};
-
+use super::tokio_trace::{
+    self,
+    subscriber::{self, Subscriber},
+    Level, SpanData, SpanId,
+};
 
 use std::{
-    collections::hash_map::RandomState,
-    hash::{BuildHasher, Hash, Hasher},
+    collections::HashMap,
     fmt,
     io::{self, Write},
-    sync::Mutex,
-    time::{Instant, SystemTime},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Mutex,
+    },
+    time::SystemTime,
 };
 
 pub struct SloggishSubscriber {
     indent_amount: usize,
     stderr: io::Stderr,
-    t0_instant: Instant,
-    t0_sys: SystemTime,
-    hash_builder: RandomState,
-    stack: Mutex<Vec<u64>>,
+    stack: Mutex<Vec<SpanId>>,
+    spans: Mutex<HashMap<SpanId, SpanData>>,
+    ids: AtomicUsize,
 }
 
 struct ColorLevel(Level);
@@ -53,21 +57,16 @@ impl SloggishSubscriber {
         Self {
             indent_amount,
             stderr: io::stderr(),
-            t0_instant: Instant::now(),
-            t0_sys: SystemTime::now(),
-            hash_builder: RandomState::new(),
             stack: Mutex::new(vec![]),
+            spans: Mutex::new(HashMap::new()),
+            ids: AtomicUsize::new(0),
         }
     }
 
-    fn anchor_instant(&self, t1: Instant) -> SystemTime {
-        let diff = t1 - self.t0_instant;
-        self.t0_sys + diff
-    }
-
-    fn print_kvs<'a, I>(&self, writer: &mut impl Write, kvs: I, leading: &str) -> io::Result<()>
+    fn print_kvs<'a, I, T>(&self, writer: &mut impl Write, kvs: I, leading: &str) -> io::Result<()>
     where
-        I: IntoIterator<Item = (&'a str, &'a dyn tokio_trace::Value)>,
+        I: IntoIterator<Item = (&'a str, T)>,
+        T: fmt::Debug,
     {
         let mut kvs = kvs.into_iter();
         if let Some((k, v)) = kvs.next() {
@@ -85,50 +84,75 @@ impl SloggishSubscriber {
         Ok(())
     }
 
-    fn print_meta(
-        &self,
-        writer: &mut impl Write,
-        meta: &tokio_trace::Meta,
-    ) -> io::Result<()> {
+    fn print_meta(&self, writer: &mut impl Write, meta: &tokio_trace::Meta) -> io::Result<()> {
         write!(
             writer,
             "{level} {target} ",
             level = ColorLevel(meta.level),
-            target = meta.target.unwrap_or(meta.module_path),
+            target = meta.target,
         )
     }
 
-    fn print_indent(&self, writer: &mut impl Write, indent: usize,) -> io::Result<()> {
+    fn print_indent(&self, writer: &mut impl Write, indent: usize) -> io::Result<()> {
         for _ in 0..(indent * self.indent_amount) {
             write!(writer, " ")?;
         }
         Ok(())
     }
-
-    fn hash_span(&self, span: &tokio_trace::SpanData) -> u64 {
-        let mut hasher = self.hash_builder.build_hasher();
-        span.hash(&mut hasher);
-        hasher.finish()
-    }
 }
 
-impl tokio_trace::Subscriber for SloggishSubscriber {
+impl Subscriber for SloggishSubscriber {
+    fn enabled(&self, _metadata: &tokio_trace::Meta) -> bool {
+        true
+    }
+
+    fn new_span(&self, span: tokio_trace::SpanData) -> tokio_trace::span::Id {
+        let next = self.ids.fetch_add(1, Ordering::SeqCst) as u64;
+        let id = tokio_trace::span::Id::from_u64(next);
+        self.spans.lock().unwrap().insert(id.clone(), span);
+        id
+    }
+
+    fn add_value(
+        &self,
+        span: &tokio_trace::SpanId,
+        name: &'static str,
+        value: &dyn tokio_trace::IntoValue,
+    ) -> Result<(), subscriber::AddValueError> {
+        let mut spans = self.spans.lock().expect("mutex poisoned!");
+        let span = spans
+            .get_mut(span)
+            .ok_or(subscriber::AddValueError::NoSpan)?;
+        span.add_value(name, value)
+    }
+
+    fn add_prior_span(
+        &self,
+        _span: &tokio_trace::SpanId,
+        _follows: tokio_trace::SpanId,
+    ) -> Result<(), subscriber::PriorError> {
+        // unimplemented
+        Ok(())
+    }
+
     #[inline]
-    fn observe_event<'event, 'meta: 'event>(&self, event: &'event tokio_trace::Event<'event, 'meta>) {
+    fn observe_event<'event, 'meta: 'event>(
+        &self,
+        event: &'event tokio_trace::Event<'event, 'meta>,
+    ) {
         let mut stderr = self.stderr.lock();
-        let parent_hash = self.hash_span(&event.parent);
 
         let stack = self.stack.lock().unwrap();
-        if let Some(idx) = stack.iter()
-            .position(|hash| hash == &parent_hash)
+        if let Some(idx) = stack
+            .iter()
+            .position(|id| event.parent.as_ref().map(|p| p == id).unwrap_or(false))
         {
             self.print_indent(&mut stderr, idx + 1).unwrap();
         }
-        let t1 = self.anchor_instant(event.timestamp);
         write!(
             &mut stderr,
             "{} ",
-            humantime::format_rfc3339_seconds(t1)
+            humantime::format_rfc3339_seconds(SystemTime::now())
         ).unwrap();
         self.print_meta(&mut stderr, event.meta).unwrap();
         write!(
@@ -141,23 +165,19 @@ impl tokio_trace::Subscriber for SloggishSubscriber {
     }
 
     #[inline]
-    fn enter(&self, span: &tokio_trace::SpanData, _at: Instant) {
+    fn enter(&self, span: tokio_trace::span::Id, _state: tokio_trace::span::State) {
         let mut stderr = self.stderr.lock();
-
-        let span_hash = self.hash_span(span);
-        let parent_hash = span.parent()
-            .map(|parent| self.hash_span(parent));
-
         let mut stack = self.stack.lock().unwrap();
-        if stack.iter().any(|hash| hash == &span_hash) {
+        let spans = self.spans.lock().unwrap();
+        let data = spans.get(&span);
+        let parent = data.and_then(SpanData::parent);
+        if stack.iter().any(|id| id == &span) {
             // We are already in this span, do nothing.
             return;
         } else {
             let indent = if let Some(idx) = stack
                 .iter()
-                .position(|hash| parent_hash
-                    .map(|p| hash == &p)
-                    .unwrap_or(false))
+                .position(|id| parent.map(|p| id == p).unwrap_or(false))
             {
                 let idx = idx + 1;
                 stack.truncate(idx);
@@ -167,12 +187,14 @@ impl tokio_trace::Subscriber for SloggishSubscriber {
                 0
             };
             self.print_indent(&mut stderr, indent).unwrap();
-            stack.push(span_hash);
-            self.print_kvs(&mut stderr, span.fields(), "").unwrap();
+            stack.push(span);
+            if let Some(data) = data {
+                self.print_kvs(&mut stderr, data.fields(), "").unwrap();
+            }
             write!(&mut stderr, "\n").unwrap();
         }
     }
 
     #[inline]
-    fn exit(&self, _span: &tokio_trace::SpanData, _at: Instant) {}
+    fn exit(&self, _span: tokio_trace::span::Id, _state: tokio_trace::span::State) {}
 }
