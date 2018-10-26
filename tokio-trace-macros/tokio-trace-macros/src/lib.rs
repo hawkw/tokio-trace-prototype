@@ -37,7 +37,7 @@ pub fn trace(_args: TokenStream, item: TokenStream) -> TokenStream {
     quote_spanned!(call_site=>
         #(#attrs) *
         #vis #constness #unsafety #asyncness #abi fn #ident(#params) #return_type {
-            span!(#ident_str, traced_function = #ident_str).enter(move || {
+            span!(#ident_str, traced_function = &#ident_str).enter(move || {
                 #block
             })
         }

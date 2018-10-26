@@ -2,26 +2,28 @@
 extern crate tokio_trace;
 #[macro_use]
 extern crate tokio_trace_macros;
+extern crate env_logger;
+extern crate tokio_trace_log;
+
 use tokio_trace::Level;
 
-#[path = "../../../tokio-trace/examples/sloggish/sloggish_subscriber.rs"]
-mod sloggish;
-use self::sloggish::SloggishSubscriber;
-
 fn main() {
-    tokio_trace::Dispatcher::builder()
-        .add_subscriber(SloggishSubscriber::new(2))
-        .init();
+    env_logger::Builder::new().parse("trace").init();
+    let subscriber = tokio_trace_log::TraceLogger::new();
 
-    let server_span = span!("server", local_port = 8888);
-    server_span.clone().enter(move || {
-        suggest_band("Parquet Courts");
+    tokio_trace::Dispatch::to(subscriber).with(|| {
+        let num = 1;
+
+        let span = span!("Getting rec from another function.", number_of_recs = &num);
+        span.enter(|| {
+            let band = suggest_band();
+            event!(Level::Info, { band_recommendation = &band }, "Got a rec.");
+        });
     });
 }
 
 #[trace]
 #[inline]
-fn suggest_band(band: &str) -> String {
-    event!(Level::Info, { band = band.to_string() }, "suggested a band");
-    format!("Have you listened to {}?", band)
+fn suggest_band() -> String {
+    format!("Wild Pink")
 }

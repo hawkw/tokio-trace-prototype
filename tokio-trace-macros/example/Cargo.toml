@@ -5,6 +5,8 @@ authors = ["David Barsky <dbarsky@amazon.com>"]
 
 [dependencies]
 tokio-trace = { path = "../../tokio-trace" }
+tokio-trace-log = { path = "../../tokio-trace-log" }
 tokio-trace-macros = { path = "../tokio-trace-macros" }
+env_logger = "0.5"
 ansi_term = "0.11"
 humantime = "1.1.1"
