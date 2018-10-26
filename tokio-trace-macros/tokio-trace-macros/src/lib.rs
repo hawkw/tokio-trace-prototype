@@ -1,5 +1,3 @@
-#![feature(proc_macro_diagnostic)]
-
 extern crate proc_macro;
 #[macro_use]
 extern crate syn;
@@ -43,5 +41,6 @@ pub fn trace(_args: TokenStream, item: TokenStream) -> TokenStream {
                 #block
             })
         }
-    ).into()
+    )
+    .into()
 }

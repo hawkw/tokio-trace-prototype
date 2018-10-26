@@ -20,8 +20,7 @@ fn main() {
 }
 
 #[trace]
-#[deprecated]
-#[warn(missing_docs)]
+#[inline]
 fn suggest_band(band: &str) -> String {
     event!(Level::Info, { band = band.to_string() }, "suggested a band");
     format!("Have you listened to {}?", band)
