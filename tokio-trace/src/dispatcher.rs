@@ -196,7 +196,8 @@ mod tests {
             foo.clone().enter(|| {});
             foo
         });
-        Dispatch::to(subscriber::mock().run()).as_default(move || foo.enter(|| span!("bar").enter(|| {})))
+        Dispatch::to(subscriber::mock().run())
+            .as_default(move || foo.enter(|| span!("bar").enter(|| {})))
     }
 
     #[test]
