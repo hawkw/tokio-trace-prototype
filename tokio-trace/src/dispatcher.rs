@@ -45,7 +45,7 @@ impl Dispatch {
         Dispatch(Arc::new(subscriber))
     }
 
-    pub fn with<T>(&self, f: impl FnOnce() -> T) -> T {
+    pub fn as_default<T>(&self, f: impl FnOnce() -> T) -> T {
         CURRENT_DISPATCH.with(|current| {
             let prior = current.replace(self.with_invalidate()).dispatch;
             let result = f();
@@ -191,12 +191,12 @@ mod tests {
             .exit(span::mock().named(Some("bar")).with_state(State::Done))
             .exit(span::mock().named(Some("foo")).with_state(State::Done))
             .run();
-        let foo = Dispatch::to(subscriber1).with(|| {
+        let foo = Dispatch::to(subscriber1).as_default(|| {
             let foo = span!("foo");
             foo.clone().enter(|| {});
             foo
         });
-        Dispatch::to(subscriber::mock().run()).with(move || foo.enter(|| span!("bar").enter(|| {})))
+        Dispatch::to(subscriber::mock().run()).as_default(move || foo.enter(|| span!("bar").enter(|| {})))
     }
 
     #[test]
@@ -218,13 +218,13 @@ mod tests {
             .exit(span::mock().named(Some("baz")).with_state(State::Done))
             .run();
 
-        let foo = Dispatch::to(subscriber1).with(|| {
+        let foo = Dispatch::to(subscriber1).as_default(|| {
             let foo = span!("foo");
             foo.clone().enter(|| {});
             foo
         });
-        let baz = Dispatch::to(subscriber2).with(|| span!("baz"));
-        Dispatch::to(subscriber::mock().run()).with(move || {
+        let baz = Dispatch::to(subscriber2).as_default(|| span!("baz"));
+        Dispatch::to(subscriber::mock().run()).as_default(move || {
             foo.enter(|| span!("bar").enter(|| {}));
             baz.enter(|| span!("quux").enter(|| {}))
         })
