@@ -1,5 +1,5 @@
 use {
-    span,
+    span::{self, Span},
     subscriber::{self, Subscriber},
     Event, IntoValue, Meta,
 };
@@ -7,6 +7,7 @@ use {
 use std::{
     cell::RefCell,
     collections::{hash_map::DefaultHasher, HashSet},
+    default::Default,
     fmt,
     hash::{Hash, Hasher},
     sync::Arc,
@@ -30,7 +31,7 @@ impl Dispatch {
     }
 
     pub fn current() -> Dispatch {
-        CURRENT_DISPATCH.with(|current| current.borrow().dispatch.clone())
+        Span::current().dispatch().cloned().unwrap_or_default()
     }
 
     pub fn to<S>(subscriber: S) -> Self
@@ -64,6 +65,12 @@ impl Dispatch {
 impl fmt::Debug for Dispatch {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.pad("Dispatch(...)")
+    }
+}
+
+impl Default for Dispatch {
+    fn default() -> Self {
+        CURRENT_DISPATCH.with(|current| current.borrow().dispatch.clone())
     }
 }
 
