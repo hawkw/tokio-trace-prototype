@@ -170,3 +170,71 @@ impl Subscriber for NoSubscriber {
 
     fn exit(&self, _span: span::Id, _state: span::State) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use ::{subscriber, span::{self, State}};
+    use super::*;
+
+    #[test]
+    fn dispatcher_is_sticky() {
+        // Test ensuring that entire trace trees are collected by the same
+        // dispatcher, even across dispatcher context switches.
+        let subscriber1 = subscriber::mock()
+            .enter(span::mock().named(Some("foo")))
+            .exit(span::mock().named(Some("foo")).with_state(State::Idle))
+            .enter(span::mock().named(Some("foo")))
+            .enter(span::mock().named(Some("bar")))
+            .exit(span::mock().named(Some("bar")).with_state(State::Done))
+            .exit(span::mock().named(Some("foo")).with_state(State::Done))
+            .run();
+        let foo = Dispatch::to(subscriber1).with(|| {
+            let foo = span!("foo");
+            foo.clone().enter(|| {});
+            foo
+        });
+        Dispatch::to(subscriber::mock().run()).with(move || {
+            foo.enter(|| {
+                span!("bar").enter(|| {})
+            })
+        })
+    }
+
+    #[test]
+    fn dispatcher_isnt_too_sticky() {
+        // Test ensuring that new trace trees are collected by the current
+        // dispatcher.
+        let subscriber1 = subscriber::mock()
+            .enter(span::mock().named(Some("foo")))
+            .exit(span::mock().named(Some("foo")).with_state(State::Idle))
+            .enter(span::mock().named(Some("foo")))
+            .enter(span::mock().named(Some("bar")))
+            .exit(span::mock().named(Some("bar")).with_state(State::Done))
+            .exit(span::mock().named(Some("foo")).with_state(State::Done))
+            .run();
+        let subscriber2 = subscriber::mock()
+            .enter(span::mock().named(Some("baz")))
+            .enter(span::mock().named(Some("quux")))
+            .exit(span::mock().named(Some("quux")).with_state(State::Done))
+            .exit(span::mock().named(Some("baz")).with_state(State::Done))
+            .run();
+
+        let foo = Dispatch::to(subscriber1).with(|| {
+            let foo = span!("foo");
+            foo.clone().enter(|| {});
+            foo
+        });
+        let baz = Dispatch::to(subscriber2).with(|| {
+            span!("baz")
+        });
+        Dispatch::to(subscriber::mock().run()).with(move || {
+            foo.enter(|| {
+                span!("bar").enter(|| {})
+            });
+            baz.enter(|| {
+                span!("quux").enter(|| {})
+            })
+        })
+    }
+
+}
