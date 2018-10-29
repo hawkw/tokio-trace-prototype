@@ -173,8 +173,11 @@ impl Subscriber for NoSubscriber {
 
 #[cfg(test)]
 mod tests {
-    use ::{subscriber, span::{self, State}};
     use super::*;
+    use {
+        span::{self, State},
+        subscriber,
+    };
 
     #[test]
     fn dispatcher_is_sticky() {
@@ -193,11 +196,7 @@ mod tests {
             foo.clone().enter(|| {});
             foo
         });
-        Dispatch::to(subscriber::mock().run()).with(move || {
-            foo.enter(|| {
-                span!("bar").enter(|| {})
-            })
-        })
+        Dispatch::to(subscriber::mock().run()).with(move || foo.enter(|| span!("bar").enter(|| {})))
     }
 
     #[test]
@@ -224,16 +223,10 @@ mod tests {
             foo.clone().enter(|| {});
             foo
         });
-        let baz = Dispatch::to(subscriber2).with(|| {
-            span!("baz")
-        });
+        let baz = Dispatch::to(subscriber2).with(|| span!("baz"));
         Dispatch::to(subscriber::mock().run()).with(move || {
-            foo.enter(|| {
-                span!("bar").enter(|| {})
-            });
-            baz.enter(|| {
-                span!("quux").enter(|| {})
-            })
+            foo.enter(|| span!("bar").enter(|| {}));
+            baz.enter(|| span!("quux").enter(|| {}))
         })
     }
 
