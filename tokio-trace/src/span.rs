@@ -223,6 +223,12 @@ impl Span {
         }
     }
 
+    /// Returns a reference to the dispatcher that tracks this span, or `None`
+    /// if the span is disabled.
+    pub(crate) fn dispatch(&self) -> Option<&Dispatch> {
+        self.inner.as_ref().map(|inner| &inner.inner.subscriber)
+    }
+
     pub fn enter<F: FnOnce() -> T, T>(self, f: F) -> T {
         match self.inner {
             Some(inner) => inner.enter(f),
