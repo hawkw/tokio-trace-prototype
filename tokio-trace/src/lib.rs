@@ -146,6 +146,8 @@ macro_rules! meta {
 macro_rules! cached_filter {
     ($meta:expr, $dispatcher:expr) => {{
         use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+        // TODO: maybe we should bundle all this callsite-specific data together
+        // into a struct or something...
         static FILTERED_BY: AtomicUsize = ATOMIC_USIZE_INIT;
         static FILTERED: AtomicUsize = ATOMIC_USIZE_INIT;
         const ENABLED: usize = 1;
