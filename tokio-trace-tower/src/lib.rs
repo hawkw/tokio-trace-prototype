@@ -27,8 +27,8 @@ where
 {
     type Request = T::Request;
     type Response = T::Response;
-    type Future = Instrumented<T::Future>;
     type Error = T::Error;
+    type Future = Instrumented<T::Future>;
 
     fn poll_ready(&mut self) -> futures::Poll<(), Self::Error> {
         let span = self.span.clone();
