@@ -22,7 +22,7 @@ thread_local! {
 #[derive(Clone)]
 pub struct Dispatch {
     subscriber: Arc<dyn Subscriber + Send + Sync>,
-    gen: usize,
+    id: usize,
 }
 
 impl Dispatch {
@@ -30,7 +30,7 @@ impl Dispatch {
     pub fn none() -> Self {
         Dispatch {
             subscriber: Arc::new(NoSubscriber),
-            gen: 0,
+            id: 0,
         }
     }
 
@@ -57,7 +57,7 @@ impl Dispatch {
         static GEN: AtomicUsize = ATOMIC_USIZE_INIT;
         Dispatch {
             subscriber: Arc::new(subscriber),
-            gen: GEN.fetch_add(1, Ordering::AcqRel),
+            id: GEN.fetch_add(1, Ordering::AcqRel),
         }
     }
 
@@ -82,14 +82,14 @@ impl Dispatch {
 
     #[doc(hidden)]
     pub fn validate_cache(&self, filtered_by: &AtomicUsize, meta: &Meta) -> bool {
-        let last_gen = filtered_by.load(Ordering::Acquire);
+        let last_id = filtered_by.load(Ordering::Acquire);
 
         // If the callsite was last filtered by a different subscriber, assume
         // the filter is no longer valid.
-        if last_gen != self.gen {
+        if last_id != self.id {
             // Update the stamp on the call site so this subscriber is now the
             // last to filter it.
-            filtered_by.compare_and_swap(last_gen, self.gen, Ordering::Release);
+            filtered_by.compare_and_swap(last_id, self.id, Ordering::Release);
             return true;
         }
 
