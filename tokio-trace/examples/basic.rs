@@ -13,7 +13,7 @@ fn main() {
 
     tokio_trace::Dispatch::new(subscriber).as_default(|| {
         let foo = 3;
-        event!(Level::Info, { foo = foo, bar = "bar" }, "hello world");
+        trace!({ foo = foo, bar = "bar" }, "hello! I'm gonna shave a yak.");
 
         span!("my_great_span", foo = 4, baz = 5).enter(|| {
             Span::current().close();
