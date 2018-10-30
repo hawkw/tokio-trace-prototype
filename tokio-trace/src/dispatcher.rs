@@ -8,7 +8,10 @@ use std::{
     cell::RefCell,
     default::Default,
     fmt,
-    sync::{Arc, atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering}},
+    sync::{
+        atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT},
+        Arc,
+    },
 };
 
 thread_local! {
@@ -27,7 +30,7 @@ impl Dispatch {
     pub fn none() -> Self {
         Dispatch {
             subscriber: Arc::new(NoSubscriber),
-            gen: 0
+            gen: 0,
         }
     }
 
@@ -103,9 +106,7 @@ impl fmt::Debug for Dispatch {
 
 impl Default for Dispatch {
     fn default() -> Self {
-        CURRENT_DISPATCH.with(|current| {
-            current.borrow().clone()
-        })
+        CURRENT_DISPATCH.with(|current| current.borrow().clone())
     }
 }
 
