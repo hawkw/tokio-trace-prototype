@@ -146,10 +146,11 @@ macro_rules! meta {
 macro_rules! cached_filter {
     ($meta:expr, $dispatcher:expr) => {{
         use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+        static FILTERED_BY: AtomicUsize = ATOMIC_USIZE_INIT;
         static FILTERED: AtomicUsize = ATOMIC_USIZE_INIT;
         const ENABLED: usize = 1;
         const DISABLED: usize = 2;
-        if $dispatcher.should_invalidate_filter($meta) {
+        if $dispatcher.validate_cache(&FILTERED_BY, $meta) {
             let enabled = $dispatcher.enabled(&META);
             if enabled {
                 FILTERED.store(ENABLED, Ordering::Relaxed);

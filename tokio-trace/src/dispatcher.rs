@@ -6,30 +6,29 @@ use {
 
 use std::{
     cell::RefCell,
-    collections::{hash_map::DefaultHasher, HashSet},
     default::Default,
     fmt,
-    hash::{Hash, Hasher},
-    sync::Arc,
+    sync::{Arc, atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering}},
 };
 
 thread_local! {
-    static CURRENT_DISPATCH: RefCell<Option<Current>> = RefCell::new(None);
-}
-
-struct Current {
-    dispatch: Dispatch,
-    seen: HashSet<u64>,
+    static CURRENT_DISPATCH: RefCell<Dispatch> = RefCell::new(Dispatch::none());
 }
 
 /// `Dispatch` trace data to a [`Subscriber`].
 #[derive(Clone)]
-pub struct Dispatch(Arc<dyn Subscriber + Send + Sync>);
+pub struct Dispatch {
+    subscriber: Arc<dyn Subscriber + Send + Sync>,
+    gen: usize,
+}
 
 impl Dispatch {
     /// Returns a new `Dispatch` that discards events and spans.
     pub fn none() -> Self {
-        Dispatch(Arc::new(NoSubscriber))
+        Dispatch {
+            subscriber: Arc::new(NoSubscriber),
+            gen: 0
+        }
     }
 
     /// Returns the subscriber that a new [`Span`] or [`Event`] would dispatch
@@ -52,7 +51,11 @@ impl Dispatch {
     where
         S: Subscriber + Send + Sync + 'static,
     {
-        Dispatch(Arc::new(subscriber))
+        static GEN: AtomicUsize = ATOMIC_USIZE_INIT;
+        Dispatch {
+            subscriber: Arc::new(subscriber),
+            gen: GEN.fetch_add(1, Ordering::AcqRel),
+        }
     }
 
     /// Sets this dispatch as the default for the duration of a closure.
@@ -67,21 +70,28 @@ impl Dispatch {
     /// [`Event`]: ::Event
     pub fn as_default<T>(&self, f: impl FnOnce() -> T) -> T {
         CURRENT_DISPATCH.with(|current| {
-            let prior = current
-                .replace(Some(self.with_invalidate()))
-                .map(|c| c.dispatch)
-                .unwrap_or_else(Dispatch::none);
+            let prior = current.replace(self.clone());
             let result = f();
-            *current.borrow_mut() = Some(prior.with_invalidate());
+            *current.borrow_mut() = prior;
             result
         })
     }
 
-    fn with_invalidate(&self) -> Current {
-        Current {
-            dispatch: self.clone(),
-            seen: HashSet::new(),
+    #[doc(hidden)]
+    pub fn validate_cache(&self, filtered_by: &AtomicUsize, meta: &Meta) -> bool {
+        let last_gen = filtered_by.load(Ordering::Acquire);
+
+        // If the callsite was last filtered by a different subscriber, assume
+        // the filter is no longer valid.
+        if last_gen != self.gen {
+            // Update the stamp on the call site so this subscriber is now the
+            // last to filter it.
+            filtered_by.compare_and_swap(last_gen, self.gen, Ordering::Release);
+            return true;
         }
+
+        // Otherwise, just ask the subscriber what it thinks.
+        self.subscriber.should_invalidate_filter(meta)
     }
 }
 
@@ -94,37 +104,20 @@ impl fmt::Debug for Dispatch {
 impl Default for Dispatch {
     fn default() -> Self {
         CURRENT_DISPATCH.with(|current| {
-            current
-                .borrow()
-                .as_ref()
-                .map(|c| c.dispatch.clone())
-                .unwrap_or_else(Dispatch::none)
+            current.borrow().clone()
         })
     }
 }
 
 impl Subscriber for Dispatch {
+    #[inline]
     fn new_span(&self, span: span::Data) -> span::Id {
-        self.0.new_span(span)
+        self.subscriber.new_span(span)
     }
 
+    #[inline]
     fn should_invalidate_filter(&self, metadata: &Meta) -> bool {
-        CURRENT_DISPATCH.with(|current| {
-            if let Some(ref mut current) = *current.borrow_mut() {
-                let mut hasher = DefaultHasher::new();
-                metadata.hash(&mut hasher);
-                let hash = hasher.finish();
-
-                if current.seen.contains(&hash) {
-                    self.0.should_invalidate_filter(metadata)
-                } else {
-                    current.seen.insert(hash);
-                    true
-                }
-            } else {
-                false
-            }
-        })
+        self.subscriber.should_invalidate_filter(metadata)
     }
 
     #[inline]
@@ -134,7 +127,7 @@ impl Subscriber for Dispatch {
         name: &'static str,
         value: &dyn IntoValue,
     ) -> Result<(), subscriber::AddValueError> {
-        self.0.add_value(span, name, value)
+        self.subscriber.add_value(span, name, value)
     }
 
     #[inline]
@@ -143,27 +136,27 @@ impl Subscriber for Dispatch {
         span: &span::Id,
         follows: span::Id,
     ) -> Result<(), subscriber::PriorError> {
-        self.0.add_prior_span(span, follows)
+        self.subscriber.add_prior_span(span, follows)
     }
 
     #[inline]
     fn enabled(&self, metadata: &Meta) -> bool {
-        self.0.enabled(metadata)
+        self.subscriber.enabled(metadata)
     }
 
     #[inline]
     fn observe_event<'event, 'meta: 'event>(&self, event: &'event Event<'event, 'meta>) {
-        self.0.observe_event(event)
+        self.subscriber.observe_event(event)
     }
 
     #[inline]
     fn enter(&self, span: span::Id, state: span::State) {
-        self.0.enter(span, state)
+        self.subscriber.enter(span, state)
     }
 
     #[inline]
     fn exit(&self, span: span::Id, state: span::State) {
-        self.0.exit(span, state)
+        self.subscriber.exit(span, state)
     }
 }
 
