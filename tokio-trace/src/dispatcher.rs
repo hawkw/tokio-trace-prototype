@@ -14,7 +14,7 @@ use std::{
 };
 
 thread_local! {
-    static CURRENT_DISPATCH: RefCell<Current> = RefCell::new(Dispatch::none().with_invalidate());
+    static CURRENT_DISPATCH: RefCell<Option<Current>> = RefCell::new(None);
 }
 
 struct Current {
@@ -67,9 +67,12 @@ impl Dispatch {
     /// [`Event`]: ::Event
     pub fn as_default<T>(&self, f: impl FnOnce() -> T) -> T {
         CURRENT_DISPATCH.with(|current| {
-            let prior = current.replace(self.with_invalidate()).dispatch;
+            let prior = current
+                .replace(Some(self.with_invalidate()))
+                .map(|c| c.dispatch)
+                .unwrap_or_else(Dispatch::none);
             let result = f();
-            *current.borrow_mut() = prior.with_invalidate();
+            *current.borrow_mut() = Some(prior.with_invalidate());
             result
         })
     }
@@ -90,7 +93,13 @@ impl fmt::Debug for Dispatch {
 
 impl Default for Dispatch {
     fn default() -> Self {
-        CURRENT_DISPATCH.with(|current| current.borrow().dispatch.clone())
+        CURRENT_DISPATCH.with(|current| {
+            current
+                .borrow()
+                .as_ref()
+                .map(|c| c.dispatch.clone())
+                .unwrap_or_else(Dispatch::none)
+        })
     }
 }
 
@@ -101,15 +110,19 @@ impl Subscriber for Dispatch {
 
     fn should_invalidate_filter(&self, metadata: &Meta) -> bool {
         CURRENT_DISPATCH.with(|current| {
-            let mut hasher = DefaultHasher::new();
-            metadata.hash(&mut hasher);
-            let hash = hasher.finish();
+            if let Some(ref mut current) = *current.borrow_mut() {
+                let mut hasher = DefaultHasher::new();
+                metadata.hash(&mut hasher);
+                let hash = hasher.finish();
 
-            if current.borrow().seen.contains(&hash) {
-                self.0.should_invalidate_filter(metadata)
+                if current.seen.contains(&hash) {
+                    self.0.should_invalidate_filter(metadata)
+                } else {
+                    current.seen.insert(hash);
+                    true
+                }
             } else {
-                current.borrow_mut().seen.insert(hash);
-                true
+                false
             }
         })
     }
