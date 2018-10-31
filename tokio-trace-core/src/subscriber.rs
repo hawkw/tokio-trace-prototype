@@ -302,7 +302,11 @@ mod test_support {
             Ok(())
         }
 
-        fn add_follows_from(&self, _span: &span::Id, _follows: span::Id) -> Result<(), FollowsError> {
+        fn add_follows_from(
+            &self,
+            _span: &span::Id,
+            _follows: span::Id,
+        ) -> Result<(), FollowsError> {
             // TODO: it should be possible to expect spans to follow from other spans
             Ok(())
         }
