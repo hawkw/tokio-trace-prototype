@@ -5,9 +5,10 @@ authors = ["Eliza Weisman <eliza@buoyant.io>"]
 
 [features]
 default = []
-test-support =  []
+test-support = ["tokio-trace-core/test-support"]
 
 [dependencies]
+tokio-trace-core = { path = "../tokio-trace-core" }
 
 [dev-dependencies]
 ansi_term = "0.11"
