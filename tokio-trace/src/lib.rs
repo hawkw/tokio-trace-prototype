@@ -160,11 +160,7 @@ macro_rules! cached_filter {
         if FILTERED_BY.with(|filtered_by| $dispatcher.validate_cache(filtered_by, $meta)) {
             let enabled = $dispatcher.enabled(&META);
             FILTERED.with(|filtered| {
-                *filtered.borrow_mut() = if enabled {
-                    ENABLED
-                } else {
-                    DISABLED
-                };
+                *filtered.borrow_mut() = if enabled { ENABLED } else { DISABLED };
             });
             enabled
         } else {
@@ -175,14 +171,10 @@ macro_rules! cached_filter {
                     DISABLED => return false,
                     // Otherwise, this span has not yet been filtered, so call
                     // `enabled` now and store the result.
-                    _=> { }
+                    _ => {}
                 }
                 let enabled = $dispatcher.enabled(&META);
-                *filtered.borrow_mut() = if enabled {
-                    ENABLED
-                } else {
-                    DISABLED
-                };
+                *filtered.borrow_mut() = if enabled { ENABLED } else { DISABLED };
                 enabled
             })
         }

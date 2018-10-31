@@ -82,7 +82,6 @@ impl Dispatch {
 
     #[doc(hidden)]
     pub fn validate_cache(&self, filtered_by: &RefCell<usize>, meta: &Meta) -> bool {
-
         // If the callsite was last filtered by a different subscriber, assume
         // the filter is no longer valid.
         if *filtered_by.borrow() != self.id {
