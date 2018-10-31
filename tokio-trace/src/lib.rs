@@ -117,4 +117,26 @@ macro_rules! event {
     )
 }
 
-pub use tokio_trace_core::*;
+mod dispatcher;
+pub mod subscriber;
+pub mod span;
+
+pub use self::{
+    dispatcher::Dispatch,
+    span::{
+        Span,
+        Id as SpanId,
+        Data as SpanData,
+    },
+    subscriber::Subscriber,
+    tokio_trace_core::{
+        callsite,
+        value::{self, Value, IntoValue, AsValue},
+        Event,
+        Meta,
+        Level,
+    },
+};
+
+#[doc(hidden)]
+pub use tokio_trace_core::Kind;

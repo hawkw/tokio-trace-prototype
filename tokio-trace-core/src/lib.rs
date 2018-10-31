@@ -150,7 +150,7 @@ pub enum Level {
 #[doc(hidden)]
 pub mod callsite;
 
-mod dispatcher;
+pub mod dispatcher;
 pub mod span;
 pub mod subscriber;
 pub mod value;
