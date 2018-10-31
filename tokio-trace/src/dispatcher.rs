@@ -81,15 +81,14 @@ impl Dispatch {
     }
 
     #[doc(hidden)]
-    pub fn validate_cache(&self, filtered_by: &AtomicUsize, meta: &Meta) -> bool {
-        let last_id = filtered_by.load(Ordering::Acquire);
+    pub fn validate_cache(&self, filtered_by: &RefCell<usize>, meta: &Meta) -> bool {
 
         // If the callsite was last filtered by a different subscriber, assume
         // the filter is no longer valid.
-        if last_id != self.id {
+        if *filtered_by.borrow() != self.id {
             // Update the stamp on the call site so this subscriber is now the
             // last to filter it.
-            filtered_by.compare_and_swap(last_id, self.id, Ordering::Release);
+            *filtered_by.borrow_mut() = self.id;
             return true;
         }
 
