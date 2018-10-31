@@ -117,23 +117,17 @@ macro_rules! event {
 }
 
 mod dispatcher;
-pub mod subscriber;
 pub mod span;
+pub mod subscriber;
 
 pub use self::{
     dispatcher::Dispatch,
-    span::{
-        Span,
-        Id as SpanId,
-        Data as SpanData,
-    },
+    span::{Data as SpanData, Id as SpanId, Span},
     subscriber::Subscriber,
     tokio_trace_core::{
         callsite,
-        value::{self, Value, IntoValue, AsValue},
-        Event,
-        Meta,
-        Level,
+        value::{self, AsValue, IntoValue, Value},
+        Event, Level, Meta,
     },
 };
 
