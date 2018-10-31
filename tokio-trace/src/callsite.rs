@@ -1,9 +1,5 @@
 use std::cell::Cell;
-use ::{
-    Dispatch,
-    Meta,
-    Subscriber,
-};
+use {Dispatch, Meta, Subscriber};
 
 #[doc(hidden)]
 pub struct Cache<'a> {
