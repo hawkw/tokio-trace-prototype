@@ -6,3 +6,6 @@ authors = ["Eliza Weisman <eliza@buoyant.io>"]
 [features]
 default = []
 test-support = []
+
+[dev-dependencies]
+futures = "0.1"

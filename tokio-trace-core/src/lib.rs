@@ -23,7 +23,7 @@
 //! span is _completed_. Consider, for example, a future which has an associated
 //! span and enters that span every time it is polled:
 //! ```rust
-//! # extern crate tokio_trace;
+//! # extern crate tokio_trace_core as tokio_trace;
 //! # extern crate futures;
 //! # use futures::{Future, Poll, Async};
 //! struct MyFuture {
