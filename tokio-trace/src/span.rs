@@ -286,7 +286,7 @@ mod tests {
         .unwrap();
     }
 
-        #[test]
+    #[test]
     fn span_closes_on_drop() {
         let subscriber = subscriber::mock()
             .enter(span::mock().named(Some("foo")))

@@ -13,6 +13,7 @@ pub trait Observe {
     fn observe_event<'event, 'meta: 'event>(&self, event: &'event Event<'event, 'meta>);
     fn enter<'a>(&self, span: &SpanRef<'a>);
     fn exit<'a>(&self, span: &SpanRef<'a>);
+    fn close<'a>(&self, span: &SpanRef<'a>);
 
     fn filter(&self) -> &dyn Filter {
         &filter::NoFilter
@@ -263,6 +264,11 @@ where
         self.inner.exit(span)
     }
 
+    #[inline]
+    fn close<'a>(&self, span: &SpanRef<'a>) {
+        self.inner.close(span)
+    }
+
     fn filter(&self) -> &dyn Filter {
         self
     }
@@ -303,6 +309,11 @@ where
     fn exit<'a>(&self, span: &SpanRef<'a>) {
         self.a.exit(span);
         self.b.exit(span);
+    }
+
+    fn close<'a>(&self, span: &SpanRef<'a>) {
+        self.a.close(span);
+        self.b.close(span);
     }
 
     fn filter(&self) -> &dyn Filter {
@@ -350,6 +361,13 @@ where
             Either::B(b) => b.exit(span),
         }
     }
+
+    fn close<'a>(&self, span: &SpanRef<'a>) {
+        match self {
+            Either::A(a) => a.close(span),
+            Either::B(b) => b.close(span),
+        }
+    }
 }
 
 impl<A, B> Filter for Either<A, B>
@@ -378,6 +396,8 @@ impl Observe for NoObserver {
     fn enter<'a>(&self, _span: &SpanRef<'a>) {}
 
     fn exit<'a>(&self, _span: &SpanRef<'a>) {}
+
+    fn close<'a>(&self, _span: &SpanRef<'a>) {}
 
     fn filter(&self) -> &dyn Filter {
         self
