@@ -149,16 +149,29 @@ impl Span {
     ///
     /// Returns the result of evaluating `f`.
     pub fn enter<F: FnOnce() -> T, T>(&mut self, f: F) -> T {
-        let (result, should_close) = match self.inner {
-            Some(ref mut inner) =>
-                (inner.enter(f), inner.should_close()),
-            None => return f(),
-        };
-        if should_close {
-           drop(self.inner.take());
-           self.is_closed = true;
-        };
-        result
+        match self.inner.take() {
+            Some(mut inner) => {
+                inner.has_entered = true;
+                let (result, prior) = CURRENT_SPAN.with(|current_span| {
+                    inner.enter();
+                    let prior = current_span.replace(Some(inner));
+                    (f(), prior)
+                });
+                CURRENT_SPAN.with(|current_span| {
+                    let inner = current_span.replace(prior)
+                        .expect("cannot exit span that wasn't entered");
+                    inner.exit();
+                    self.inner = if inner.should_close() {
+                        drop(inner);
+                        None
+                    } else {
+                        Some(inner)
+                    };
+                });
+                result
+            }
+            None => f(),
+        }
     }
 
 
@@ -196,7 +209,7 @@ impl Span {
             if let Some(ref mut inner) = *current.borrow_mut() {
                 if Some(inner.id()) == self.inner.as_ref().map(Enter::id) {
                     self.inner.take();
-                    inner.should_close();
+                    inner.close();
                     true;
                 }
             }
@@ -419,19 +432,13 @@ impl Enter {
         }
     }
 
-    fn enter<F: FnOnce() -> T, T>(&mut self, f: F) -> T {
+    fn enter(&mut self) {
         self.has_entered = true;
-        let (result, prior) = CURRENT_SPAN.with(|current_span| {
-            let prior = current_span.replace(Some(self.clone()));
-            self.subscriber.enter(self.id());
-            (f(), prior)
-        });
+        self.subscriber.enter(self.id());
+    }
 
-        CURRENT_SPAN.with(|current_span| {
-            current_span.replace(prior);
-            self.subscriber.exit(self.id());
-        });
-        result
+    fn exit(&self) {
+        self.subscriber.exit(self.id());
     }
 
     fn close(&mut self) {
@@ -469,7 +476,7 @@ impl Hash for Enter {
 
 impl Drop for Enter {
     fn drop(&mut self) {
-        if self.should_close {
+        if self.should_close() {
             self.subscriber.close(self.id());
         }
     }
