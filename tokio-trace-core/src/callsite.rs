@@ -1,8 +1,5 @@
-use std::{
-    cell::Cell,
-    thread::LocalKey,
-};
-use {Dispatch, Meta, Subscriber, Span};
+use std::{cell::Cell, thread::LocalKey};
+use {Dispatch, Meta, Span, Subscriber};
 
 #[derive(Debug)]
 pub struct Callsite(&'static LocalKey<Cache<'static>>);
@@ -33,16 +30,12 @@ impl Callsite {
 
     #[inline]
     pub fn is_enabled(&self, dispatch: &Dispatch) -> bool {
-        self.0.with(|cache| {
-            cache.is_enabled(dispatch)
-        })
+        self.0.with(|cache| cache.is_enabled(dispatch))
     }
 
     #[inline]
     pub fn metadata(&self) -> &'static Meta<'static> {
-        self.0.with(|cache| {
-            cache.meta
-        })
+        self.0.with(|cache| cache.meta)
     }
 }
 
