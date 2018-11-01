@@ -2,7 +2,7 @@ extern crate tokio_trace_core;
 
 #[doc(hidden)]
 #[macro_export]
-macro_rules! meta {
+macro_rules! callsite {
     (span: $name:expr, $( $field_name:ident ),*) => ({
         $crate::Meta {
             name: Some($name),
@@ -16,7 +16,7 @@ macro_rules! meta {
         }
     });
     (event: $lvl:expr, $( $field_name:ident ),*) =>
-        (meta!(event: $lvl, target: module_path!(), $( $field_name ),* ));
+        (callsite!(event: $lvl, target: module_path!(), $( $field_name ),* ));
     (event: $lvl:expr, target: $target:expr, $( $field_name:ident ),*) => ({
         $crate::Meta {
             name: None,
@@ -29,6 +29,14 @@ macro_rules! meta {
             kind: $crate::Kind::Event,
         }
     });
+    (@ $meta:expr ) => ({
+        use $crate::{callsite, Meta};
+        static META: Meta = $meta;
+        thread_local! {
+            static CACHE: callsite::Cache = callsite::Cache::new(&META);
+        }
+        callsite::Callsite::new(&CACHE)
+    })
 }
 
 /// Constructs a new span.
