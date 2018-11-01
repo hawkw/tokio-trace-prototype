@@ -192,9 +192,22 @@ impl Span {
     /// Signals that this span should close the next time it is exited, or when
     /// it is dropped.
     pub fn close(&mut self) {
-        if let Some(ref mut inner) = self.inner {
-            inner.close();
-        }
+        self.is_closed = CURRENT_SPAN.with(|current| {
+            if let Some(ref mut inner) = *current.borrow_mut() {
+                if Some(inner.id()) == self.inner.as_ref().map(Enter::id) {
+                    self.inner.take();
+                    inner.should_close();
+                    true;
+                }
+            }
+            if let Some(ref mut inner) = self.inner {
+                inner.close();
+                true
+            } else {
+                false
+            }
+        });
+
     }
 
     /// Returns `true` if this span is closed.
