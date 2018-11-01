@@ -106,6 +106,44 @@
 
 use std::{fmt, slice};
 
+#[macro_export]
+macro_rules! callsite {
+    (span: $name:expr, $( $field_name:ident ),*) => ({
+        callsite!(@ $crate::Meta {
+            name: Some($name),
+            target: module_path!(),
+            level: $crate::Level::Trace,
+            module_path: Some(module_path!()),
+            file: Some(file!()),
+            line: Some(line!()),
+            field_names: &[ $(stringify!($field_name)),* ],
+            kind: $crate::Kind::Span,
+        })
+    });
+    (event: $lvl:expr, $( $field_name:ident ),*) =>
+        (callsite!(event: $lvl, target: module_path!(), $( $field_name ),* ));
+    (event: $lvl:expr, target: $target:expr, $( $field_name:ident ),*) => ({
+        callsite!(@ $crate::Meta {
+            name: None,
+            target: $target,
+            level: $lvl,
+            module_path: Some(module_path!()),
+            file: Some(file!()),
+            line: Some(line!()),
+            field_names: &[ $(stringify!($field_name)),* ],
+            kind: $crate::Kind::Event,
+        })
+    });
+    (@ $meta:expr ) => ({
+        use $crate::{callsite, Meta};
+        static META: Meta<'static> = $meta;
+        thread_local! {
+            static CACHE: callsite::Cache<'static> = callsite::Cache::new(&META);
+        }
+        callsite::Callsite::new(&CACHE)
+    })
+}
+
 /// Describes the level of verbosity of a `Span` or `Event`.
 #[repr(usize)]
 #[derive(Copy, Eq, Debug, Hash)]
