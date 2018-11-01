@@ -278,7 +278,7 @@ mod test_support {
         }
 
         pub fn close(mut self, span: MockSpan) -> Self {
-            self.expected.push_back(Expect::Exit(span));
+            self.expected.push_back(Expect::Close(span));
             self
         }
 
@@ -364,6 +364,7 @@ mod test_support {
             let span = spans
                 .get(&span)
                 .unwrap_or_else(|| panic!("no span for ID {:?}", span));
+            println!("enter:\t{:?}", span.name());
             match self.expected.lock().unwrap().pop_front() {
                 None => {}
                 Some(Expect::Event(_)) => panic!(
@@ -398,6 +399,8 @@ mod test_support {
             let span = spans
                 .get(&span)
                 .unwrap_or_else(|| panic!("no span for ID {:?}", span));
+
+            println!("exit:\t{:?}", span.name());
             match self.expected.lock().unwrap().pop_front() {
                 None => {}
                 Some(Expect::Event(_)) => panic!(
@@ -432,6 +435,7 @@ mod test_support {
             let span = spans
                 .get(&span)
                 .unwrap_or_else(|| panic!("no span for ID {:?}", span));
+            println!("close:\t{:?}", span.name());
             match self.expected.lock().unwrap().pop_front() {
                 None => {}
                 Some(Expect::Event(_)) => panic!(
@@ -448,12 +452,12 @@ mod test_support {
                     expected_span.name,
                     span.name()
                 ),
-                Some(Expect::Close(expected_span)) => panic!(
+                Some(Expect::Close(expected_span)) => {
                     if let Some(name) = expected_span.name {
                         assert_eq!(name, span.name());
                     }
                     // TODO: expect fields
-                ),
+                },
                 Some(Expect::Nothing) => panic!(
                     "expected nothing else to happen, but closed span {:?}",
                     span.name(),
