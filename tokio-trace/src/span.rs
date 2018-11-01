@@ -18,7 +18,7 @@
 //! let my_var = 5;
 //! let my_span = span!("my_span", my_var = &my_var);
 //!
-//! my_span.clone().enter(|| {
+//! my_span.enter(|| {
 //!     // perform some work in the context of `my_span`...
 //! });
 //!
@@ -111,33 +111,34 @@ mod tests {
             .enter(span::mock().named(Some("bar")))
             // The first time we exit "bar", there will be another handle with
             // which we could potentially re-enter bar.
-            .exit(span::mock().named(Some("bar")).with_state(State::Idle))
+            .exit(span::mock().named(Some("bar")))
             // Re-enter "bar", using the cloned handle.
             .enter(span::mock().named(Some("bar")))
             // Now, when we exit "bar", there is no handle to re-enter it, so
             // it should become "done".
-            .exit(span::mock().named(Some("bar")).with_state(State::Done))
-            // "foo" never had more than one handle, so it should also become
-            // "done" when we exit it.
-            .exit(span::mock().named(Some("foo")).with_state(State::Done))
+            .exit(span::mock().named(Some("bar")))
+            .close(span::mock().named(Some("bar")))
+            .exit(span::mock().named(Some("foo")))
             .run();
 
         Dispatch::to(subscriber).as_default(|| {
             span!("foo",).enter(|| {
-                let bar = span!("bar",);
-                bar.clone().enter(|| {
+                let mut bar = span!("bar",);
+                bar.enter(|| {
                     // do nothing. exiting "bar" should leave it idle, since it can
                     // be re-entered.
                 });
                 bar.enter(|| {
-                    // enter "bar" again. this time, the last handle is used, so
-                    // "bar" should be marked as done.
+                    // enter "bar" again. this time, we explicitly close bar.
+                    Span::current().close();
                 });
             });
         });
     }
 
-    #[test]
+    // This test doesn't make sense in the context of non-cloneable spans.
+    /*
+   #[test]
     fn exit_doesnt_finish_concurrently_executing_spans() {
         // Test that exiting a span only marks it as "done" when no other
         // threads are still executing inside that span.
@@ -151,13 +152,15 @@ mod tests {
             .enter(span::mock().named(Some("quux")))
             // When the main thread exits "quux", it will still be running in the
             // spawned thread.
-            .exit(span::mock().named(Some("quux")).with_state(State::Running))
+            .exit(span::mock().named(Some("quux")))
             // Now, when this thread exits "quux", there is no handle to re-enter it, so
             // it should become "done".
-            .exit(span::mock().named(Some("quux")).with_state(State::Done))
+            .exit(span::mock().named(Some("quux")))
+            .close(span::mock().named(Some("quux")))
             // "baz" never had more than one handle, so it should also become
             // "done" when we exit it.
-            .exit(span::mock().named(Some("baz")).with_state(State::Done))
+            .exit(span::mock().named(Some("baz")))
+            .close(span::mock().named(Some("baz")))
             .run();
 
         Dispatch::to(subscriber).as_default(|| {
@@ -193,6 +196,7 @@ mod tests {
             });
         });
     }
+    */
 
     #[test]
     fn handles_to_the_same_span_are_equal() {
@@ -201,14 +205,12 @@ mod tests {
         // won't enter any spans in this test, so the subscriber won't actually
         // expect to see any spans.
         Dispatch::to(subscriber::mock().run()).as_default(|| {
-            let foo1 = span!("foo");
-            let foo2 = foo1.clone();
-
-            // Two handles that point to the same span are equal.
-            assert_eq!(foo1, foo2);
-
-            // // The two span's data handles are also equal.
-            // assert_eq!(foo1.data(), foo2.data());
+            span!("foo").enter(|| {
+                let foo1 = Span::current();
+                let foo2 = Span::current();
+                // Two handles that point to the same span are equal.
+                assert_eq!(foo1, foo2);
+            })
         });
     }
 
@@ -246,15 +248,17 @@ mod tests {
     fn spans_always_go_to_the_subscriber_that_tagged_them() {
         let subscriber1 = subscriber::mock()
             .enter(span::mock().named(Some("foo")))
-            .exit(span::mock().named(Some("foo")).with_state(State::Idle))
+            .exit(span::mock().named(Some("foo")))
             .enter(span::mock().named(Some("foo")))
-            .exit(span::mock().named(Some("foo")).with_state(State::Done));
+            .exit(span::mock().named(Some("foo")))
+            .close(span::mock().named(Some("foo")))
+            .done();
         let subscriber1 = Dispatch::to(subscriber1.run());
         let subscriber2 = Dispatch::to(subscriber::mock().run());
 
-        let foo = subscriber1.as_default(|| {
-            let foo = span!("foo");
-            foo.clone().enter(|| {});
+        let mut foo = subscriber1.as_default(|| {
+            let mut foo = span!("foo");
+            foo.enter(|| {});
             foo
         });
         // Even though we enter subscriber 2's context, the subscriber that
@@ -266,13 +270,15 @@ mod tests {
     fn spans_always_go_to_the_subscriber_that_tagged_them_even_across_threads() {
         let subscriber1 = subscriber::mock()
             .enter(span::mock().named(Some("foo")))
-            .exit(span::mock().named(Some("foo")).with_state(State::Idle))
+            .exit(span::mock().named(Some("foo")))
             .enter(span::mock().named(Some("foo")))
-            .exit(span::mock().named(Some("foo")).with_state(State::Done));
+            .exit(span::mock().named(Some("foo")))
+            .close(span::mock().named(Some("foo")))
+            .done();
         let subscriber1 = Dispatch::to(subscriber1.run());
-        let foo = subscriber1.as_default(|| {
-            let foo = span!("foo");
-            foo.clone().enter(|| {});
+        let mut foo = subscriber1.as_default(|| {
+            let mut foo = span!("foo");
+            foo.enter(|| {});
             foo
         });
 
@@ -309,7 +315,7 @@ mod tests {
             .done()
             .run();
         Dispatch::to(subscriber).as_default(|| {
-            let mut span = span!("foo");
+            let span = span!("foo");
             drop(span);
         })
     }
