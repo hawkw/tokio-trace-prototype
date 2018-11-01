@@ -67,7 +67,7 @@ macro_rules! span {
             thread_local! {
                 // TODO: if callsite caches become an API, can we better
                 // encapsulate the thread-local-iness of them? Do we want to?
-                static CALLSITE: callsite::Cache<'static> = callsite!(&META);
+                static CALLSITE: callsite::Cache<'static> = callsite::Cache::new(&META);
             }
             let dispatcher = Dispatch::current();
             // TODO: should span construction just become a method on callsites?
@@ -96,7 +96,7 @@ macro_rules! event {
                 $target, $( $k ),*
             };
             thread_local! {
-                static CALLSITE: callsite::Cache<'static> = callsite!(&META);
+                static CALLSITE: callsite::Cache<'static> = callsite::Cache::new(&META);
             }
             let dispatcher = Dispatch::current();
             if CALLSITE.with(|c| c.is_enabled(&dispatcher)) {

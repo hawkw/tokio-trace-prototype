@@ -3,19 +3,20 @@ use {Dispatch, Meta, Subscriber};
 
 #[doc(hidden)]
 pub struct Cache<'a> {
-    // TODO: these fields _should_ be private, but they have to be public so
-    // that callsite caches can be constructed by a macro. When const fns are
-    // stable, the callsite cache can just have a `const fn` constructor
-    // instead.
-    #[doc(hidden)]
-    pub last_filtered_by: Cell<usize>,
-    #[doc(hidden)]
-    pub cached_filter: Cell<Option<bool>>,
-    #[doc(hidden)]
-    pub meta: &'a Meta<'a>,
+    last_filtered_by: Cell<usize>,
+    cached_filter: Cell<Option<bool>>,
+    meta: &'a Meta<'a>,
 }
 
 impl<'a> Cache<'a> {
+    pub fn new(meta: &'a Meta<'a>) -> Self {
+        Self {
+            last_filtered_by: Cell::new(0),
+            cached_filter: Cell::new(None),
+            meta,
+        }
+    }
+
     #[inline]
     pub fn is_invalid(&self, dispatch: &Dispatch) -> bool {
         let id = dispatch.id();

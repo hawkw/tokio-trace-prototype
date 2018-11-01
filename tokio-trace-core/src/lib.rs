@@ -106,21 +106,6 @@
 
 use std::{fmt, slice};
 
-// Cache the result of testing if a span or event with the given metadata is
-// enabled by the current subscriber, so the filter doesn't have to be
-// reapplied if we have already called `enabled`.
-#[doc(hidden)]
-#[macro_export]
-macro_rules! callsite {
-    ($meta:expr) => {
-        $crate::callsite::Cache {
-            last_filtered_by: ::std::cell::Cell::new(0),
-            cached_filter: ::std::cell::Cell::new(None),
-            meta: $meta,
-        }
-    };
-}
-
 /// Describes the level of verbosity of a `Span` or `Event`.
 #[repr(usize)]
 #[derive(Copy, Eq, Debug, Hash)]
