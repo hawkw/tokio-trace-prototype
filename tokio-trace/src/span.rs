@@ -16,7 +16,7 @@
 //! # #[macro_use] extern crate tokio_trace;
 //! # fn main() {
 //! let my_var = 5;
-//! let my_span = span!("my_span", my_var = &my_var);
+//! let mut my_span = span!("my_span", my_var = &my_var);
 //!
 //! my_span.enter(|| {
 //!     // perform some work in the context of `my_span`...
@@ -122,7 +122,7 @@ mod tests {
             .run();
 
         Dispatch::to(subscriber).as_default(|| {
-            span!("foo",).enter(|| {
+            span!("foo").enter(|| {
                 let mut bar = span!("bar",);
                 bar.enter(|| {
                     // do nothing. exiting "bar" should leave it idle, since it can
