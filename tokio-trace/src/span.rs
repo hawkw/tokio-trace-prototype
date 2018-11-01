@@ -285,4 +285,32 @@ mod tests {
         }).join()
         .unwrap();
     }
+
+        #[test]
+    fn span_closes_on_drop() {
+        let subscriber = subscriber::mock()
+            .enter(span::mock().named(Some("foo")))
+            .exit(span::mock().named(Some("foo")))
+            .close(span::mock().named(Some("foo")))
+            .done()
+            .run();
+        Dispatch::to(subscriber).as_default(|| {
+            let mut span = span!("foo");
+            span.enter(|| {
+
+            });
+            drop(span);
+        })
+    }
+
+    #[test]
+    fn span_doesnt_close_if_it_never_opened() {
+        let subscriber = subscriber::mock()
+            .done()
+            .run();
+        Dispatch::to(subscriber).as_default(|| {
+            let mut span = span!("foo");
+            drop(span);
+        })
+    }
 }

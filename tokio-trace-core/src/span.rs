@@ -4,10 +4,6 @@ use std::{
     cmp, fmt,
     hash::{Hash, Hasher},
     iter, slice,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
 };
 use {
     subscriber::{AddValueError, FollowsError, Subscriber},
@@ -98,6 +94,8 @@ pub(crate) struct Enter {
     parent: Option<Id>,
 
     should_close: bool,
+
+    has_entered: bool,
 }
 
 // ===== impl Span =====
@@ -404,10 +402,12 @@ impl Enter {
             subscriber,
             parent,
             should_close: false,
+            has_entered: false,
         }
     }
 
-    fn enter<F: FnOnce() -> T, T>(&self, f: F) -> T {
+    fn enter<F: FnOnce() -> T, T>(&mut self, f: F) -> T {
+        self.has_entered = true;
         let (result, prior) = CURRENT_SPAN.with(|current_span| {
             let prior = current_span.replace(Some(self.clone()));
             self.subscriber.enter(self.id());
@@ -426,7 +426,7 @@ impl Enter {
     }
 
     fn should_close(&self) -> bool {
-        self.should_close
+        self.should_close && self.has_entered
     }
 
     fn id(&self) -> Id {
@@ -469,7 +469,7 @@ pub use self::test_support::*;
 mod test_support {
     #![allow(missing_docs)]
     use std::collections::HashMap;
-    use {value::OwnedValue};
+    use value::OwnedValue;
 
     /// A mock span.
     ///

@@ -243,6 +243,7 @@ mod test_support {
         Enter(MockSpan),
         Exit(MockSpan),
         Close(MockSpan),
+        Nothing,
     }
 
     struct Running<F: Fn(&Meta) -> bool> {
@@ -278,6 +279,11 @@ mod test_support {
 
         pub fn close(mut self, span: MockSpan) -> Self {
             self.expected.push_back(Expect::Exit(span));
+            self
+        }
+
+        pub fn done(mut self) -> Self {
+            self.expected.push_back(Expect::Nothing);
             self
         }
 
@@ -348,6 +354,8 @@ mod test_support {
                     "expected to close span {:?} but got an event",
                     expected_span.name,
                 ),
+                Some(Expect::Nothing) =>
+                    panic!("expected nothing else to happen, but got an event"),
             }
         }
 
@@ -377,6 +385,10 @@ mod test_support {
                     "expected to close span {:?}, but entered span {:?} instead",
                     expected_span.name,
                     span.name()
+                ),
+                Some(Expect::Nothing) => panic!(
+                    "expected nothing else to happen, but entered span {:?}",
+                    span.name(),
                 ),
             }
         }
@@ -408,6 +420,10 @@ mod test_support {
                     expected_span.name,
                     span.name()
                 ),
+                Some(Expect::Nothing) => panic!(
+                    "expected nothing else to happen, but exited span {:?}",
+                    span.name(),
+                ),
             }
         }
 
@@ -437,6 +453,10 @@ mod test_support {
                         assert_eq!(name, span.name());
                     }
                     // TODO: expect fields
+                ),
+                Some(Expect::Nothing) => panic!(
+                    "expected nothing else to happen, but closed span {:?}",
+                    span.name(),
                 ),
             }
         }
