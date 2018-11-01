@@ -36,7 +36,7 @@
 //!     type Error = ();
 //!
 //!     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-//!         self.span.clone().enter(|| {
+//!         self.span.enter(|| {
 //!             // Do actual future work
 //! # Ok(Async::Ready(()))
 //!         })

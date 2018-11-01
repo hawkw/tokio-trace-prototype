@@ -88,6 +88,13 @@
 //! [`State`]: ::span::State
 //! [`Data`]: ::span::Data
 pub use tokio_trace_core::span::*;
+pub use tokio_trace_core::Span; // TODO: auto-close
+// use tokio_trace_core::span::Span as Inner;
+
+// #[derive(Clone, Debug)]
+// pub struct Span {
+
+// }
 
 #[cfg(test)]
 mod tests {

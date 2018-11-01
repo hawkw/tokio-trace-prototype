@@ -16,13 +16,15 @@ use {
 };
 
 thread_local! {
-    static CURRENT_SPAN: RefCell<Option<Active>> = RefCell::new(None);
+    // TODO: can this be a `Cell`?
+    static CURRENT_SPAN: RefCell<Option<Enter>> = RefCell::new(None);
 }
 
 /// A handle that represents a span in the process of executing.
-#[derive(Clone, PartialEq, Hash)]
+#[derive(PartialEq, Hash)]
 pub struct Span {
-    inner: Option<Active>,
+    inner: Option<Enter>,
+    is_closed: bool,
 }
 
 /// Representation of the data associated with a span.
@@ -68,11 +70,6 @@ pub trait AsId {
     fn as_id(&self) -> Option<Id>;
 }
 
-#[derive(Clone, Debug, PartialEq, Hash)]
-struct Active {
-    inner: Arc<ActiveInner>,
-}
-
 /// Internal representation of the inner state of a span which has not yet
 /// completed.
 ///
@@ -88,46 +85,19 @@ struct Active {
 /// interacted with directly by downstream users of `tokio-trace`. Instead, all
 /// interaction with an active span's state is carried out through `Span`
 /// references.
-#[derive(Debug)]
-struct ActiveInner {
+#[derive(Debug, Clone)]
+pub(crate) struct Enter {
     id: Id,
-
-    /// An entering reference to the span's parent, used to re-enter the parent
-    /// span upon exiting this span.
-    ///
-    /// Implicitly, this also keeps the parent span from becoming `Done` as long
-    /// as the child span's `Inner` remains alive.
-    enter_parent: Option<Active>,
 
     /// The number of threads which have entered this span.
     ///
     /// Incremented on enter and decremented on exit.
-    currently_entered: AtomicUsize,
-
-    /// The subscriber with which this span was registered.
-    /// TODO: it would be nice if this could be any arbitrary `Subscriber`,
-    /// rather than `Dispatch`, but object safety.
+    // currently_entered: AtomicUsize,
     subscriber: Dispatch,
 
-    state: AtomicUsize,
-}
+    parent: Option<Id>,
 
-/// Enumeration of the potential states of a [`Span`](Span).
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-#[repr(usize)]
-pub enum State {
-    /// The span has been created but has yet to be entered.
-    Unentered,
-    /// A thread is currently executing inside the span or one of its children.
-    Running,
-    /// The span has previously been entered, but is not currently
-    /// executing. However, it is not done and may be entered again.
-    Idle,
-    /// The span has completed.
-    ///
-    /// It will *not* be entered again (and may be dropped once all
-    /// subscribers have finished processing it).
-    Done,
+    should_close: bool,
 }
 
 // ===== impl Span =====
@@ -135,11 +105,14 @@ pub enum State {
 impl Span {
     #[doc(hidden)]
     pub fn new(dispatch: Dispatch, static_meta: &'static StaticMeta) -> Span {
-        let parent = Active::current();
-        let data = Data::new(parent.as_ref().map(Active::id), static_meta);
+        let parent = Id::current();
+        let data = Data::new(parent.clone(), static_meta);
         let id = dispatch.new_span(data);
-        let inner = Some(Active::new(id, dispatch, parent));
-        Self { inner }
+        let inner = Some(Enter::new(id, dispatch, parent));
+        Self {
+            inner,
+            is_closed: false,
+        }
     }
 
     /// This is primarily used by the `span!` macro, so it has to be public,
@@ -147,21 +120,26 @@ impl Span {
     /// directly.
     #[doc(hidden)]
     pub fn new_disabled() -> Self {
-        Span { inner: None }
+        Span {
+            inner: None,
+            is_closed: false,
+        }
     }
 
     /// Returns a reference to the span that this thread is currently
     /// executing.
+    // TODO: should the subscriber be responsible for tracking this?
     pub fn current() -> Self {
         Self {
-            inner: Active::current(),
+            inner: Enter::current(),
+            is_closed: false,
         }
     }
 
     /// Returns a reference to the dispatcher that tracks this span, or `None`
     /// if the span is disabled.
     pub(crate) fn dispatch(&self) -> Option<&Dispatch> {
-        self.inner.as_ref().map(|inner| &inner.inner.subscriber)
+        self.inner.as_ref().map(|inner| &inner.subscriber)
     }
 
     /// Executes the given function in the context of this span.
@@ -172,16 +150,23 @@ impl Span {
     /// one).
     ///
     /// Returns the result of evaluating `f`.
-    pub fn enter<F: FnOnce() -> T, T>(self, f: F) -> T {
-        match self.inner {
-            Some(inner) => inner.enter(f),
-            None => f(),
-        }
+    pub fn enter<F: FnOnce() -> T, T>(&mut self, f: F) -> T {
+        let (result, should_close) = match self.inner {
+            Some(ref mut inner) =>
+                (inner.enter(f), inner.should_close()),
+            None => return f(),
+        };
+        if should_close {
+           drop(self.inner.take());
+           self.is_closed = true;
+        };
+        result
     }
+
 
     /// Returns the `Id` of the parent of this span, if one exists.
     pub fn parent(&self) -> Option<Id> {
-        self.inner.as_ref().and_then(Active::parent)
+        self.inner.as_ref().and_then(Enter::parent)
     }
 
     /// Sets the field on this span named `name` to the given `value`.
@@ -195,7 +180,6 @@ impl Span {
         value: &dyn IntoValue,
     ) -> Result<(), AddValueError> {
         if let Some(ref inner) = self.inner {
-            let inner = &inner.inner;
             match inner.subscriber.add_value(&inner.id, field, value) {
                 Ok(()) => Ok(()),
                 Err(AddValueError::NoSpan) => panic!("span should still exist!"),
@@ -205,6 +189,25 @@ impl Span {
             // If the span doesn't exist, silently do nothing.
             Ok(())
         }
+    }
+
+    /// Signals that this span should close the next time it is exited, or when
+    /// it is dropped.
+    pub fn close(&mut self) {
+        if let Some(ref mut inner) = self.inner {
+            inner.close();
+        }
+    }
+
+    /// Returns `true` if this span is closed.
+    pub fn is_closed(&self) -> bool {
+        self.inner.is_none() && self.is_closed
+    }
+
+    /// Returns `true` if this span was disabled by the subscriber and does not
+    /// exist.
+    pub fn is_disabled(&self) -> bool {
+        self.inner.is_none() && !self.is_closed
     }
 
     /// Indicates that the span with the given ID has an indirect causal
@@ -225,7 +228,6 @@ impl Span {
     pub fn follows_from<I: AsId>(&self, from: I) -> Result<(), FollowsError> {
         if let Some(ref inner) = self.inner {
             let from_id = from.as_id().ok_or(FollowsError::NoPreceedingId)?;
-            let inner = &inner.inner;
             match inner.subscriber.add_follows_from(&inner.id, from_id) {
                 Ok(()) => Ok(()),
                 Err(FollowsError::NoSpan(ref id)) if id == &inner.id => {
@@ -246,8 +248,6 @@ impl fmt::Debug for Span {
         if let Some(ref inner) = self.inner {
             span.field("id", &inner.id())
                 .field("parent", &inner.parent())
-                .field("state", &inner.state())
-                .field("is_last_standing", &inner.is_last_standing())
         } else {
             span.field("disabled", &true)
         }.finish()
@@ -256,7 +256,7 @@ impl fmt::Debug for Span {
 
 impl AsId for Span {
     fn as_id(&self) -> Option<Id> {
-        self.inner.as_ref().map(Active::id)
+        self.inner.as_ref().map(Enter::id)
     }
 }
 
@@ -385,7 +385,7 @@ impl Id {
 
     /// Returns the ID of the currently-executing span.
     pub fn current() -> Option<Self> {
-        Active::current().as_ref().map(Active::id)
+        Enter::current().as_ref().map(Enter::id)
     }
 }
 
@@ -395,129 +395,72 @@ impl AsId for Id {
     }
 }
 
-// ===== impl Active =====
+// ===== impl Enter =====
 
-impl Active {
-    fn current() -> Option<Self> {
-        CURRENT_SPAN.with(|span| span.borrow().as_ref().cloned())
-    }
-
-    fn new(id: Id, subscriber: Dispatch, enter_parent: Option<Self>) -> Self {
-        let inner = Arc::new(ActiveInner {
+impl Enter {
+    fn new(id: Id, subscriber: Dispatch, parent: Option<Id>) -> Self {
+       Self {
             id,
-            enter_parent,
-            currently_entered: AtomicUsize::new(0),
-            state: AtomicUsize::new(State::Unentered as usize),
             subscriber,
-        });
-        Self { inner }
-    }
-
-    fn enter<F: FnOnce() -> T, T>(self, f: F) -> T {
-        let prior_state = self.state();
-        match prior_state {
-            // The span has been marked as done; it may not be reentered again.
-            // TODO: maybe this should not crash the thread?
-            State::Done => panic!("cannot re-enter completed span!"),
-            _ => {
-                let result = CURRENT_SPAN.with(|current_span| {
-                    self.inner.transition_on_enter(prior_state);
-                    current_span.replace(Some(self.clone()));
-                    self.inner.subscriber.enter(self.id(), self.state());
-                    f()
-                });
-
-                CURRENT_SPAN.with(|current_span| {
-                    current_span.replace(self.inner.enter_parent.as_ref().cloned());
-                    // If we are the only remaining enter handle to this
-                    // span, it can now transition to Done. Otherwise, it
-                    // transitions to Idle.
-                    let next_state = if self.is_last_standing() {
-                        // Dropping this span handle will drop the enterable
-                        // reference to self.parent.
-                        State::Done
-                    } else {
-                        State::Idle
-                    };
-                    self.inner.transition_on_exit(next_state);
-                    self.inner.subscriber.exit(self.id(), self.state());
-                });
-                result
-            }
+            parent,
+            should_close: false,
         }
     }
 
-    /// Returns true if this is the last remaining handle with the capacity to
-    /// enter the span.
-    ///
-    /// Used to determine when the span can be marked as completed.
-    fn is_last_standing(&self) -> bool {
-        Arc::strong_count(&self.inner) == 1
+    fn enter<F: FnOnce() -> T, T>(&self, f: F) -> T {
+        let (result, prior) = CURRENT_SPAN.with(|current_span| {
+            let prior = current_span.replace(Some(self.clone()));
+            self.subscriber.enter(self.id());
+            (f(), prior)
+        });
+
+        CURRENT_SPAN.with(|current_span| {
+            current_span.replace(prior);
+            self.subscriber.exit(self.id());
+        });
+        result
+    }
+
+    fn close(&mut self) {
+        self.should_close = true;
+    }
+
+    fn should_close(&self) -> bool {
+        self.should_close
     }
 
     fn id(&self) -> Id {
-        self.inner.id.clone()
-    }
-
-    fn state(&self) -> State {
-        self.inner.state()
+        self.id.clone()
     }
 
     fn parent(&self) -> Option<Id> {
-        self.inner.enter_parent.as_ref().map(Active::id)
+        self.parent.clone()
+    }
+
+    fn current() -> Option<Self> {
+        CURRENT_SPAN.with(|c| c.borrow().clone())
     }
 }
 
-// ===== impl ActiveInnInner =====
-
-impl ActiveInner {
-    /// Returns the current [`State`](::span::State) of this span.
-    pub fn state(&self) -> State {
-        match self.state.load(Ordering::Acquire) {
-            s if s == State::Unentered as usize => State::Unentered,
-            s if s == State::Running as usize => State::Running,
-            s if s == State::Idle as usize => State::Idle,
-            s if s == State::Done as usize => State::Done,
-            invalid => panic!("invalid state: {:?}", invalid),
-        }
-    }
-
-    fn set_state(&self, prev: State, next: State) {
-        self.state
-            .compare_and_swap(prev as usize, next as usize, Ordering::Release);
-    }
-
-    /// Performs the state transition when entering the span.
-    fn transition_on_enter(&self, from_state: State) {
-        self.currently_entered.fetch_add(1, Ordering::Release);
-        self.set_state(from_state, State::Running);
-    }
-
-    /// Performs the state transition when exiting the span.
-    fn transition_on_exit(&self, next_state: State) {
-        // Decrement the exit count
-        let remaining_exits = self.currently_entered.fetch_sub(1, Ordering::AcqRel);
-        // Only advance the state if we are the last remaining
-        // thread to exit the span.
-        if remaining_exits == 1 {
-            self.set_state(State::Running, next_state);
-        }
-    }
-}
-
-impl cmp::PartialEq for ActiveInner {
-    fn eq(&self, other: &ActiveInner) -> bool {
+impl cmp::PartialEq for Enter {
+    fn eq(&self, other: &Enter) -> bool {
         self.id == other.id
     }
 }
 
-impl Hash for ActiveInner {
+impl Hash for Enter {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.id.hash(state);
     }
 }
 
-// ===== impl DataInner =====
+impl Drop for Enter {
+    fn drop(&mut self) {
+        if self.should_close {
+            self.subscriber.close(self.id());
+        }
+    }
+}
 
 #[cfg(any(test, feature = "test-support"))]
 pub use self::test_support::*;
@@ -526,7 +469,7 @@ pub use self::test_support::*;
 mod test_support {
     #![allow(missing_docs)]
     use std::collections::HashMap;
-    use {span::State, value::OwnedValue};
+    use {value::OwnedValue};
 
     /// A mock span.
     ///
@@ -534,7 +477,6 @@ mod test_support {
     /// `subscriber` module.
     pub struct MockSpan {
         pub name: Option<Option<&'static str>>,
-        pub state: Option<State>,
         pub fields: HashMap<String, Box<OwnedValue>>,
         // TODO: more
     }
@@ -542,7 +484,6 @@ mod test_support {
     pub fn mock() -> MockSpan {
         MockSpan {
             name: None,
-            state: None,
             fields: HashMap::new(),
         }
     }
@@ -550,11 +491,6 @@ mod test_support {
     impl MockSpan {
         pub fn named(mut self, name: Option<&'static str>) -> Self {
             self.name = Some(name);
-            self
-        }
-
-        pub fn with_state(mut self, state: State) -> Self {
-            self.state = Some(state);
             self
         }
 
