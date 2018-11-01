@@ -154,59 +154,15 @@ mod tests {
         }
         let subscriber = subscriber::mock()
             .enter(span::mock().named(Some("foo")))
-            .exit(
-                span::mock()
-                    .named(Some("foo"))
-                    .with_state(span::State::Idle),
-            ).enter(span::mock().named(Some("foo")))
-            .exit(
-                span::mock()
-                    .named(Some("foo"))
-                    .with_state(span::State::Done),
-            ).run();
+            .exit(span::mock().named(Some("foo")))
+            .enter(span::mock().named(Some("foo")))
+            .exit(span::mock().named(Some("foo")))
+            .close(span::mock().named(Some("foo")))
+            .done()
+            .run();
         Dispatch::to(subscriber).as_default(|| {
             MyFuture { polls: 0 }
                 .instrument(span!("foo"))
-                .wait()
-                .unwrap();
-        })
-    }
-
-    #[test]
-    fn future_completion_leaves_reachable_spans_idle() {
-        struct MyFuture {
-            polls: usize,
-        }
-
-        impl Future for MyFuture {
-            type Item = ();
-            type Error = ();
-            fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-                self.polls += 1;
-                if self.polls == 2 {
-                    Ok(Async::Ready(()))
-                } else {
-                    task::current().notify();
-                    Ok(Async::NotReady)
-                }
-            }
-        }
-        let subscriber = subscriber::mock()
-            .enter(span::mock().named(Some("foo")))
-            .exit(
-                span::mock()
-                    .named(Some("foo"))
-                    .with_state(span::State::Idle),
-            ).enter(span::mock().named(Some("foo")))
-            .exit(
-                span::mock()
-                    .named(Some("foo"))
-                    .with_state(span::State::Idle),
-            ).run();
-        Dispatch::to(subscriber).as_default(|| {
-            let foo = span!("foo");
-            MyFuture { polls: 0 }
-                .instrument(foo.clone())
                 .wait()
                 .unwrap();
         })
@@ -233,16 +189,12 @@ mod tests {
         }
         let subscriber = subscriber::mock()
             .enter(span::mock().named(Some("foo")))
-            .exit(
-                span::mock()
-                    .named(Some("foo"))
-                    .with_state(span::State::Idle),
-            ).enter(span::mock().named(Some("foo")))
-            .exit(
-                span::mock()
-                    .named(Some("foo"))
-                    .with_state(span::State::Done),
-            ).run();
+            .exit(span::mock().named(Some("foo")))
+            .enter(span::mock().named(Some("foo")))
+            .exit(span::mock().named(Some("foo")))
+            .close(span::mock().named(Some("foo")))
+            .done()
+            .run();
         Dispatch::to(subscriber).as_default(|| {
             MyFuture { polls: 0 }
                 .instrument(span!("foo"))
@@ -255,26 +207,15 @@ mod tests {
     fn stream_enter_exit_is_reasonable() {
         let subscriber = subscriber::mock()
             .enter(span::mock().named(Some("foo")))
-            .exit(
-                span::mock()
-                    .named(Some("foo"))
-                    .with_state(span::State::Idle),
-            ).enter(span::mock().named(Some("foo")))
-            .exit(
-                span::mock()
-                    .named(Some("foo"))
-                    .with_state(span::State::Idle),
-            ).enter(span::mock().named(Some("foo")))
-            .exit(
-                span::mock()
-                    .named(Some("foo"))
-                    .with_state(span::State::Idle),
-            ).enter(span::mock().named(Some("foo")))
-            .exit(
-                span::mock()
-                    .named(Some("foo"))
-                    .with_state(span::State::Done),
-            ).run();
+            .exit(span::mock().named(Some("foo")))
+            .enter(span::mock().named(Some("foo")))
+            .exit(span::mock().named(Some("foo")))
+            .enter(span::mock().named(Some("foo")))
+            .exit(span::mock().named(Some("foo")))
+            .enter(span::mock().named(Some("foo")))
+            .exit(span::mock().named(Some("foo")))
+            .close(span::mock().named(Some("foo")))
+            .run();
         Dispatch::to(subscriber).as_default(|| {
             stream::iter_ok::<_, ()>(&[1, 2, 3])
                 .instrument(span!("foo"))
