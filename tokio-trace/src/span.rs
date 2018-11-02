@@ -158,8 +158,7 @@ pub trait IntoShared {
 }
 
 impl IntoShared for Span {
-    fn into_shared(mut self) -> Shared {
-        self.close();
+    fn into_shared(self) -> Shared {
         Shared {
             inner: self.into_inner().map(Arc::new)
         }
@@ -185,6 +184,9 @@ impl Shared {
             let guard = inner.enter();
             let result = f();
             inner.exit_and_join(guard);
+            if Arc::strong_count(&inner) == 1 {
+                inner.close();
+            }
             result
         } else {
             f()
@@ -277,68 +279,6 @@ mod tests {
             });
         });
     }
-
-    // This test doesn't make sense in the context of non-cloneable spans.
-    /*
-   #[test]
-    fn exit_doesnt_finish_concurrently_executing_spans() {
-        // Test that exiting a span only marks it as "done" when no other
-        // threads are still executing inside that span.
-        use std::sync::{Arc, Barrier};
-
-        let subscriber = subscriber::mock()
-            .enter(span::mock().named(Some("baz")))
-            // Main thread enters "quux".
-            .enter(span::mock().named(Some("quux")))
-            // Spawned thread also enters "quux".
-            .enter(span::mock().named(Some("quux")))
-            // When the main thread exits "quux", it will still be running in the
-            // spawned thread.
-            .exit(span::mock().named(Some("quux")))
-            // Now, when this thread exits "quux", there is no handle to re-enter it, so
-            // it should become "done".
-            .exit(span::mock().named(Some("quux")))
-            .close(span::mock().named(Some("quux")))
-            // "baz" never had more than one handle, so it should also become
-            // "done" when we exit it.
-            .exit(span::mock().named(Some("baz")))
-            .close(span::mock().named(Some("baz")))
-            .run();
-
-        Dispatch::to(subscriber).as_default(|| {
-            let barrier1 = Arc::new(Barrier::new(2));
-            let barrier2 = Arc::new(Barrier::new(2));
-            // Make copies of the barriers for thread 2 to wait on.
-            let t2_barrier1 = barrier1.clone();
-            let t2_barrier2 = barrier2.clone();
-
-            span!("baz",).enter(move || {
-                let quux = span!("quux",);
-                let quux2 = quux.clone();
-                let handle = thread::Builder::new()
-                    .name("thread-2".to_string())
-                    .spawn(move || {
-                        quux2.enter(|| {
-                            // Once this thread has entered "quux", allow thread 1
-                            // to exit.
-                            t2_barrier1.wait();
-                            // Wait for the main thread to allow us to exit.
-                            t2_barrier2.wait();
-                        })
-                    }).expect("spawn test thread");
-                quux.enter(|| {
-                    // Wait for thread 2 to enter "quux". When we exit "quux", it
-                    // should stay running, since it's running in the other thread.
-                    barrier1.wait();
-                });
-                // After we exit "quux", wait for the second barrier, so the other
-                // thread unblocks and exits "quux".
-                barrier2.wait();
-                handle.join().unwrap();
-            });
-        });
-    }
-    */
 
     #[test]
     fn handles_to_the_same_span_are_equal() {
@@ -504,5 +444,130 @@ mod tests {
             let span = span!("foo");
             drop(span);
         })
+    }
+
+    mod shared {
+        use super::*;
+
+        #[test]
+        fn span_closes_on_drop() {
+            let subscriber = subscriber::mock()
+                .enter(span::mock().named(Some("foo")))
+                .exit(span::mock().named(Some("foo")))
+                .close(span::mock().named(Some("foo")))
+                .done()
+                .run();
+            Dispatch::to(subscriber).as_default(|| {
+                span!("foo").into_shared().enter(|| {
+
+                })
+            })
+        }
+
+        #[test]
+        fn span_doesnt_close_if_it_never_opened() {
+            let subscriber = subscriber::mock()
+                .done()
+                .run();
+            Dispatch::to(subscriber).as_default(|| {
+                let span = span!("foo").into_shared();
+                drop(span);
+            })
+        }
+
+        #[test]
+        fn exit_doesnt_finish_concurrently_executing_spans() {
+            // Test that exiting a span only marks it as "done" when no other
+            // threads are still executing inside that span.
+            use std::sync::{Arc, Barrier};
+
+            let subscriber = subscriber::mock()
+                .enter(span::mock().named(Some("baz")))
+                // Main thread enters "quux".
+                .enter(span::mock().named(Some("quux")))
+                // Spawned thread also enters "quux".
+                .enter(span::mock().named(Some("quux")))
+                // When the main thread exits "quux", it will still be running in the
+                // spawned thread.
+                .exit(span::mock().named(Some("quux")))
+                // Now, when this thread exits "quux", there is no handle to re-enter it, so
+                // it should become "done".
+                .exit(span::mock().named(Some("quux")))
+                .close(span::mock().named(Some("quux")))
+                // "baz" never had more than one handle, so it should also become
+                // "done" when we exit it.
+                .exit(span::mock().named(Some("baz")))
+                .close(span::mock().named(Some("baz")))
+                .done()
+                .run();
+
+            Dispatch::to(subscriber).as_default(|| {
+                let barrier1 = Arc::new(Barrier::new(2));
+                let barrier2 = Arc::new(Barrier::new(2));
+                // Make copies of the barriers for thread 2 to wait on.
+                let t2_barrier1 = barrier1.clone();
+                let t2_barrier2 = barrier2.clone();
+
+                span!("baz",).enter(move || {
+                    let quux = span!("quux",).into_shared();
+                    let quux2 = quux.clone();
+                    let handle = thread::Builder::new()
+                        .name("thread-2".to_string())
+                        .spawn(move || {
+                            quux2.enter(|| {
+                                // Once this thread has entered "quux", allow thread 1
+                                // to exit.
+                                t2_barrier1.wait();
+                                // Wait for the main thread to allow us to exit.
+                                t2_barrier2.wait();
+                            })
+                        }).expect("spawn test thread");
+                    quux.enter(|| {
+                        // Wait for thread 2 to enter "quux". When we exit "quux", it
+                        // should stay running, since it's running in the other thread.
+                        barrier1.wait();
+                    });
+                    // After we exit "quux", wait for the second barrier, so the other
+                    // thread unblocks and exits "quux".
+                    barrier2.wait();
+                    handle.join().unwrap();
+                });
+            });
+        }
+
+        #[test]
+        fn exit_doesnt_finish_while_handles_still_exist() {
+            // Test that exiting a span only marks it as "done" when no handles
+            // that can re-enter the span exist.
+            let subscriber = subscriber::mock()
+                .enter(span::mock().named(Some("foo")))
+                .enter(span::mock().named(Some("bar")))
+                // The first time we exit "bar", there will be another handle with
+                // which we could potentially re-enter bar.
+                .exit(span::mock().named(Some("bar")))
+                // Re-enter "bar", using the cloned handle.
+                .enter(span::mock().named(Some("bar")))
+                // Now, when we exit "bar", there is no handle to re-enter it, so
+                // it should become "done".
+                .exit(span::mock().named(Some("bar")))
+                .close(span::mock().named(Some("bar")))
+                .exit(span::mock().named(Some("foo")))
+                .done()
+                .run();
+
+            Dispatch::to(subscriber).as_default(|| {
+                span!("foo").enter(|| {
+                    let bar = span!("bar").into_shared();
+                    bar.clone().enter(|| {
+                        // do nothing. exiting "bar" should leave it idle, since it can
+                        // be re-entered.
+                    });
+                    // Enter "bar" again. consuming the last handle to `bar`
+                    // close the span automatically.
+                    bar.enter(|| {
+                    });
+                });
+            });
+        }
     }
 }
