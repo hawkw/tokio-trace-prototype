@@ -18,7 +18,8 @@ use {span, Event, IntoValue, Meta, SpanId};
 ///   spans.
 /// - Filtering spans and events, and determining when those filters must be
 ///   invalidated.
-/// - Observing spans as they are entered and exited, and events as they occur.
+/// - Observing spans as they are entered, exited, and closed, and events as
+///   they occur.
 ///
 /// When a span is entered or exited, the subscriber is provided only with the
 /// [`SpanId`] with which it tagged that span when it was created. This means
@@ -181,7 +182,9 @@ pub trait Subscriber {
     /// [`SpanId`] that identifies the closed span.
     ///
     /// Unlike `exit`, this method implies that the span will not be entered
-    /// again.
+    /// again. The subscriber is free to use that guarantee as it sees fit (such
+    /// as garbage-collecting any cached data related to that span, if
+    /// necessary).
     ///
     /// [`Span`]: ::span::Span
     /// [`SpanId`]: ::span::Id
