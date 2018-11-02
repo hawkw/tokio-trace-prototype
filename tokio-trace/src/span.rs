@@ -127,6 +127,61 @@
 //! a subscriber never observes an inconsistant state; namely, a span being
 //! entered after it has closed.
 //!
+//! ## Shared spans
+//!
+//! In general, it is rarely necessary to create multiple handles to a span that
+//! persist outside of the period during which that span is executing. Users who
+//! wish to have multiple handles capable of entering a span, or enter the same
+//! span from multiple threads, may wish to use the [shared span] type instead.
+//!
+//! A `Shared` handle behaves similarly to a `Span` handle, but may be cloned
+//! freely. Any `Shared` handle may be used to enter the span it corresponds to,
+//! and (since `Shared` handles are `Send + Sync`) they may be used to allow
+//! multiple threads to enter the same span.
+//!
+//! Shared handles may be created from a span using the [`IntoShared`] trait:
+//! ```
+//! # #[macro_use] extern crate tokio_trace;
+//! # fn main() {
+//! use tokio_trace::span::IntoShared;
+//! // Convert a regular `Span` handle into a cloneable `Shared` handle.
+//! let span = span!("foo").into_shared();
+//!
+//! // Entering a `Shared` span handle *consumes* the handle:
+//! span.clone().enter(|| {
+//!     // ...
+//! });
+//!
+//! // When all `Shared` handles to the span have been consumed, it will close.
+//! span.enter(|| {
+//!     // ...
+//! }) // --> Subscriber::close(span)
+//! # }
+//! ```
+//!
+//! Unlike `Span` handles, `Shared` spans are represented by `Arc` pointers, so
+//! constructing them will allocate memory, if the span is enabled.
+//!
+//! **Note**: When _not_ using shared spans, it is possible to cause a span to
+//! _never_ be dropped, by entering it, creating a second handle using
+//! `Span::current`, and returning that handle from the closure which executes
+//! inside the span, and then dropping that handle while the span is not
+//! currently executing. Since the span is not currently executing, it has no
+//! way to observe the second handle being dropped, and it cannot determine if
+//! it is safe to close.  However, if all such handles are dropped while the
+//! span is executing, the span will still be able to close normally. Spans will
+//! only  fail to close in situations where the second handle is dropped while
+//! the span is _not_ executing.
+//!
+//! This is possible because the logic for determining if a span can close is
+//! intentionally cautious. Spans will only close if they _know_ they cannot be
+//! entered; although a span failing to close does result in potentially
+//! incorrect trace data, this is less serious of a problem than the
+//! inconsistant state that arises when a span is closed and then re-entered.
+//! The latter violates the assumptions that a reasonable subscriber
+//! implementation could be expected to make.
+//!
+//!
 //! # Accessing a Span's Data
 //!
 //! The [`Data`] type represents a *non-entering* reference to a `Span`'s data
@@ -139,6 +194,8 @@
 //! [`Subscriber`]: ::Subscriber
 //! [`State`]: ::span::State
 //! [`Data`]: ::span::Data
+//! [shared span]: ::span::Shared
+//! [`IntoShared`]: ::span::IntoShared
 pub use tokio_trace_core::span::{
     Span,
     Id,
@@ -153,7 +210,11 @@ use ::{IntoValue, subscriber};
 use tokio_trace_core::span::Enter;
 use std::sync::Arc;
 
+/// Trait for converting a `Span` into a cloneable `Shared` span.
 pub trait IntoShared {
+    /// Returns a `Shared` span handle that can be cloned.
+    ///
+    /// This will allocate memory to store the span if the span is enabled.
     fn into_shared(self) -> Shared;
 }
 
@@ -172,6 +233,8 @@ pub struct Shared {
 
 impl Shared {
     /// Executes the given function in the context of this span.
+    ///
+    /// Unlike `Span::enter`, this *consumes* the shared span handle.
     ///
     /// If this span is enabled, then this function enters the span, invokes
     /// and then exits the span. If the span is disabled, `f` will still be
