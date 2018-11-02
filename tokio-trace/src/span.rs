@@ -139,14 +139,98 @@
 //! [`Subscriber`]: ::Subscriber
 //! [`State`]: ::span::State
 //! [`Data`]: ::span::Data
-pub use tokio_trace_core::span::*;
-pub use tokio_trace_core::Span; // TODO: auto-close
-                                // use tokio_trace_core::span::Span as Inner;
+pub use tokio_trace_core::span::{
+    Span,
+    Id,
+    Data,
+    AsId,
+};
 
-// #[derive(Clone, Debug)]
-// pub struct Span {
+#[cfg(any(test, feature = "test-support"))]
+pub use tokio_trace_core::span::{mock, MockSpan};
 
-// }
+use ::{IntoValue, subscriber};
+use tokio_trace_core::span::Enter;
+use std::sync::Arc;
+
+pub trait IntoShared {
+    fn into_shared(self) -> Shared;
+}
+
+impl IntoShared for Span {
+    fn into_shared(mut self) -> Shared {
+        self.close();
+        Shared {
+            inner: self.into_inner().map(Arc::new)
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Shared {
+    inner: Option<Arc<Enter>>,
+}
+
+impl Shared {
+    /// Executes the given function in the context of this span.
+    ///
+    /// If this span is enabled, then this function enters the span, invokes
+    /// and then exits the span. If the span is disabled, `f` will still be
+    /// invoked, but in the context of the currently-executing span (if there is
+    /// one).
+    ///
+    /// Returns the result of evaluating `f`.
+    pub fn enter<F: FnOnce() -> T, T>(self, f: F) -> T {
+        if let Some(inner) = self.inner {
+            let guard = inner.enter();
+            let result = f();
+            inner.exit_and_join(guard);
+            result
+        } else {
+            f()
+        }
+
+    }
+
+    /// Returns the `Id` of the parent of this span, if one exists.
+    pub fn parent(&self) -> Option<Id> {
+        self.inner.as_ref().and_then(|inner| inner.parent())
+    }
+
+    /// Sets the field on this span named `name` to the given `value`.
+    ///
+    /// `name` must name a field already defined by this span's metadata, and
+    /// the field must not already have a value. If this is not the case, this
+    /// function returns an [`AddValueError`](::subscriber::AddValueError).
+    pub fn add_value(
+        &self,
+        field: &'static str,
+        value: &dyn IntoValue,
+    ) -> Result<(), subscriber::AddValueError> {
+        self.inner.as_ref().map(|inner| inner.add_value(field, value))
+            .unwrap_or(Ok(()))
+    }
+
+    /// Indicates that the span with the given ID has an indirect causal
+    /// relationship with this span.
+    ///
+    /// This relationship differs somewhat from the parent-child relationship: a
+    /// span may have any number of prior spans, rather than a single one; and
+    /// spans are not considered to be executing _inside_ of the spans they
+    /// follow from. This means that a span may close even if subsequent spans
+    /// that follow from it are still open, and time spent inside of a
+    /// subsequent span should not be included in the time its precedents were
+    /// executing. This is used to model causal relationships such as when a
+    /// single future spawns several related background tasks, et cetera.
+    ///
+    /// If this span is disabled, this function will do nothing. Otherwise, it
+    /// returns `Ok(())` if the other span was added as a precedent of this
+    /// span, or an error if this was not possible.
+    pub fn follows_from<I: AsId>(&self, from: I) -> Result<(), subscriber::FollowsError> {
+        self.inner.as_ref().map(move |inner| inner.follows_from(from))
+            .unwrap_or(Ok(()))
+    }
+}
 
 #[cfg(test)]
 mod tests {

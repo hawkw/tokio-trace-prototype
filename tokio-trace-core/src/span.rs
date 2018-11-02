@@ -87,7 +87,7 @@ pub trait AsId {
 /// enabled by the current filter. This type is primarily used for implementing
 /// span handles; users should typically not need to interact with it directly.
 #[derive(Debug)]
-pub(crate) struct Enter {
+pub struct Enter {
     /// The span's ID, as provided by `subscriber`.
     id: Id,
 
@@ -119,9 +119,8 @@ pub(crate) struct Enter {
 
 #[derive(Debug)]
 #[must_use = "once a span has been entered, it should be exited"]
-struct Entered {
+pub struct Entered {
     prior: Option<Enter>,
-    wanted_close: bool,
 }
 
 // ===== impl Span =====
@@ -201,16 +200,8 @@ impl Span {
         field: &'static str,
         value: &dyn IntoValue,
     ) -> Result<(), AddValueError> {
-        if let Some(ref inner) = self.inner {
-            match inner.subscriber.add_value(&inner.id, field, value) {
-                Ok(()) => Ok(()),
-                Err(AddValueError::NoSpan) => panic!("span should still exist!"),
-                Err(e) => Err(e),
-            }
-        } else {
-            // If the span doesn't exist, silently do nothing.
-            Ok(())
-        }
+        self.inner.as_ref().map(|inner| inner.add_value(field, value))
+            .unwrap_or(Ok(()))
     }
 
     /// Signals that this span should close the next time it is exited, or when
@@ -252,19 +243,12 @@ impl Span {
     /// returns `Ok(())` if the other span was added as a precedent of this
     /// span, or an error if this was not possible.
     pub fn follows_from<I: AsId>(&self, from: I) -> Result<(), FollowsError> {
-        if let Some(ref inner) = self.inner {
-            let from_id = from.as_id().ok_or(FollowsError::NoPreceedingId)?;
-            match inner.subscriber.add_follows_from(&inner.id, from_id) {
-                Ok(()) => Ok(()),
-                Err(FollowsError::NoSpan(ref id)) if id == &inner.id => {
-                    panic!("span {:?} should exist to add a preceeding span", inner.id)
-                }
-                Err(e) => Err(e),
-            }
-        } else {
-            // If the span doesn't exist, silently do nothing.
-            Ok(())
-        }
+        self.inner.as_ref().map(move |inner| inner.follows_from(from))
+            .unwrap_or(Ok(()))
+    }
+
+    pub fn into_inner(self) -> Option<Enter> {
+        self.inner
     }
 }
 
@@ -424,6 +408,80 @@ impl AsId for Id {
 // ===== impl Enter =====
 
 impl Enter {
+    pub fn enter(&self) -> Entered {
+        // The current handle will no longer enter the span, since it has just
+        // been used to enter. Therefore, it will be safe to close the span if
+        // no additional handles exist when the span is exited.
+        self.handles.fetch_sub(1, Ordering::Release);
+        // The span has now been entered, so it's okay to close it.
+        self.has_entered.store(true, Ordering::Release);
+        self.subscriber.enter(self.id());
+        let prior = CURRENT_SPAN.with(|current_span| {
+            current_span.replace(Some(self.duplicate()))
+        });
+        self.wants_close.store(false, Ordering::Release);
+        Entered {
+            prior,
+        }
+    }
+
+    /// Signals to this span that it should try to close itself when it is safe
+    /// to do so.
+    pub fn close(&self) {
+        self.wants_close.store(true, Ordering::Release);
+    }
+
+    pub fn exit_and_join(&self, other: Entered) {
+        if let Some(other) = other.exit() {
+            self.handles.store(other.handle_count(), Ordering::Release);
+            self.has_entered.store(other.has_entered(), Ordering::Release);
+            self.wants_close.store(other.take_close(), Ordering::Release);
+        }
+    }
+
+    /// Sets the field on this span named `name` to the given `value`.
+    ///
+    /// `name` must name a field already defined by this span's metadata, and
+    /// the field must not already have a value. If this is not the case, this
+    /// function returns an [`AddValueError`](::subscriber::AddValueError).
+    pub fn add_value(
+        &self,
+        field: &'static str,
+        value: &dyn IntoValue,
+    ) -> Result<(), AddValueError> {
+        match self.subscriber.add_value(&self.id, field, value) {
+            Ok(()) => Ok(()),
+            Err(AddValueError::NoSpan) => panic!("span should still exist!"),
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Indicates that the span with the given ID has an indirect causal
+    /// relationship with this span.
+    ///
+    /// This relationship differs somewhat from the parent-child relationship: a
+    /// span may have any number of prior spans, rather than a single one; and
+    /// spans are not considered to be executing _inside_ of the spans they
+    /// follow from. This means that a span may close even if subsequent spans
+    /// that follow from it are still open, and time spent inside of a
+    /// subsequent span should not be included in the time its precedents were
+    /// executing. This is used to model causal relationships such as when a
+    /// single future spawns several related background tasks, et cetera.
+    ///
+    /// If this span is disabled, this function will do nothing. Otherwise, it
+    /// returns `Ok(())` if the other span was added as a precedent of this
+    /// span, or an error if this was not possible.
+    pub fn follows_from<I: AsId>(&self, from: I) -> Result<(), FollowsError> {
+        let from_id = from.as_id().ok_or(FollowsError::NoPreceedingId)?;
+        match self.subscriber.add_follows_from(&self.id, from_id) {
+            Ok(()) => Ok(()),
+            Err(FollowsError::NoSpan(ref id)) if id == &self.id => {
+                panic!("span {:?} should exist to add a preceeding span", self.id)
+            }
+            Err(e) => Err(e),
+        }
+    }
+
     fn new(id: Id, subscriber: Dispatch, parent: Option<Id>) -> Self {
         Self {
             id,
@@ -435,7 +493,7 @@ impl Enter {
         }
     }
 
-    pub(crate) fn clone_current() -> Option<Self> {
+    fn clone_current() -> Option<Self> {
         CURRENT_SPAN.with(|current| {
             current.borrow().as_ref().map(|ref current| {
                 current.handles.fetch_add(1, Ordering::Release);
@@ -453,30 +511,6 @@ impl Enter {
             has_entered: AtomicBool::from(self.has_entered()),
             handles: AtomicUsize::from(self.handle_count()),
         }
-    }
-
-    fn enter(&self) -> Entered {
-            // The current handle will no longer enter the span, since it has just
-        // been used to enter. Therefore, it will be safe to close the span if
-        // no additional handles exist when the span is exited.
-        self.handles.fetch_sub(1, Ordering::Release);
-        // The span has now been entered, so it's okay to close it.
-        self.has_entered.store(true, Ordering::Release);
-        self.subscriber.enter(self.id());
-        let prior = CURRENT_SPAN.with(|current_span| {
-            current_span.replace(Some(self.duplicate()))
-        });
-        let wanted_close = self.wants_close.swap(false, Ordering::AcqRel);
-        Entered {
-            prior,
-            wanted_close,
-        }
-    }
-
-    /// Signals to this span that it should try to close itself when it is safe
-    /// to do so.
-    fn close(&self) {
-        self.wants_close.store(true, Ordering::Release);
     }
 
     /// Returns `true` if this span _should_ close itself.
@@ -498,15 +532,19 @@ impl Enter {
         self.wants_close.load(Ordering::Acquire)
     }
 
+    fn take_close(&self) -> bool {
+        self.wants_close.swap(false, Ordering::Release)
+    }
+
     fn handle_count(&self) -> usize {
         self.handles.load(Ordering::Acquire)
     }
 
-    fn id(&self) -> Id {
+    pub fn id(&self) -> Id {
         self.id.clone()
     }
 
-    fn parent(&self) -> Option<Id> {
+    pub fn parent(&self) -> Option<Id> {
         self.parent.clone()
     }
 }
