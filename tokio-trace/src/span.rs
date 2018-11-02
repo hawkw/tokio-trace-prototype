@@ -220,9 +220,7 @@ pub trait IntoShared {
 
 impl IntoShared for Span {
     fn into_shared(self) -> Shared {
-        Shared {
-            inner: self.into_inner().map(Arc::new)
-        }
+        Shared::from_span(self)
     }
 }
 
@@ -232,6 +230,16 @@ pub struct Shared {
 }
 
 impl Shared {
+    /// Returns a `Shared` span handle that can be cloned.
+    ///
+    /// This function allocates memory to store the shared span, if the span is
+    /// enabled.
+    pub fn from_span(span: Span) -> Self {
+        Self {
+            inner: span.into_inner().map(Arc::new)
+        }
+    }
+
     /// Executes the given function in the context of this span.
     ///
     /// Unlike `Span::enter`, this *consumes* the shared span handle.
