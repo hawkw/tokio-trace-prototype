@@ -270,8 +270,7 @@ mod test_support {
 
     impl<F: Fn(&Meta) -> bool> MockSubscriber<F> {
         pub fn enter(mut self, span: MockSpan) -> Self {
-            self.expected
-                .push_back(Expect::Enter(span));
+            self.expected.push_back(Expect::Enter(span));
             self
         }
 
@@ -357,8 +356,9 @@ mod test_support {
                     "expected to close span {:?} but got an event",
                     expected_span.name,
                 ),
-                Some(Expect::Nothing) =>
-                    panic!("expected nothing else to happen, but got an event"),
+                Some(Expect::Nothing) => {
+                    panic!("expected nothing else to happen, but got an event")
+                }
             }
         }
 
@@ -456,7 +456,7 @@ mod test_support {
                         assert_eq!(name, span.name());
                     }
                     // TODO: expect fields
-                },
+                }
                 Some(Expect::Nothing) => panic!(
                     "expected nothing else to happen, but closed span {:?}",
                     span.name(),

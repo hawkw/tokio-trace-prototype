@@ -40,9 +40,7 @@ where
         let span = &mut self.span;
         let inner = &mut self.inner;
         span.enter(|| {
-            span!("request", request = &req).enter(move || {
-                inner.call(req).in_current_span()
-            })
+            span!("request", request = &req).enter(move || inner.call(req).in_current_span())
         })
     }
 }

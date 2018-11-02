@@ -4,7 +4,7 @@ use std::{
     cmp, fmt,
     hash::{Hash, Hasher},
     iter, slice,
-    sync::atomic::{AtomicUsize, AtomicBool, Ordering},
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 use {
     subscriber::{AddValueError, FollowsError, Subscriber},
@@ -159,7 +159,6 @@ impl Span {
             None => f(),
         }
     }
-
 
     /// Returns the `Id` of the parent of this span, if one exists.
     pub fn parent(&self) -> Option<Id> {
@@ -395,7 +394,7 @@ impl AsId for Id {
 
 impl Enter {
     fn new(id: Id, subscriber: Dispatch, parent: Option<Id>) -> Self {
-       Self {
+        Self {
             id,
             subscriber,
             parent,
@@ -425,12 +424,8 @@ impl Enter {
         self.handles.fetch_sub(1, Ordering::Release);
         self.has_entered.store(true, Ordering::Release);
         self.subscriber.enter(self.id());
-        let prior = CURRENT_SPAN.with(|current_span| {
-            current_span.replace(Some(self))
-        });
-        Entered {
-            prior,
-        }
+        let prior = CURRENT_SPAN.with(|current_span| current_span.replace(Some(self)));
+        Entered { prior }
     }
 
     fn close(&self) {
@@ -485,9 +480,8 @@ impl Drop for Enter {
                 _ if self.handle_count() <= 1 => {
                     self.subscriber.close(self.id());
                 }
-                _ => {},
+                _ => {}
             })
-
         }
     }
 }
@@ -495,7 +489,8 @@ impl Drop for Enter {
 impl Entered {
     fn exit(self) -> Option<Enter> {
         CURRENT_SPAN.with(|current_span| {
-            let inner = current_span.replace(self.prior)
+            let inner = current_span
+                .replace(self.prior)
                 .expect("cannot exit span that wasn't entered");
             inner.subscriber.exit(inner.id());
             if inner.should_close() {

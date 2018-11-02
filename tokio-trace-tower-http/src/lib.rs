@@ -102,8 +102,7 @@ where
                 version = &request.version(),
                 uri = request.uri(),
                 headers = request.headers()
-            )
-                .enter(move || inner.call(request).in_current_span())
+            ).enter(move || inner.call(request).in_current_span())
         })
     }
 }

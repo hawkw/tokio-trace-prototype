@@ -11,10 +11,7 @@ pub trait Instrument: Sized {
     // TODO: consider renaming to `in_span` for consistency w/
     // `in_current_span`?
     fn instrument(self, span: Span) -> Instrumented<Self> {
-        Instrumented {
-            inner: self,
-            span,
-        }
+        Instrumented { inner: self, span }
     }
 
     fn in_current_span(self) -> Instrumented<Self> {
@@ -98,7 +95,7 @@ impl<T: Sink> Sink for Instrumented<T> {
     }
 
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-                let span = &mut self.span;
+        let span = &mut self.span;
         let inner = &mut self.inner;
         span.enter(|| inner.poll_complete())
     }

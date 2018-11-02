@@ -45,7 +45,7 @@ mod tests {
             let mut foo = span!("foo");
             let mut bar = foo.enter(|| {
                 let mut bar = span!("bar");
-                bar.enter(||());
+                bar.enter(|| ());
                 bar
             });
 

@@ -141,7 +141,7 @@
 //! [`Data`]: ::span::Data
 pub use tokio_trace_core::span::*;
 pub use tokio_trace_core::Span; // TODO: auto-close
-// use tokio_trace_core::span::Span as Inner;
+                                // use tokio_trace_core::span::Span as Inner;
 
 // #[derive(Clone, Debug)]
 // pub struct Span {
@@ -360,9 +360,7 @@ mod tests {
             .run();
         Dispatch::to(subscriber).as_default(|| {
             let mut span = span!("foo");
-            span.enter(|| {
-
-            });
+            span.enter(|| {});
             drop(span);
         })
     }
@@ -382,7 +380,7 @@ mod tests {
             .run();
         Dispatch::to(subscriber).as_default(|| {
             let mut foo = span!("foo");
-            foo.enter(|| {  });
+            foo.enter(|| {});
 
             span!("bar").enter(|| {
                 // Since `foo` is not executing, it should close immediately.
@@ -403,7 +401,7 @@ mod tests {
             .run();
         Dispatch::to(subscriber).as_default(|| {
             let mut foo = span!("foo");
-            foo.enter(|| {  });
+            foo.enter(|| {});
 
             foo.close();
 
@@ -412,15 +410,12 @@ mod tests {
                 // exit.
             });
             assert!(foo.is_closed());
-
         })
     }
 
     #[test]
     fn span_doesnt_close_if_it_never_opened() {
-        let subscriber = subscriber::mock()
-            .done()
-            .run();
+        let subscriber = subscriber::mock().done().run();
         Dispatch::to(subscriber).as_default(|| {
             let span = span!("foo");
             drop(span);

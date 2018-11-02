@@ -3,10 +3,7 @@ pub use tokio_trace_core::dispatcher::*;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use {
-        span,
-        subscriber,
-    };
+    use {span, subscriber};
 
     #[test]
     fn dispatcher_is_sticky() {
