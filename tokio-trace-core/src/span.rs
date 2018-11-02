@@ -85,10 +85,6 @@ pub trait AsId {
 pub(crate) struct Enter {
     id: Id,
 
-    /// The number of threads which have entered this span.
-    ///
-    /// Incremented on enter and decremented on exit.
-    // currently_entered: AtomicUsize,
     subscriber: Dispatch,
 
     parent: Option<Id>,
@@ -96,6 +92,8 @@ pub(crate) struct Enter {
     should_close: bool,
 
     has_entered: bool,
+
+    handles: usize,
 }
 
 // ===== impl Span =====
@@ -128,8 +126,14 @@ impl Span {
     /// executing.
     // TODO: should the subscriber be responsible for tracking this?
     pub fn current() -> Self {
+        let inner = CURRENT_SPAN.with(|current| {
+            current.borrow_mut().as_mut().map(|ref mut current| {
+                current.handles += 1;
+                current.clone()
+            })
+        });
         Self {
-            inner: Enter::current(),
+            inner,
             is_closed: false,
         }
     }
@@ -152,19 +156,21 @@ impl Span {
         match self.inner.take() {
             Some(mut inner) => {
                 inner.has_entered = true;
+                inner.handles -= 1;
                 let (result, prior) = CURRENT_SPAN.with(|current_span| {
                     inner.enter();
                     let prior = current_span.replace(Some(inner));
                     (f(), prior)
                 });
                 CURRENT_SPAN.with(|current_span| {
-                    let inner = current_span.replace(prior)
+                    let mut inner = current_span.replace(prior)
                         .expect("cannot exit span that wasn't entered");
                     inner.exit();
                     self.inner = if inner.should_close() {
                         drop(inner);
                         None
                     } else {
+                        inner.handles += 1;
                         Some(inner)
                     };
                 });
@@ -205,22 +211,7 @@ impl Span {
     /// Signals that this span should close the next time it is exited, or when
     /// it is dropped.
     pub fn close(&mut self) {
-        self.is_closed = CURRENT_SPAN.with(|current| {
-            if let Some(ref mut inner) = *current.borrow_mut() {
-                if Some(inner.id()) == self.inner.as_ref().map(Enter::id) {
-                    self.inner.take();
-                    inner.close();
-                    true;
-                }
-            }
-            if let Some(ref mut inner) = self.inner {
-                inner.close();
-                true
-            } else {
-                false
-            }
-        });
-
+        self.inner.take().as_mut().map(Enter::close);
     }
 
     /// Returns `true` if this span is closed.
@@ -409,7 +400,7 @@ impl Id {
 
     /// Returns the ID of the currently-executing span.
     pub fn current() -> Option<Self> {
-        Enter::current().as_ref().map(Enter::id)
+        CURRENT_SPAN.with(|c| c.borrow().as_ref().map(|c| c.id.clone()))
     }
 }
 
@@ -429,6 +420,7 @@ impl Enter {
             parent,
             should_close: false,
             has_entered: false,
+            handles: 1,
         }
     }
 
@@ -445,8 +437,12 @@ impl Enter {
         self.should_close = true;
     }
 
+    fn can_close(&self) -> bool {
+        self.has_entered && self.handles == 1
+    }
+
     fn should_close(&self) -> bool {
-        self.should_close && self.has_entered
+        self.should_close && self.can_close()
     }
 
     fn id(&self) -> Id {
@@ -455,10 +451,6 @@ impl Enter {
 
     fn parent(&self) -> Option<Id> {
         self.parent.clone()
-    }
-
-    fn current() -> Option<Self> {
-        CURRENT_SPAN.with(|c| c.borrow().clone())
     }
 }
 
@@ -476,8 +468,19 @@ impl Hash for Enter {
 
 impl Drop for Enter {
     fn drop(&mut self) {
-        if self.should_close() {
-            self.subscriber.close(self.id());
+        println!("Enter::Drop: self={:?}, should_close={:?};", self, self.should_close());
+        if self.has_entered && self.should_close {
+            CURRENT_SPAN.with(|c| match *c.borrow_mut() {
+                Some(ref mut current) if current == self => {
+                    current.handles -= 1;
+                    current.should_close = true;
+                }
+                _ if self.handles == 1 => {
+                    self.subscriber.close(self.id());
+                }
+                _ => {},
+            })
+
         }
     }
 }
@@ -495,6 +498,7 @@ mod test_support {
     ///
     /// This is intended for use with the mock subscriber API in the
     /// `subscriber` module.
+    #[derive(Default)]
     pub struct MockSpan {
         pub name: Option<Option<&'static str>>,
         pub fields: HashMap<String, Box<OwnedValue>>,
@@ -503,8 +507,7 @@ mod test_support {
 
     pub fn mock() -> MockSpan {
         MockSpan {
-            name: None,
-            fields: HashMap::new(),
+            ..MockSpan::default()
         }
     }
 
