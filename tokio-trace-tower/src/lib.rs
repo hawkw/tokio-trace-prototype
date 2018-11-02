@@ -6,7 +6,6 @@ extern crate tokio_trace_futures;
 
 use std::fmt;
 use tokio_trace_futures::{Instrument, Instrumented};
-use tokio_trace::Span;
 use tower_service::Service;
 
 // TODO: Can this still be `Clone` (some kind of SharedSpan type?)
