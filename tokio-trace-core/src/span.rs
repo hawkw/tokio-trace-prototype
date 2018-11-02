@@ -121,6 +121,7 @@ pub(crate) struct Enter {
 #[must_use = "once a span has been entered, it should be exited"]
 struct Entered {
     prior: Option<Enter>,
+    wanted_close: bool,
 }
 
 // ===== impl Span =====
@@ -438,28 +439,38 @@ impl Enter {
         CURRENT_SPAN.with(|current| {
             current.borrow().as_ref().map(|ref current| {
                 current.handles.fetch_add(1, Ordering::Release);
-                Self {
-                    id: current.id.clone(),
-                    subscriber: current.subscriber.clone(),
-                    parent: current.parent.clone(),
-                    wants_close: AtomicBool::from(current.wants_close()),
-                    has_entered: AtomicBool::from(current.has_entered()),
-                    handles: AtomicUsize::from(current.handle_count()),
-                }
+                current.duplicate()
             })
         })
     }
 
-    fn enter(self) -> Entered {
-        // The current handle will no longer enter the span, since it has just
+    fn duplicate(&self) -> Self {
+        Self {
+            id: self.id.clone(),
+            subscriber: self.subscriber.clone(),
+            parent: self.parent.clone(),
+            wants_close: AtomicBool::from(self.wants_close()),
+            has_entered: AtomicBool::from(self.has_entered()),
+            handles: AtomicUsize::from(self.handle_count()),
+        }
+    }
+
+    fn enter(&self) -> Entered {
+            // The current handle will no longer enter the span, since it has just
         // been used to enter. Therefore, it will be safe to close the span if
         // no additional handles exist when the span is exited.
         self.handles.fetch_sub(1, Ordering::Release);
         // The span has now been entered, so it's okay to close it.
         self.has_entered.store(true, Ordering::Release);
         self.subscriber.enter(self.id());
-        let prior = CURRENT_SPAN.with(|current_span| current_span.replace(Some(self)));
-        Entered { prior }
+        let prior = CURRENT_SPAN.with(|current_span| {
+            current_span.replace(Some(self.duplicate()))
+        });
+        let wanted_close = self.wants_close.swap(false, Ordering::AcqRel);
+        Entered {
+            prior,
+            wanted_close,
+        }
     }
 
     /// Signals to this span that it should try to close itself when it is safe
