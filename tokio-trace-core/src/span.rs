@@ -97,6 +97,12 @@ pub(crate) struct Enter {
     handles: AtomicUsize,
 }
 
+#[derive(Debug)]
+#[must_use = "once a span has been entered, it should be exited"]
+struct Entered {
+    prior: Option<Enter>,
+}
+
 // ===== impl Span =====
 
 impl Span {
@@ -150,24 +156,9 @@ impl Span {
     pub fn enter<F: FnOnce() -> T, T>(&mut self, f: F) -> T {
         match self.inner.take() {
             Some(inner) => {
-                inner.handles.fetch_sub(1, Ordering::Release);
-                let (result, prior) = CURRENT_SPAN.with(|current_span| {
-                    inner.enter();
-                    let prior = current_span.replace(Some(inner));
-                    (f(), prior)
-                });
-                CURRENT_SPAN.with(|current_span| {
-                    let inner = current_span.replace(prior)
-                        .expect("cannot exit span that wasn't entered");
-                    inner.exit();
-                    self.inner = if inner.should_close() {
-                        drop(inner);
-                        None
-                    } else {
-                        inner.handles.fetch_add(1, Ordering::Release);
-                        Some(inner)
-                    };
-                });
+                let guard = inner.enter();
+                let result = f();
+                self.inner = guard.exit();
                 result
             }
             None => f(),
@@ -434,13 +425,16 @@ impl Enter {
         })
     }
 
-    fn enter(&self) {
+    fn enter(self) -> Entered {
+        self.handles.fetch_sub(1, Ordering::Release);
         self.has_entered.store(true, Ordering::Release);
         self.subscriber.enter(self.id());
-    }
-
-    fn exit(&self) {
-        self.subscriber.exit(self.id());
+        let prior = CURRENT_SPAN.with(|current_span| {
+            current_span.replace(Some(self))
+        });
+        Entered {
+            prior,
+        }
     }
 
     fn close(&self) {
@@ -499,6 +493,24 @@ impl Drop for Enter {
             })
 
         }
+    }
+}
+
+impl Entered {
+    fn exit(self) -> Option<Enter> {
+        CURRENT_SPAN.with(|current_span| {
+            let inner = current_span.replace(self.prior)
+                .expect("cannot exit span that wasn't entered");
+            inner.subscriber.exit(inner.id());
+            if inner.should_close() {
+                // Dropping `inner` will allow it to perform the closure if
+                // able.
+                None
+            } else {
+                inner.handles.fetch_add(1, Ordering::Release);
+                Some(inner)
+            }
+        })
     }
 }
 
