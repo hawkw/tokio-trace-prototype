@@ -8,10 +8,8 @@
 //! performs a given function (either a closure or a function pointer), exits
 //! the span, and then returns the result.
 //!
-//! Calling `enter` on a span handle consumes that handle (as the number of
-//! currently extant span handles is used for span completion bookkeeping), but
-//! it may be `clone`d inexpensively (span handles are atomically reference
-//! counted) in order to enter the span multiple times. For example:
+//! Calling `enter` on a span handle enters the span that handle corresponds to,
+//! if the span exists:
 //! ```
 //! # #[macro_use] extern crate tokio_trace;
 //! # fn main() {
@@ -26,54 +24,108 @@
 //!
 //! my_span.enter(|| {
 //!     // Perform some more work in the context of `my_span`.
-//!     // Since this call to `enter` *consumes* rather than clones `my_span`,
-//!     // it may not be entered again (unless any more clones of the handle
-//!     // exist elsewhere). Thus, `my_span` is free to mark itself as "done"
-//!     // upon exiting.
 //! });
 //! # }
 //! ```
 //!
 //! # The Span Lifecycle
 //!
-//! At any given point in time, a `Span` is in one of four [`State`]s:
-//! - `State::Unentered`: The span has been constructed but has not yet been
-//!   entered for the first time.
-//! - `State::Running`: One or more threads are currently executing inside this
-//!   span or one of its children.
-//! - `State::Idle`: The flow of execution has exited the span, but it may be
-//!   entered again and resume execution.
-//! - `State::Done`: The span has completed execution and may not be entered
-//!   again.
+//! Execution may enter and exit a span multiple times before that
+//! span is _closed_. Consider, for example, a future which has an associated
+//! span and enters that span every time it is polled:
+//! ```rust
+//! # extern crate tokio_trace;
+//! # extern crate futures;
+//! # use futures::{Future, Poll, Async};
+//! struct MyFuture {
+//!    // data
+//!    span: tokio_trace::Span,
+//! }
 //!
-//! Spans transition between these states when execution enters and exit them.
-//! Upon entry, if a span is not currently in the `Running` state, it will
-//! transition to the running state. Upon exit, a span checks if it is executing
-//! in any other threads, and if it is not, it transitions to either the `Idle`
-//! or `Done` state. The determination of which state to transition to is made
-//! based on whether or not the potential exists for the span to be entered
-//! again (i.e. whether any `Span` handles with that capability currently
-//! exist).
+//! impl Future for MyFuture {
+//!     type Item = ();
+//!     type Error = ();
 //!
-//! **Note**: A `Span` handle represents a _single entry_ into the span.
-//! Entering a `Span` handle, but a handle may be `clone`d prior to entry if the
-//! span expects to be entered again. This is due to how spans determine whether
-//! or not to close themselves.
+//!     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+//!         self.span.enter(|| {
+//!             // Do actual future work
+//! # Ok(Async::Ready(()))
+//!         })
+//!     }
+//! }
+//! ```
 //!
-//! Rather than requiring the user to _explicitly_ close a span, spans are able
-//! to account for their own completion automatically. When a span is exited,
-//! the span is responsible for determining whether it should transition back to
-//! the `Idle` state, or transition to the `Done` state. This is determined
-//! prior to notifying the subscriber that the span has been exited, so that the
-//! subscriber can be informed of the state that the span has transitioned to.
-//! The next state is chosen based on whether or not the possibility to re-enter
-//! the span exists --- namely, are there still handles with the capacity to
-//! enter the span? If so, the span transitions back to `Idle`. However, if no
-//! more handles exist, the span cannot be entered again; it may instead
-//! transition to `Done`.
+//! If this future was spawned on an executor, it might yield one or more times
+//! before `poll` returns `Ok(Async::Ready)`. If the future were to yield, then
+//! the executor would move on to poll the next future, which may _also_ enter
+//! an associated span or series of spans. Therefore, it is valid for a span to
+//! be entered repeatedly before it completes. Only the time when that span or
+//! one of its children was the current span is considered to be time spent in
+//! that span. A span which is not executing and has not yet been closed is said
+//! to be _idle_.
 //!
-//! Thus, span handles are single-use. Cloning the span handle _signals the
-//! intent to enter the span again_.
+//! Because spans may be entered and exited multiple times before they close,
+//! [`Subscriber`]s have separate trait methods which are called to notify them
+//! of span exits and span closures. When execution exits a span,
+//! [`exit`](::Subscriber::exit) will always be called with that span's ID to
+//! notify the subscriber that the span has been exited. If the span has been
+//! exited for the final time, the `exit` will be followed by a call to
+//! [`close`](::Subscriber::close), signalling that the span has been closed.
+//! Subscribers may expect that a span which has closed will not be entered
+//! again.
+//!
+//! If there is only a single handle with the capacity to exit a span, dropping
+//! that handle will automatically close the span, since the capacity to enter
+//! it no longer exists. For example:
+//! ```
+//! # #[macro_use] extern crate tokio_trace;
+//! # fn main() {
+//! {
+//!     span!("my_span").enter(|| {
+//!         // perform some work in the context of `my_span`...
+//!     }); // --> Subscriber::exit(my_span)
+//!
+//!     // The handle to `my_span` only lives inside of this block; when it is
+//!     // dropped, the subscriber will be informed that `my_span` has closed.
+//!
+//! } // --> Subscriber::close(my_span)
+//! # }
+//! ```
+//!
+//! If one or more handles to a span exist, the span will be kept open until
+//! that handle drops. However, a span may be explicitly asked to close by
+//! calling the [`Span::close`] method. For example:
+//! ```
+//! # #[macro_use] extern crate tokio_trace;
+//! # fn main() {
+//! use tokio_trace::Span;
+//!
+//! let mut my_span = span!("my_span");
+//! my_span.enter(|| {
+//!     // Signal to my_span that it should close when it exits
+//!     Span::current().close();
+//! }); // --> Subscriber::exit(my_span); Subscriber::close(my_span)
+//!
+//! // The handle to `my_span` still exists, but it now knows that the span was
+//! // closed while it was executing.
+//! my_span.is_closed(); // ==> true
+//!
+//! // Attempting to enter the span using the handle again will do nothing.
+//! my_span.enter(|| {
+//!     // no-op
+//! });
+//! # }
+//! ```
+//!
+//! When a span is asked to close by explicitly calling `Span::close`, if it is
+//! executing, it will wait until it exits to signal that it has been closed. If
+//! it is not currently executing, it will signal closure immediately.
+//!
+//! Calls to `Span::close()` are *not* guaranteed to close the span immediately.
+//! If multiple handles to the span exist, the span will not be closed until all
+//! but the one which opened the span have been dropped. This is to ensure that
+//! a subscriber never observes an inconsistant state; namely, a span being
+//! entered after it has closed.
 //!
 //! # Accessing a Span's Data
 //!

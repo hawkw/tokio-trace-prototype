@@ -17,7 +17,12 @@ thread_local! {
     static CURRENT_SPAN: RefCell<Option<Enter>> = RefCell::new(None);
 }
 
-/// A handle that represents a span in the process of executing.
+/// A handle representing a span, with the capability to enter the span if it
+/// exists.
+///
+/// If the span was rejected by the current `Subscriber`'s filter, entering the
+/// span will silently do nothing. Thus, the handle can be used in the same
+/// manner regardless of whether or not the trace is currently being collected.
 #[derive(PartialEq, Hash)]
 pub struct Span {
     inner: Option<Enter>,
@@ -67,21 +72,11 @@ pub trait AsId {
     fn as_id(&self) -> Option<Id>;
 }
 
-/// Internal representation of the inner state of a span which has not yet
-/// completed.
+/// A handle representing the capacity to enter a span which is known to exist.
 ///
-/// This is kept separate from the `Data`, which holds the data about the
-/// span, because this type is referenced only by *entering* (`Span`) handles.
-/// It is only necessary to track this state while the capacity still exists to
-/// re-enter the span; once it can no longer be re-entered, the `ActiveInner`
-/// can be dropped (and *should* be dropped, as this may allow the parent span
-/// to finish as well, if the `ActiveInner` holds the only remaining entering
-/// reference to the parent span).
-///
-/// This type is purely internal to the `span` module and is not intended to be
-/// interacted with directly by downstream users of `tokio-trace`. Instead, all
-/// interaction with an active span's state is carried out through `Span`
-/// references.
+/// Unlike `Span`, this type is only constructed for spans which _have_ been
+/// enabled by the current filter. This type is primarily used for implementing
+/// span handles; users should typically not need to interact with it directly.
 #[derive(Debug)]
 pub(crate) struct Enter {
     id: Id,
