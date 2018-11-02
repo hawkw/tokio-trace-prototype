@@ -196,6 +196,7 @@ impl Span {
     /// Signals that this span should close the next time it is exited, or when
     /// it is dropped.
     pub fn close(&mut self) {
+        self.is_closed = true;
         self.inner.take().as_ref().map(Enter::close);
     }
 
