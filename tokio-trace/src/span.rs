@@ -196,19 +196,14 @@
 //! [`Data`]: ::span::Data
 //! [shared span]: ::span::Shared
 //! [`IntoShared`]: ::span::IntoShared
-pub use tokio_trace_core::span::{
-    Span,
-    Id,
-    Data,
-    AsId,
-};
+pub use tokio_trace_core::span::{AsId, Data, Id, Span};
 
 #[cfg(any(test, feature = "test-support"))]
 pub use tokio_trace_core::span::{mock, MockSpan};
 
-use ::{IntoValue, subscriber};
-use tokio_trace_core::span::Enter;
 use std::sync::Arc;
+use tokio_trace_core::span::Enter;
+use {subscriber, IntoValue};
 
 /// Trait for converting a `Span` into a cloneable `Shared` span.
 pub trait IntoShared {
@@ -236,7 +231,7 @@ impl Shared {
     /// enabled.
     pub fn from_span(span: Span) -> Self {
         Self {
-            inner: span.into_inner().map(Arc::new)
+            inner: span.into_inner().map(Arc::new),
         }
     }
 
@@ -262,7 +257,6 @@ impl Shared {
         } else {
             f()
         }
-
     }
 
     /// Returns the `Id` of the parent of this span, if one exists.
@@ -280,7 +274,9 @@ impl Shared {
         field: &'static str,
         value: &dyn IntoValue,
     ) -> Result<(), subscriber::AddValueError> {
-        self.inner.as_ref().map(|inner| inner.add_value(field, value))
+        self.inner
+            .as_ref()
+            .map(|inner| inner.add_value(field, value))
             .unwrap_or(Ok(()))
     }
 
@@ -300,7 +296,9 @@ impl Shared {
     /// returns `Ok(())` if the other span was added as a precedent of this
     /// span, or an error if this was not possible.
     pub fn follows_from<I: AsId>(&self, from: I) -> Result<(), subscriber::FollowsError> {
-        self.inner.as_ref().map(move |inner| inner.follows_from(from))
+        self.inner
+            .as_ref()
+            .map(move |inner| inner.follows_from(from))
             .unwrap_or(Ok(()))
     }
 }
@@ -528,18 +526,12 @@ mod tests {
                 .close(span::mock().named(Some("foo")))
                 .done()
                 .run();
-            Dispatch::to(subscriber).as_default(|| {
-                span!("foo").into_shared().enter(|| {
-
-                })
-            })
+            Dispatch::to(subscriber).as_default(|| span!("foo").into_shared().enter(|| {}))
         }
 
         #[test]
         fn span_doesnt_close_if_it_never_opened() {
-            let subscriber = subscriber::mock()
-                .done()
-                .run();
+            let subscriber = subscriber::mock().done().run();
             Dispatch::to(subscriber).as_default(|| {
                 let span = span!("foo").into_shared();
                 drop(span);
@@ -635,8 +627,7 @@ mod tests {
                     });
                     // Enter "bar" again. consuming the last handle to `bar`
                     // close the span automatically.
-                    bar.enter(|| {
-                    });
+                    bar.enter(|| {});
                 });
             });
         }

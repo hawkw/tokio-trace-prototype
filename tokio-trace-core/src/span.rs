@@ -209,7 +209,9 @@ impl Span {
         field: &'static str,
         value: &dyn IntoValue,
     ) -> Result<(), AddValueError> {
-        self.inner.as_ref().map(|inner| inner.add_value(field, value))
+        self.inner
+            .as_ref()
+            .map(|inner| inner.add_value(field, value))
             .unwrap_or(Ok(()))
     }
 
@@ -252,7 +254,9 @@ impl Span {
     /// returns `Ok(())` if the other span was added as a precedent of this
     /// span, or an error if this was not possible.
     pub fn follows_from<I: AsId>(&self, from: I) -> Result<(), FollowsError> {
-        self.inner.as_ref().map(move |inner| inner.follows_from(from))
+        self.inner
+            .as_ref()
+            .map(move |inner| inner.follows_from(from))
             .unwrap_or(Ok(()))
     }
 
@@ -431,13 +435,9 @@ impl Enter {
         // The span has now been entered, so it's okay to close it.
         self.has_entered.store(true, Ordering::Release);
         self.subscriber.enter(self.id());
-        let prior = CURRENT_SPAN.with(|current_span| {
-            current_span.replace(Some(self.duplicate()))
-        });
+        let prior = CURRENT_SPAN.with(|current_span| current_span.replace(Some(self.duplicate())));
         self.wants_close.store(false, Ordering::Release);
-        Entered {
-            prior,
-        }
+        Entered { prior }
     }
 
     /// Indicates the span _should_ be closed the next time it exits or this
@@ -465,8 +465,10 @@ impl Enter {
     pub fn exit_and_join(&self, other: Entered) {
         if let Some(other) = other.exit() {
             self.handles.store(other.handle_count(), Ordering::Release);
-            self.has_entered.store(other.has_entered(), Ordering::Release);
-            self.wants_close.store(other.take_close(), Ordering::Release);
+            self.has_entered
+                .store(other.has_entered(), Ordering::Release);
+            self.wants_close
+                .store(other.take_close(), Ordering::Release);
         }
     }
 
