@@ -316,6 +316,55 @@ mod tests {
     }
 
     #[test]
+    fn span_closes_when_idle() {
+        let subscriber = subscriber::mock()
+            .enter(span::mock().named(Some("foo")))
+            .exit(span::mock().named(Some("foo")))
+            // A second span is entered so that the mock subscriber will
+            // expect "foo" at a separate point in time from when it is exited.
+            .enter(span::mock().named(Some("bar")))
+            .close(span::mock().named(Some("foo")))
+            .exit(span::mock().named(Some("bar")))
+            .close(span::mock().named(Some("bar")))
+            .done()
+            .run();
+        Dispatch::to(subscriber).as_default(|| {
+            let mut foo = span!("foo");
+            foo.enter(|| {  });
+
+            span!("bar").enter(|| {
+                // Since `foo` is not executing, it should close immediately.
+                foo.close();
+            });
+
+            assert!(foo.is_closed());
+        })
+    }
+
+    #[test]
+    fn entering_a_closed_span_is_a_no_op() {
+        let subscriber = subscriber::mock()
+            .enter(span::mock().named(Some("foo")))
+            .exit(span::mock().named(Some("foo")))
+            .close(span::mock().named(Some("foo")))
+            .done()
+            .run();
+        Dispatch::to(subscriber).as_default(|| {
+            let mut foo = span!("foo");
+            foo.enter(|| {  });
+
+            foo.close();
+
+            foo.enter(|| {
+                // The subscriber expects nothing else to happen after the first
+                // exit.
+            });
+            assert!(foo.is_closed());
+
+        })
+    }
+
+    #[test]
     fn span_doesnt_close_if_it_never_opened() {
         let subscriber = subscriber::mock()
             .done()
