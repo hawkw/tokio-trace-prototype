@@ -25,7 +25,16 @@ thread_local! {
 /// manner regardless of whether or not the trace is currently being collected.
 #[derive(PartialEq, Hash)]
 pub struct Span {
+    /// A handle used to enter the span when it is not executing.
+    ///
+    /// If this is `None`, then the span has either closed or was never enabled.
     inner: Option<Enter>,
+
+    /// Set to `true` when the span closes.
+    ///
+    /// This allows us to distinguish if `inner` is `None` because the span was
+    /// never enabled (and thus the inner state was never created), or if the
+    /// previously entered, but it is now closed.
     is_closed: bool,
 }
 
@@ -79,16 +88,32 @@ pub trait AsId {
 /// span handles; users should typically not need to interact with it directly.
 #[derive(Debug)]
 pub(crate) struct Enter {
+    /// The span's ID, as provided by `subscriber`.
     id: Id,
 
+    /// The subscriber that will receive events relating to this span.
+    ///
+    /// This should be the same subscriber that provided this span with its
+    /// `id`.
     subscriber: Dispatch,
 
+    /// The span ID of this span's parent, if there is one.
     parent: Option<Id>,
 
+    /// A flag indicating that the span has been instructed to close when
+    /// possible.
+    ///
+    /// This does _not_ indicate that it is _currently_ okay to close the span,
+    /// only that it _should_ close when it is safe to do so.
     wants_close: AtomicBool,
 
+    /// A flag that is set when the span is entered for the first time.
+    ///
+    /// If this is false, closing the span should do nothing.
     has_entered: AtomicBool,
 
+    /// Incremented when new handles are created, and decremented when they are
+    /// dropped if this is the current span.
     handles: AtomicUsize,
 }
 
@@ -191,6 +216,11 @@ impl Span {
     /// it is dropped.
     pub fn close(&mut self) {
         self.is_closed = true;
+        // Take the span's `Enter` handle and try to close it. If the span is
+        // idle, then the `Enter` will close it immediately when it is dropped.
+        // Otherwise, if corresponds to the same span as the currently-executing
+        // one, it will tell the current span to try to close when it exits.
+        // Taking the `Enter` will prevent this handle from re-entering the span.
         self.inner.take().as_ref().map(Enter::close);
     }
 
@@ -421,17 +451,30 @@ impl Enter {
     }
 
     fn enter(self) -> Entered {
+        // The current handle will no longer enter the span, since it has just
+        // been used to enter. Therefore, it will be safe to close the span if
+        // no additional handles exist when the span is exited.
         self.handles.fetch_sub(1, Ordering::Release);
+        // The span has now been entered, so it's okay to close it.
         self.has_entered.store(true, Ordering::Release);
         self.subscriber.enter(self.id());
         let prior = CURRENT_SPAN.with(|current_span| current_span.replace(Some(self)));
         Entered { prior }
     }
 
+    /// Signals to this span that it should try to close itself when it is safe
+    /// to do so.
     fn close(&self) {
         self.wants_close.store(true, Ordering::Release);
     }
 
+    /// Returns `true` if this span _should_ close itself.
+    ///
+    /// This is true IFF:
+    /// - the span has been told to close,
+    /// - the span has been entered already (we don't want to close spans that
+    ///   have never been entered),
+    /// - there aren't multiple handles capable of entering the span.
     fn should_close(&self) -> bool {
         self.wants_close() && self.has_entered() && self.handle_count() == 1
     }
@@ -471,12 +514,21 @@ impl Hash for Enter {
 
 impl Drop for Enter {
     fn drop(&mut self) {
+        // If this handle wants to be closed, try to close it --- either by
+        // closing it now if it is idle, or telling the current span to close
+        // when it exits, if it is the current span.
         if self.has_entered() && self.wants_close() {
             CURRENT_SPAN.with(|c| match *c.borrow() {
+                // If the `enter` being dropped corresponds to the same span as
+                // the current span, then we cannot close it yet. Instead, we
+                // signal to the copy of this span that currently occupies
+                // CURRENT_SPAN that it should try to close when it is exited.
                 Some(ref current) if current == self => {
                     current.handles.fetch_sub(1, Ordering::Release);
                     current.wants_close.store(true, Ordering::Release);
                 }
+                // If this span is not the current span, then it may close now,
+                // if there are no other handles with the capacity to re-enter it.
                 _ if self.handle_count() <= 1 => {
                     self.subscriber.close(self.id());
                 }
@@ -498,6 +550,8 @@ impl Entered {
                 // able.
                 None
             } else {
+                // We are returning a new `Enter`. Increment the number of
+                // handles that may enter the span.
                 inner.handles.fetch_add(1, Ordering::Release);
                 Some(inner)
             }
