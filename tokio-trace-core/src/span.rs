@@ -4,6 +4,7 @@ use std::{
     cmp, fmt,
     hash::{Hash, Hasher},
     iter, slice,
+    sync::atomic::{AtomicUsize, AtomicBool, Ordering},
 };
 use {
     subscriber::{AddValueError, FollowsError, Subscriber},
@@ -81,7 +82,7 @@ pub trait AsId {
 /// interacted with directly by downstream users of `tokio-trace`. Instead, all
 /// interaction with an active span's state is carried out through `Span`
 /// references.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) struct Enter {
     id: Id,
 
@@ -89,11 +90,11 @@ pub(crate) struct Enter {
 
     parent: Option<Id>,
 
-    should_close: bool,
+    wants_close: AtomicBool,
 
-    has_entered: bool,
+    has_entered: AtomicBool,
 
-    handles: usize,
+    handles: AtomicUsize,
 }
 
 // ===== impl Span =====
@@ -126,14 +127,8 @@ impl Span {
     /// executing.
     // TODO: should the subscriber be responsible for tracking this?
     pub fn current() -> Self {
-        let inner = CURRENT_SPAN.with(|current| {
-            current.borrow_mut().as_mut().map(|ref mut current| {
-                current.handles += 1;
-                current.clone()
-            })
-        });
         Self {
-            inner,
+            inner: Enter::clone_current(),
             is_closed: false,
         }
     }
@@ -154,23 +149,22 @@ impl Span {
     /// Returns the result of evaluating `f`.
     pub fn enter<F: FnOnce() -> T, T>(&mut self, f: F) -> T {
         match self.inner.take() {
-            Some(mut inner) => {
-                inner.has_entered = true;
-                inner.handles -= 1;
+            Some(inner) => {
+                inner.handles.fetch_sub(1, Ordering::Release);
                 let (result, prior) = CURRENT_SPAN.with(|current_span| {
                     inner.enter();
                     let prior = current_span.replace(Some(inner));
                     (f(), prior)
                 });
                 CURRENT_SPAN.with(|current_span| {
-                    let mut inner = current_span.replace(prior)
+                    let inner = current_span.replace(prior)
                         .expect("cannot exit span that wasn't entered");
                     inner.exit();
                     self.inner = if inner.should_close() {
                         drop(inner);
                         None
                     } else {
-                        inner.handles += 1;
+                        inner.handles.fetch_add(1, Ordering::Release);
                         Some(inner)
                     };
                 });
@@ -211,7 +205,7 @@ impl Span {
     /// Signals that this span should close the next time it is exited, or when
     /// it is dropped.
     pub fn close(&mut self) {
-        self.inner.take().as_mut().map(Enter::close);
+        self.inner.take().as_ref().map(Enter::close);
     }
 
     /// Returns `true` if this span is closed.
@@ -418,14 +412,30 @@ impl Enter {
             id,
             subscriber,
             parent,
-            should_close: false,
-            has_entered: false,
-            handles: 1,
+            wants_close: AtomicBool::from(false),
+            has_entered: AtomicBool::from(false),
+            handles: AtomicUsize::from(1),
         }
     }
 
-    fn enter(&mut self) {
-        self.has_entered = true;
+    pub(crate) fn clone_current() -> Option<Self> {
+        CURRENT_SPAN.with(|current| {
+            current.borrow().as_ref().map(|ref current| {
+                current.handles.fetch_add(1, Ordering::Release);
+                Self {
+                    id: current.id.clone(),
+                    subscriber: current.subscriber.clone(),
+                    parent: current.parent.clone(),
+                    wants_close: AtomicBool::from(current.wants_close()),
+                    has_entered: AtomicBool::from(current.has_entered()),
+                    handles: AtomicUsize::from(current.handle_count()),
+                }
+            })
+        })
+    }
+
+    fn enter(&self) {
+        self.has_entered.store(true, Ordering::Release);
         self.subscriber.enter(self.id());
     }
 
@@ -433,16 +443,24 @@ impl Enter {
         self.subscriber.exit(self.id());
     }
 
-    fn close(&mut self) {
-        self.should_close = true;
-    }
-
-    fn can_close(&self) -> bool {
-        self.has_entered && self.handles == 1
+    fn close(&self) {
+        self.wants_close.store(true, Ordering::Release);
     }
 
     fn should_close(&self) -> bool {
-        self.should_close && self.can_close()
+        self.wants_close() && self.has_entered() && self.handle_count() == 1
+    }
+
+    fn has_entered(&self) -> bool {
+        self.has_entered.load(Ordering::Acquire)
+    }
+
+    fn wants_close(&self) -> bool {
+        self.wants_close.load(Ordering::Acquire)
+    }
+
+    fn handle_count(&self) -> usize {
+        self.handles.load(Ordering::Acquire)
     }
 
     fn id(&self) -> Id {
@@ -468,14 +486,13 @@ impl Hash for Enter {
 
 impl Drop for Enter {
     fn drop(&mut self) {
-        println!("Enter::Drop: self={:?}, should_close={:?};", self, self.should_close());
-        if self.has_entered && self.should_close {
-            CURRENT_SPAN.with(|c| match *c.borrow_mut() {
-                Some(ref mut current) if current == self => {
-                    current.handles -= 1;
-                    current.should_close = true;
+        if self.has_entered() && self.wants_close() {
+            CURRENT_SPAN.with(|c| match *c.borrow() {
+                Some(ref current) if current == self => {
+                    current.handles.fetch_sub(1, Ordering::Release);
+                    current.wants_close.store(true, Ordering::Release);
                 }
-                _ if self.handles == 1 => {
+                _ if self.handle_count() <= 1 => {
                     self.subscriber.close(self.id());
                 }
                 _ => {},
