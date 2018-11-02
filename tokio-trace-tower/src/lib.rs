@@ -42,7 +42,7 @@ where
         let inner = &mut self.inner;
         span.enter(|| {
             span!("request", request = &req).enter(move || {
-                inner.call(req).instrument(Span::current())
+                inner.call(req).in_current_span()
             })
         })
     }

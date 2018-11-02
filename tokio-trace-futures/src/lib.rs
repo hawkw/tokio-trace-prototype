@@ -9,11 +9,17 @@ pub mod executor;
 
 // TODO: seal?
 pub trait Instrument: Sized {
+    // TODO: consider renaming to `in_span` for consistency w/
+    // `in_current_span`?
     fn instrument(self, span: Span) -> Instrumented<Self> {
         Instrumented {
             inner: self,
             span,
         }
+    }
+
+    fn in_current_span(self) -> Instrumented<Self> {
+        self.instrument(Span::current())
     }
 }
 

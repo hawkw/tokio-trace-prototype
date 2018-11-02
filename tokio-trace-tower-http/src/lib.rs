@@ -7,18 +7,21 @@ extern crate tokio_trace_futures;
 
 use futures::{Future, Poll};
 use tokio_trace_futures::{Instrument, Instrumented};
-use tokio_trace::Span;
 use tower_service::{NewService, Service};
 
 #[derive(Debug)]
 pub struct InstrumentedHttpService<T> {
     inner: T,
-    span: Span,
+    span: tokio_trace::Span,
 }
 
 impl<T> InstrumentedHttpService<T> {
     pub fn new(inner: T, span: tokio_trace::Span) -> Self {
         Self { inner, span }
+    }
+
+    pub fn in_current(inner: T) -> Self {
+        Self::new(inner, tokio_trace::Span::current())
     }
 }
 
@@ -70,7 +73,7 @@ where
         span.enter(move || {
             inner
                 .poll()
-                .map(|ready| ready.map(|svc| InstrumentedHttpService::new(svc, Span::current())))
+                .map(|ready| ready.map(|svc| InstrumentedHttpService::in_current(svc)))
         })
     }
 }
@@ -100,7 +103,7 @@ where
                 uri = request.uri(),
                 headers = request.headers()
             )
-                .enter(move || inner.call(request).instrument(Span::current()))
+                .enter(move || inner.call(request).in_current_span())
         })
     }
 }
