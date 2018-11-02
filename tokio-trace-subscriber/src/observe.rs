@@ -48,6 +48,7 @@ pub trait ObserveExt: Observe {
     /// # fn observe_event<'event, 'meta: 'event>(&self, _: &'event Event<'event, 'meta>) {}
     /// # fn enter(&self, _: &SpanRef) {}
     /// # fn exit(&self, _: &SpanRef) {}
+    /// # fn close(&self, _: &SpanRef) {}
     /// # fn filter(&self) -> &dyn Filter { &NoFilter}
     /// }
     ///
@@ -56,6 +57,7 @@ pub trait ObserveExt: Observe {
     /// # fn observe_event<'event, 'meta: 'event>(&self, _: &'event Event<'event, 'meta>) {}
     /// # fn enter(&self, _: &SpanRef) {}
     /// # fn exit(&self, _: &SpanRef) {}
+    /// # fn close(&self, _: &SpanRef) {}
     /// # fn filter(&self) -> &dyn Filter { &NoFilter}
     /// }
     ///
@@ -178,6 +180,7 @@ pub struct NoObserver;
 /// # fn observe_event<'event, 'meta: 'event>(&self, _: &'event Event<'event, 'meta>) {}
 /// # fn enter(&self, _: &SpanRef) {}
 /// # fn exit(&self, _: &SpanRef) {}
+/// # fn close(&self, _: &SpanRef) {}
 /// # fn filter(&self) -> &dyn Filter { &NoFilter}
 /// }
 ///
@@ -186,6 +189,7 @@ pub struct NoObserver;
 /// # fn observe_event<'event, 'meta: 'event>(&self, _: &'event Event<'event, 'meta>) {}
 /// # fn enter(&self, _: &SpanRef) {}
 /// # fn exit(&self, _: &SpanRef) {}
+/// # fn close(&self, _: &SpanRef) {}
 /// # fn filter(&self) -> &dyn Filter { &NoFilter}
 /// }
 ///
