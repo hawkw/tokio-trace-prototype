@@ -124,13 +124,19 @@ mod tests {
         Dispatch::to(subscriber).as_default(|| {
             span!("foo").enter(|| {
                 let mut bar = span!("bar",);
-                bar.enter(|| {
+                let another_bar = bar.enter(|| {
                     // do nothing. exiting "bar" should leave it idle, since it can
                     // be re-entered.
+                    let mut another_bar = Span::current();
+                    another_bar.close();
+                    another_bar
                 });
-                bar.enter(|| {
-                    // enter "bar" again. this time, we explicitly close bar.
-                    Span::current().close();
+                // Enter "bar" again. This time, the previously-requested
+                // closure should be honored.
+                bar.enter(move || {
+                    // Drop the other handle to bar. Now, the span should be allowed
+                    // to close.
+                    drop(another_bar);
                 });
             });
         });
