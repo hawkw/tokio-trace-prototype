@@ -219,6 +219,18 @@ impl IntoShared for Span {
     }
 }
 
+/// A shared, heap-allocated span handle, which may be cloned.
+///
+/// Unlike a `Span` handle, entering a `Shared` span handle consumes the handle.
+/// This is used to determine when the span may be closed. Thus, each `Shared`
+/// handle may be thought of as representing a *single* attempt to enter the
+/// span.
+///
+/// However, they may be cloned inexpensively (as they are internally
+/// reference-counted).
+// NOTE: It may also be worthwhile to provide an `UnsyncShared` type, that uses
+// `Rc` rather than `Arc` for performance reasons? I'm not sure what the
+// use-case for that would be, though.
 #[derive(Clone, Debug)]
 pub struct Shared {
     inner: Option<Arc<Enter>>,
@@ -231,7 +243,7 @@ impl Shared {
     /// enabled.
     pub fn from_span(span: Span) -> Self {
         Self {
-            inner: span.into_inner().map(Arc::new),
+            inner: Enter::from_span(span).map(Arc::new),
         }
     }
 
@@ -262,6 +274,16 @@ impl Shared {
     /// Returns the `Id` of the parent of this span, if one exists.
     pub fn parent(&self) -> Option<Id> {
         self.inner.as_ref().and_then(|inner| inner.parent())
+    }
+
+    /// Returns the `Id` of the span, or `None` if it is disabled.
+    pub fn id(&self) -> Option<Id> {
+        self.inner.as_ref().map(|inner| inner.id())
+    }
+
+    /// Returns `true` if this span is enabled.
+    pub fn is_enabled(&self) -> bool {
+        self.inner.is_some()
     }
 
     /// Sets the field on this span named `name` to the given `value`.
@@ -300,6 +322,12 @@ impl Shared {
             .as_ref()
             .map(move |inner| inner.follows_from(from))
             .unwrap_or(Ok(()))
+    }
+}
+
+impl AsId for Shared {
+    fn as_id(&self) -> Option<Id> {
+        self.id()
     }
 }
 

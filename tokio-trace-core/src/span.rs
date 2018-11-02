@@ -259,10 +259,6 @@ impl Span {
             .map(move |inner| inner.follows_from(from))
             .unwrap_or(Ok(()))
     }
-
-    pub fn into_inner(self) -> Option<Enter> {
-        self.inner
-    }
 }
 
 impl fmt::Debug for Span {
@@ -421,6 +417,17 @@ impl AsId for Id {
 // ===== impl Enter =====
 
 impl Enter {
+    /// Consumes `span` and returns the inner entering handle, if the span is
+    /// enabled.
+    ///
+    /// The returned `Enter` has approximately the same behaviour to a `Span`.
+    /// However, it is primarily intended for use in libraries custom span
+    /// types; the `Span` handle will typically represent a more ergonomic API
+    /// for actually _using_ spans.
+    pub fn from_span(span: Span) -> Option<Self> {
+        span.inner
+    }
+
     /// Enters the span, returning a guard that may be used to exit the span and
     /// re-enter the prior span.
     ///
