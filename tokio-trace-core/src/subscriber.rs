@@ -364,7 +364,6 @@ mod test_support {
             let span = spans
                 .get(&span)
                 .unwrap_or_else(|| panic!("no span for ID {:?}", span));
-            println!("enter:\t{:?}", span.name());
             match self.expected.lock().unwrap().pop_front() {
                 None => {}
                 Some(Expect::Event(_)) => panic!(
@@ -399,8 +398,6 @@ mod test_support {
             let span = spans
                 .get(&span)
                 .unwrap_or_else(|| panic!("no span for ID {:?}", span));
-
-            println!("exit:\t{:?}", span.name());
             match self.expected.lock().unwrap().pop_front() {
                 None => {}
                 Some(Expect::Event(_)) => panic!(
@@ -435,7 +432,6 @@ mod test_support {
             let span = spans
                 .get(&span)
                 .unwrap_or_else(|| panic!("no span for ID {:?}", span));
-            println!("close:\t{:?}", span.name());
             match self.expected.lock().unwrap().pop_front() {
                 None => {}
                 Some(Expect::Event(_)) => panic!(
