@@ -1,4 +1,5 @@
 use {
+    callsite,
     span::{self, Span},
     subscriber::{self, Subscriber},
     Event, IntoValue, Meta,
@@ -80,10 +81,43 @@ impl Dispatch {
         })
     }
 
-    #[doc(hidden)]
-    #[inline]
-    pub fn id(&self) -> usize {
-        self.id
+    pub fn if_enabled<F, T>(self, callsite: &callsite::Callsite, f: F) -> Option<T>
+    where
+        F: FnOnce(Dispatch, &'static Meta<'static>) -> T,
+    {
+        if callsite.0.with(|cache| self.is_enabled(cache)) {
+            Some(f(self, callsite.metadata()))
+        } else {
+            None
+        }
+    }
+
+    fn is_invalid(&self, cache: &callsite::Cache<'static>) -> bool {
+        // If the callsite was last filtered by a different subscriber, assume
+        // the filter is no longer valid.
+        if cache.cached_filter.get().is_none() || cache.last_filtered_by.get() != self.id {
+            // Update the stamp on the call site so this subscriber is now the
+            // last to filter it.
+            cache.last_filtered_by.set(self.id);
+            return true;
+        }
+
+        // Otherwise, just ask the subscriber what it thinks.
+        self.subscriber.should_invalidate_filter(&cache.meta)
+    }
+
+    fn is_enabled(&self, cache: &callsite::Cache<'static>) -> bool {
+        if self.is_invalid(cache) {
+            let enabled = self.subscriber.enabled(&cache.meta);
+            cache.cached_filter.set(Some(enabled));
+            enabled
+        } else if let Some(cached) = cache.cached_filter.get() {
+            cached
+        } else {
+            let enabled = self.subscriber.enabled(&cache.meta);
+            cache.cached_filter.set(Some(enabled));
+            enabled
+        }
     }
 }
 
