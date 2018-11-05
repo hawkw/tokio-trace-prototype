@@ -153,6 +153,9 @@ pub use self::{
 };
 use value::BorrowedValue;
 
+#[derive(Clone)]
+pub struct FieldKey(usize);
+
 /// `Event`s represent single points in time where something occurred during the
 /// execution of a program.
 ///
@@ -314,6 +317,14 @@ impl<'a> Meta<'a> {
             _ => false,
         }
     }
+
+    pub fn field_keys(&self) -> impl Iterator<Item = (&'a str, FieldKey)> {
+        self.field_names.iter().enumerate().map(|(i, &name)| (name, FieldKey(i)))
+    }
+
+    pub fn field_for(&self, name: &str) -> Option<FieldKey> {
+        self.field_names.iter().position(|&f| f == name).map(FieldKey)
+    }
 }
 
 // ===== impl Event =====
@@ -393,5 +404,15 @@ impl PartialEq for Level {
     #[inline]
     fn eq(&self, other: &Level) -> bool {
         *self as usize == *other as usize
+    }
+}
+
+impl FieldKey {
+    pub fn first() -> Self {
+        FieldKey(0)
+    }
+
+    pub fn skip(&self) -> Self {
+        FieldKey(self.0 + 1)
     }
 }

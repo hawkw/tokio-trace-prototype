@@ -7,6 +7,7 @@ use std::{
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 use {
+    FieldKey,
     subscriber::{AddValueError, FollowsError, Subscriber},
     value::{IntoValue, OwnedValue},
     DebugFields, Dispatch, StaticMeta,
@@ -36,6 +37,8 @@ pub struct Span {
     /// never enabled (and thus the inner state was never created), or if the
     /// previously entered, but it is now closed.
     is_closed: bool,
+
+    static_meta: &'static StaticMeta,
 }
 
 /// Representation of the data associated with a span.
@@ -199,10 +202,14 @@ impl Span {
         field: &'static str,
         value: &dyn IntoValue,
     ) -> Result<(), AddValueError> {
-        self.inner
-            .as_ref()
-            .map(|inner| inner.add_value(field, value))
-            .unwrap_or(Ok(()))
+        if let Some(ref inner) = self.inner {
+            let key = self.static_meta
+                .field_for(field)
+                .ok_or(::subscriber::AddValueError::NoField)?;
+            inner.add_value(key, value)
+        } else {
+            Ok(())
+        }
     }
 
     /// Signals that this span should close the next time it is exited, or when
@@ -469,7 +476,7 @@ impl Enter {
     /// function returns an [`AddValueError`](::subscriber::AddValueError).
     pub fn add_value(
         &self,
-        field: &'static str,
+        field: FieldKey,
         value: &dyn IntoValue,
     ) -> Result<(), AddValueError> {
         match self.subscriber.add_value(&self.id, field, value) {
@@ -477,6 +484,7 @@ impl Enter {
             Err(AddValueError::NoSpan) => panic!("span should still exist!"),
             Err(e) => Err(e),
         }
+        unimplemented!()
     }
 
     /// Indicates that the span with the given ID has an indirect causal
