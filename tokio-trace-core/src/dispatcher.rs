@@ -81,6 +81,11 @@ impl Dispatch {
         })
     }
 
+    /// Performs an operation if a callsite is enabled.
+    ///
+    /// If the given callsite is enabled for this subscriber, this function
+    /// calls the given closure with the dispatcher and the callsite's metadata,
+    /// and returns the result. Otherwise, it returns `None`.
     #[inline]
     pub fn if_enabled<F, T>(self, callsite: &callsite::Callsite, f: F) -> Option<T>
     where
@@ -118,7 +123,7 @@ impl Dispatch {
                 cache.cached_filter.set(Some(enabled));
                 enabled
             })
-        } else if let Some(cached) = callsite.0.with(|cache| { cache.cached_filter.get() }) {
+        } else if let Some(cached) = callsite.0.with(|cache| cache.cached_filter.get()) {
             cached
         } else {
             callsite.0.with(|cache| {

@@ -26,7 +26,6 @@ fn bench_costly_field_no_subscriber(b: &mut Bencher) {
     });
 }
 
-
 #[bench]
 fn bench_no_span_no_subscriber(b: &mut Bencher) {
     let n = test::black_box(1);
