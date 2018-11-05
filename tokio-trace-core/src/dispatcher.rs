@@ -81,42 +81,51 @@ impl Dispatch {
         })
     }
 
+    #[inline]
     pub fn if_enabled<F, T>(self, callsite: &callsite::Callsite, f: F) -> Option<T>
     where
         F: FnOnce(Dispatch, &'static Meta<'static>) -> T,
     {
-        if callsite.0.with(|cache| self.is_enabled(cache)) {
-            Some(f(self, callsite.metadata()))
-        } else {
-            None
-        }
-    }
-
-    fn is_invalid(&self, cache: &callsite::Cache<'static>) -> bool {
-        // If the callsite was last filtered by a different subscriber, assume
-        // the filter is no longer valid.
-        if cache.cached_filter.get().is_none() || cache.last_filtered_by.get() != self.id {
-            // Update the stamp on the call site so this subscriber is now the
-            // last to filter it.
-            cache.last_filtered_by.set(self.id);
-            return true;
+        if self.is_enabled(callsite) {
+            return Some(f(self, callsite.metadata()));
         }
 
-        // Otherwise, just ask the subscriber what it thinks.
-        self.subscriber.should_invalidate_filter(&cache.meta)
+        None
     }
 
-    fn is_enabled(&self, cache: &callsite::Cache<'static>) -> bool {
-        if self.is_invalid(cache) {
-            let enabled = self.subscriber.enabled(&cache.meta);
-            cache.cached_filter.set(Some(enabled));
-            enabled
-        } else if let Some(cached) = cache.cached_filter.get() {
+    #[inline]
+    fn is_invalid(&self, callsite: &callsite::Callsite) -> bool {
+        callsite.0.with(|cache| {
+            // If the callsite was last filtered by a different subscriber, assume
+            // the filter is no longer valid.
+            if cache.cached_filter.get().is_none() || cache.last_filtered_by.get() != self.id {
+                // Update the stamp on the call site so this subscriber is now the
+                // last to filter it.
+                cache.last_filtered_by.set(self.id);
+                return true;
+            }
+
+            // Otherwise, just ask the subscriber what it thinks.
+            self.subscriber.should_invalidate_filter(&cache.meta)
+        })
+    }
+
+    #[inline]
+    fn is_enabled(&self, callsite: &callsite::Callsite) -> bool {
+        if self.is_invalid(callsite) {
+            callsite.0.with(|cache| {
+                let enabled = self.subscriber.enabled(&cache.meta);
+                cache.cached_filter.set(Some(enabled));
+                enabled
+            })
+        } else if let Some(cached) = callsite.0.with(|cache| { cache.cached_filter.get() }) {
             cached
         } else {
-            let enabled = self.subscriber.enabled(&cache.meta);
-            cache.cached_filter.set(Some(enabled));
-            enabled
+            callsite.0.with(|cache| {
+                let enabled = self.subscriber.enabled(&cache.meta);
+                cache.cached_filter.set(Some(enabled));
+                enabled
+            })
         }
     }
 }
