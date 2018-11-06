@@ -108,8 +108,8 @@ pub trait IntoValue: AsValue {
 /// key-value data.
 #[derive(Clone, Eq, PartialEq)]
 pub struct Key<'a> {
-    pub(crate) i: usize,
-    pub(crate) metadata: &'a Meta<'a>,
+    i: usize,
+    metadata: &'a Meta<'a>,
 }
 
 /// A borrowed value of an erased type.
@@ -236,7 +236,11 @@ where
 {
     #[inline]
     fn as_key<'a>(&self, metadata: &'a Meta<'a>) -> Option<Key<'a>> {
-        metadata.field_for(self.borrow())
+        let name = self.borrow();
+        metadata.field_names
+            .iter()
+            .position(|&f| f == name)
+            .map(|i| Key::new(i, metadata))
     }
 }
 
@@ -383,17 +387,27 @@ impl fmt::Debug for OwnedValue {
 // ===== impl Field =====
 
 impl<'a> Key<'a> {
-    /// Returns the next field in the metadata's set of fields, if one exists.
-    /// Otherwise, if this is the last field, returns `None`.
-    pub fn next(&self) -> Option<Self> {
-        if self.i > self.metadata.field_names.len() {
-            return None;
+    pub(crate) fn new(i: usize, metadata: &'a Meta<'a>) -> Self {
+        Self {
+            i, metadata,
         }
-        Some(Key {
-            i: self.i + 1,
-            metadata: self.metadata,
-        })
     }
+
+    pub(crate) fn as_usize(&self) -> usize {
+        self.i
+    }
+
+    // /// Returns the next field in the metadata's set of fields, if one exists.
+    // /// Otherwise, if this is the last field, returns `None`.
+    // pub fn next(&self) -> Option<Self> {
+    //     if self.i > self.metadata.field_names.len() {
+    //         return None;
+    //     }
+    //     Some(Key {
+    //         i: self.i + 1,
+    //         metadata: self.metadata,
+    //     })
+    // }
 
     /// Returns a string representing the name of the field, or `None` if the
     /// field does not exist.
@@ -401,12 +415,12 @@ impl<'a> Key<'a> {
         self.metadata.field_names.get(self.i).map(|&n| n)
     }
 
-    /// Returns `true` if this is the last key in the metadata's fields.
-    ///
-    /// If this returns `true`, then `self.next()` will return `None`.
-    pub fn is_last(&self) -> bool {
-        self.i == self.metadata.field_names.len()
-    }
+    // /// Returns `true` if this is the last key in the metadata's fields.
+    // ///
+    // /// If this returns `true`, then `self.next()` will return `None`.
+    // pub fn is_last(&self) -> bool {
+    //     self.i == self.metadata.field_names.len()
+    // }
 }
 
 impl<'a> fmt::Display for Key<'a> {

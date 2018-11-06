@@ -347,7 +347,7 @@ impl Data {
         name: Q,
         value: &dyn IntoValue,
     ) -> Result<(), AddValueError> {
-        if let Some(Key { i, .. }) = name.as_key(self.static_meta) {
+        if let Some(i) = name.as_key(self.static_meta).as_ref().map(Key::as_usize) {
             let field = &mut self.field_values[i];
             if field.is_some() {
                 Err(AddValueError::FieldAlreadyExists)

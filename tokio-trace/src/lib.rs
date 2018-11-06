@@ -38,16 +38,11 @@ macro_rules! span {
                 // Depending on how many fields are generated, this may or may
                 // not actually be used, but it doesn't make sense to repeat it.
                 #[allow(unused_variables,unused_mut)]
-                let mut next_key = meta.first_field();
+                let mut keys = meta.fields();
                 $(
-                    if let Some(key) = next_key {
-                        span!(@ add_value: span, $k, &key, $($val)*);
-                        // Similarly, if this is the last key, the incremented value
-                        // won't be used...
-                        #[allow(unused_assignments)] {
-                            next_key = key.next();
-                        }
-                    }
+                    let key = keys.next()
+                        .expect(concat!("metadata should define a key for '", stringify!($k), "'"));
+                    span!(@ add_value: span, $k, &key, $($val)*);
                 )*
                 span
             }).unwrap_or_else(Span::new_disabled)

@@ -315,24 +315,11 @@ impl<'a> Meta<'a> {
     }
 
     pub fn fields(&'a self) -> impl Iterator<Item = field::Key<'a>> {
-        (0..self.field_names.len()).map(move |i| Key { i, metadata: self })
+        (0..self.field_names.len()).map(move |i| Key::new(i, self))
     }
 
-    pub fn field_for(&'a self, name: &str) -> Option<field::Key<'a>> {
-        self.field_names
-            .iter()
-            .position(|&f| f == name)
-            .map(|i| Key { i, metadata: &self })
-    }
-
-    pub fn first_field(&'a self) -> Option<field::Key<'a>> {
-        if self.field_names.len() == 0 {
-            return None;
-        }
-        Some(Key {
-            i: 0,
-            metadata: self,
-        })
+    pub fn field_for<Q: field::AsKey>(&'a self, name: &Q) -> Option<field::Key<'a>> {
+        name.as_key(self)
     }
 }
 
@@ -347,7 +334,7 @@ impl<'a> Event<'a> {
     /// Borrows the value of the field named `name`, if it exists. Otherwise,
     /// returns `None`.
     pub fn field<Q: AsKey>(&self, name: Q) -> Option<field::BorrowedValue> {
-        let field::Key { i, .. } = name.as_key(self.meta)?;
+        let i = name.as_key(self.meta)?.as_usize();
         self.field_values.get(i).map(|&val| field::borrowed(val))
     }
 
