@@ -110,7 +110,7 @@ where
     fn add_value(
         &self,
         span: &span::Id,
-        name: &'static str,
+        name: &tokio_trace::Field,
         value: &dyn IntoValue,
     ) -> Result<(), AddValueError> {
         self.registry.add_value(span, name, value)

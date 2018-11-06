@@ -1,4 +1,5 @@
 use tokio_trace::{
+    Field,
     span::{Data, Id},
     subscriber::{AddValueError, FollowsError},
     value::{IntoValue, OwnedValue},
@@ -43,7 +44,7 @@ pub trait RegisterSpan {
     fn add_value(
         &self,
         span: &Id,
-        name: &'static str,
+        name: &Field,
         value: &dyn IntoValue,
     ) -> Result<(), AddValueError>;
 
@@ -145,7 +146,7 @@ impl RegisterSpan for IncreasingCounter {
     fn add_value(
         &self,
         span: &Id,
-        name: &'static str,
+        name: &Field,
         value: &dyn IntoValue,
     ) -> Result<(), AddValueError> {
         let mut spans = self.spans.lock().expect("mutex poisoned!");

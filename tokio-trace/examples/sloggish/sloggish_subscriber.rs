@@ -116,7 +116,7 @@ impl Subscriber for SloggishSubscriber {
     fn add_value(
         &self,
         span: &tokio_trace::SpanId,
-        name: &'static str,
+        name: &tokio_trace::Field,
         value: &dyn tokio_trace::IntoValue,
     ) -> Result<(), subscriber::AddValueError> {
         let mut spans = self.spans.lock().expect("mutex poisoned!");

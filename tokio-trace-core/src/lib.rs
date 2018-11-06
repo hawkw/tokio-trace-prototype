@@ -167,6 +167,13 @@ impl FieldIndex for Field {
     }
 }
 
+impl<'f> FieldIndex for &'f Field {
+    #[inline]
+    fn as_field<'a>(&self, _metadata: &Meta<'a>) -> Option<Field> {
+        Some(Field(self.0))
+    }
+}
+
 impl<T> FieldIndex for T
 where
     T: Borrow<str>,
@@ -429,7 +436,7 @@ impl Field {
         Field(0)
     }
 
-    pub fn skip(&self) -> Self {
+    pub fn next(&self) -> Self {
         Field(self.0 + 1)
     }
 }

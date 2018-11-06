@@ -223,7 +223,7 @@ mod test_support {
 
     use super::*;
     use span::{self, MockSpan};
-    use {Event, IntoValue, Meta, SpanData, SpanId};
+    use {Event, Field, IntoValue, Meta, SpanData, SpanId};
 
     use std::{
         collections::{HashMap, VecDeque},
@@ -314,7 +314,7 @@ mod test_support {
         fn add_value(
             &self,
             _span: &span::Id,
-            _name: &'static str,
+            _name: &Field,
             _value: &dyn IntoValue,
         ) -> Result<(), AddValueError> {
             // TODO: it should be possible to expect values...

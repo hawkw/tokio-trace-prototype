@@ -37,8 +37,6 @@ pub struct Span {
     /// never enabled (and thus the inner state was never created), or if the
     /// previously entered, but it is now closed.
     is_closed: bool,
-
-    static_meta: &'static StaticMeta,
 }
 
 /// Representation of the data associated with a span.
@@ -109,6 +107,8 @@ pub struct Enter {
     /// Incremented when new handles are created, and decremented when they are
     /// dropped if this is the current span.
     handles: AtomicUsize,
+
+    meta: &'static StaticMeta,
 }
 
 /// A guard representing a span which has been entered and is currently
@@ -133,7 +133,7 @@ impl Span {
         let parent = Id::current();
         let data = Data::new(parent.clone(), static_meta);
         let id = dispatch.new_span(data);
-        let inner = Some(Enter::new(id, dispatch, parent));
+        let inner = Some(Enter::new(id, dispatch, parent, static_meta));
         Self {
             inner,
             is_closed: false,
@@ -203,7 +203,7 @@ impl Span {
         value: &dyn IntoValue,
     ) -> Result<(), AddValueError> {
         if let Some(ref inner) = self.inner {
-            let key = field.as_field(self.static_meta)
+            let key = field.as_field(inner.meta)
                 .ok_or(::subscriber::AddValueError::NoField)?;
             inner.add_value(key, value)
         } else {
@@ -342,15 +342,12 @@ impl Data {
     /// `name` must name a field already defined by this span's metadata, and
     /// the field must not already have a value. If this is not the case, this
     /// function returns an [`AddValueError`](::subscriber::AddValueError).
-    pub fn add_value(
+    pub fn add_value<Q: FieldIndex>(
         &mut self,
-        name: &'static str,
+        name: Q,
         value: &dyn IntoValue,
     ) -> Result<(), AddValueError> {
-        if let Some(i) = self
-            .field_names()
-            .position(|&field_name| field_name == name)
-        {
+        if let Some(Field(i)) = name.as_field(self.static_meta) {
             let field = &mut self.field_values[i];
             if field.is_some() {
                 Err(AddValueError::FieldAlreadyExists)
@@ -473,17 +470,21 @@ impl Enter {
     /// `name` must name a field already defined by this span's metadata, and
     /// the field must not already have a value. If this is not the case, this
     /// function returns an [`AddValueError`](::subscriber::AddValueError).
-    pub fn add_value(
+    pub fn add_value<Q: FieldIndex>(
         &self,
-        field: Field,
+        field: Q,
         value: &dyn IntoValue,
     ) -> Result<(), AddValueError> {
-        match self.subscriber.add_value(&self.id, field, value) {
-            Ok(()) => Ok(()),
-            Err(AddValueError::NoSpan) => panic!("span should still exist!"),
-            Err(e) => Err(e),
+        if let Some(field) = field.as_field(self.meta) {
+            match self.subscriber.add_value(&self.id, &field, value) {
+                Ok(()) => Ok(()),
+                Err(AddValueError::NoSpan) => panic!("span should still exist!"),
+                Err(e) => Err(e),
+            }
+        } else {
+            Ok(())
         }
-        unimplemented!()
+
     }
 
     /// Indicates that the span with the given ID has an indirect causal
@@ -521,7 +522,7 @@ impl Enter {
         self.parent.clone()
     }
 
-    fn new(id: Id, subscriber: Dispatch, parent: Option<Id>) -> Self {
+    fn new(id: Id, subscriber: Dispatch, parent: Option<Id>, meta: &'static StaticMeta) -> Self {
         Self {
             id,
             subscriber,
@@ -529,6 +530,7 @@ impl Enter {
             wants_close: AtomicBool::from(false),
             has_entered: AtomicBool::from(false),
             handles: AtomicUsize::from(1),
+            meta,
         }
     }
 
@@ -549,6 +551,7 @@ impl Enter {
             wants_close: AtomicBool::from(self.wants_close()),
             has_entered: AtomicBool::from(self.has_entered()),
             handles: AtomicUsize::from(self.handle_count()),
+            meta: self.meta,
         }
     }
 

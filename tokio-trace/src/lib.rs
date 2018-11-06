@@ -37,7 +37,7 @@ macro_rules! span {
                 let span = Span::new(dispatch.clone(), meta);
                 let mut key = Field::first();
                 $(
-                    span!(@ add_value: span, $k, key, $($val)*);
+                    span!(@ add_value: span, $k, &key, $($val)*);
                     key = key.next();
                 )*
                 span
@@ -91,7 +91,7 @@ pub use self::{
     tokio_trace_core::{
         callsite,
         value::{self, AsValue, IntoValue, Value},
-        Event, Level, Meta,
+        Event, Field, Level, Meta,
     },
 };
 

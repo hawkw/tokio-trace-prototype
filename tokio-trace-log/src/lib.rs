@@ -30,7 +30,7 @@ use std::{
 use tokio_trace::{
     span,
     subscriber::{self, Subscriber},
-    Event, IntoValue, Meta,
+    Event, Field, IntoValue, Meta,
 };
 use tokio_trace_subscriber::SpanRef;
 
@@ -187,7 +187,7 @@ impl Subscriber for TraceLogger {
     fn add_value(
         &self,
         _span: &span::Id,
-        _name: &'static str,
+        _name: &Field,
         _value: &dyn IntoValue,
     ) -> Result<(), subscriber::AddValueError> {
         // XXX eventually this should Do Something...

@@ -2,7 +2,7 @@ use {
     callsite,
     span::{self, Span},
     subscriber::{self, Subscriber},
-    Event, IntoValue, Meta,
+    Event, Field, IntoValue, Meta,
 };
 
 use std::{
@@ -162,7 +162,7 @@ impl Subscriber for Dispatch {
     fn add_value(
         &self,
         span: &span::Id,
-        name: &'static str,
+        name: &Field,
         value: &dyn IntoValue,
     ) -> Result<(), subscriber::AddValueError> {
         self.subscriber.add_value(span, name, value)
@@ -213,7 +213,7 @@ impl Subscriber for NoSubscriber {
     fn add_value(
         &self,
         _span: &span::Id,
-        _name: &'static str,
+        _name: &Field,
         _value: &dyn IntoValue,
     ) -> Result<(), subscriber::AddValueError> {
         Ok(())
