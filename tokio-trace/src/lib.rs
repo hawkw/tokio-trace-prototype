@@ -31,25 +31,24 @@ macro_rules! span {
     ($name:expr) => { span!($name,) };
     ($name:expr, $($k:ident $( = $val:expr )* ) ,*) => {
         {
-            use $crate::{callsite, Dispatch, Span, FieldKey};
+            use $crate::{callsite, Dispatch, Span, Field};
             let callsite = callsite! { span: $name, $( $k ),* };
             Dispatch::current().if_enabled(&callsite, |dispatch, meta| {
                 let span = Span::new(dispatch.clone(), meta);
-                let mut key = FieldKey::first();
-                let id = span.id();
+                let mut key = Field::first();
                 $(
-                    span!(@ add_value: id, dispatch, $k, key, $($val)*);
+                    span!(@ add_value: span, $k, key, $($val)*);
                     key = key.next();
                 )*
                 span
             }).unwrap_or_else(Span::new_disabled)
         }
     };
-    (@ add_value: $id:expr, $dispatch:expr, $k:expr, $i:expr, $val:expr) => (
-        $dispatch.add_value($id, $i, $val)
+    (@ add_value: $span:expr, $k:expr, $i:expr, $val:expr) => (
+        $span.add_value($i, $val)
             .expect(concat!("adding value for field ", stringify!($k), " failed"));
     );
-    (@ add_value: $id:expr, $dispatch:expr, $k:expr, $i:expr,) => (
+    (@ add_value: $span:expr, $k:expr, $i:expr,) => (
         // skip
     );
 }

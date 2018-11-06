@@ -1,5 +1,5 @@
 //! Subscribers collect and record trace data.
-use {span, Event, IntoValue, Meta, SpanId, FieldKey};
+use {span, Event, IntoValue, Meta, SpanId, Field};
 
 /// Trait representing the functions required to collect trace data.
 ///
@@ -69,7 +69,7 @@ pub trait Subscriber {
     fn add_value(
         &self,
         span: &span::Id,
-        field: &FieldKey,
+        field: &Field,
         value: &dyn IntoValue,
     ) -> Result<(), AddValueError>;
 

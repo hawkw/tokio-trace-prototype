@@ -7,7 +7,7 @@ use std::{
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 use {
-    FieldKey,
+    Field, FieldIndex,
     subscriber::{AddValueError, FollowsError, Subscriber},
     value::{IntoValue, OwnedValue},
     DebugFields, Dispatch, StaticMeta,
@@ -197,14 +197,13 @@ impl Span {
     /// `name` must name a field already defined by this span's metadata, and
     /// the field must not already have a value. If this is not the case, this
     /// function returns an [`AddValueError`](::subscriber::AddValueError).
-    pub fn add_value(
+    pub fn add_value<Q: FieldIndex>(
         &self,
-        field: &'static str,
+        field: Q,
         value: &dyn IntoValue,
     ) -> Result<(), AddValueError> {
         if let Some(ref inner) = self.inner {
-            let key = self.static_meta
-                .field_for(field)
+            let key = field.as_field(self.static_meta)
                 .ok_or(::subscriber::AddValueError::NoField)?;
             inner.add_value(key, value)
         } else {
@@ -323,7 +322,7 @@ impl Data {
 
     /// Borrows the value of the field named `name`, if it exists. Otherwise,
     /// returns `None`.
-    pub fn field<Q>(&self, key: Q) -> Option<&OwnedValue>
+    pub fn field<Q: FieldIndex>(&self, key: Q) -> Option<&OwnedValue>
     where
         &'static str: PartialEq<Q>,
     {
@@ -476,7 +475,7 @@ impl Enter {
     /// function returns an [`AddValueError`](::subscriber::AddValueError).
     pub fn add_value(
         &self,
-        field: FieldKey,
+        field: Field,
         value: &dyn IntoValue,
     ) -> Result<(), AddValueError> {
         match self.subscriber.add_value(&self.id, field, value) {

@@ -71,7 +71,7 @@
 //! [metadata]: struct.Meta.html
 #![warn(missing_docs)]
 
-use std::{fmt, slice};
+use std::{fmt, slice, borrow::Borrow};
 
 #[macro_export]
 macro_rules! callsite {
@@ -154,7 +154,28 @@ pub use self::{
 use value::BorrowedValue;
 
 #[derive(Clone)]
-pub struct FieldKey(usize);
+pub struct Field(usize);
+
+pub trait FieldIndex {
+    fn as_field<'a>(&self, metadata: &Meta<'a>) -> Option<Field>;
+}
+
+impl FieldIndex for Field {
+    #[inline]
+    fn as_field<'a>(&self, _metadata: &Meta<'a>) -> Option<Field> {
+        Some(Field(self.0))
+    }
+}
+
+impl<T> FieldIndex for T
+where
+    T: Borrow<str>,
+{
+    #[inline]
+    fn as_field<'a>(&self, metadata: &Meta<'a>) -> Option<Field> {
+        metadata.field_for(self.borrow())
+    }
+}
 
 /// `Event`s represent single points in time where something occurred during the
 /// execution of a program.
@@ -318,12 +339,12 @@ impl<'a> Meta<'a> {
         }
     }
 
-    pub fn field_keys(&self) -> impl Iterator<Item = (&'a str, FieldKey)> {
-        self.field_names.iter().enumerate().map(|(i, &name)| (name, FieldKey(i)))
+    pub fn field_keys(&self) -> impl Iterator<Item = (&'a str, Field)> {
+        self.field_names.iter().enumerate().map(|(i, &name)| (name, Field(i)))
     }
 
-    pub fn field_for(&self, name: &str) -> Option<FieldKey> {
-        self.field_names.iter().position(|&f| f == name).map(FieldKey)
+    pub fn field_for(&self, name: &str) -> Option<Field> {
+        self.field_names.iter().position(|&f| f == name).map(Field)
     }
 }
 
@@ -337,13 +358,9 @@ impl<'a> Event<'a> {
 
     /// Borrows the value of the field named `name`, if it exists. Otherwise,
     /// returns `None`.
-    pub fn field<Q>(&self, name: Q) -> Option<value::BorrowedValue>
-    where
-        &'a str: PartialEq<Q>,
-    {
-        self.field_names()
-            .position(|&field_name| field_name == name)
-            .and_then(|i| self.field_values.get(i).map(|&val| value::borrowed(val)))
+    pub fn field<Q: FieldIndex>(&self, name: Q) -> Option<value::BorrowedValue> {
+        let Field(i) = name.as_field(self.meta)?;
+        self.field_values.get(i).map(|&val| value::borrowed(val))
     }
 
     /// Returns an iterator over all the field names and values on this event.
@@ -407,12 +424,12 @@ impl PartialEq for Level {
     }
 }
 
-impl FieldKey {
+impl Field {
     pub fn first() -> Self {
-        FieldKey(0)
+        Field(0)
     }
 
     pub fn skip(&self) -> Self {
-        FieldKey(self.0 + 1)
+        Field(self.0 + 1)
     }
 }
