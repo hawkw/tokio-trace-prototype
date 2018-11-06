@@ -3,7 +3,7 @@ use std::{
     cell::RefCell,
     cmp, fmt,
     hash::{Hash, Hasher},
-    iter, slice,
+    iter,
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 use {

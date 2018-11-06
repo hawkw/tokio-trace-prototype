@@ -29,7 +29,9 @@ impl Subscriber for CounterSubscriber {
         for key in new_span.field_keys() {
             if let Some(name) = key.name() {
                 if name.contains("count") {
-                    self.counters.0.write()
+                    self.counters
+                        .0
+                        .write()
                         .unwrap()
                         .entry(name)
                         .or_insert_with(|| AtomicUsize::new(0));
@@ -45,20 +47,15 @@ impl Subscriber for CounterSubscriber {
         key: &field::Key,
         value: &dyn IntoValue,
     ) -> Result<(), subscriber::AddValueError> {
-        let registry = self.counters.0
-            .read()
-            .unwrap();
-        if let Some((counter, value)) = key.name()
-            .and_then(|name| {
-                let counter = registry.get(name)?;
-                let &val = value.into_value().downcast_ref::<usize>()?;
-                Some((counter, val))
-            })
-        {
+        let registry = self.counters.0.read().unwrap();
+        if let Some((counter, value)) = key.name().and_then(|name| {
+            let counter = registry.get(name)?;
+            let &val = value.into_value().downcast_ref::<usize>()?;
+            Some((counter, val))
+        }) {
             counter.fetch_add(value, Ordering::Release);
         }
         Ok(())
-
     }
 
     fn add_follows_from(
@@ -74,7 +71,8 @@ impl Subscriber for CounterSubscriber {
         if !metadata.is_span() {
             return false;
         }
-        metadata.fields()
+        metadata
+            .fields()
             .any(|f| f.name().map(|name| name.contains("count")).unwrap_or(false))
     }
 
