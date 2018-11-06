@@ -314,10 +314,13 @@ impl<'a> Meta<'a> {
         }
     }
 
+    /// Returns an iterator over the fields defined by this set of metadata.
     pub fn fields(&'a self) -> impl Iterator<Item = field::Key<'a>> {
         (0..self.field_names.len()).map(move |i| Key::new(i, self))
     }
 
+    /// Returns a [`Key`](::field::Key) to the field corresponding to `name`, if
+    /// one exists, or `None` if no such field exists.
     pub fn field_for<Q: field::AsKey>(&'a self, name: &Q) -> Option<field::Key<'a>> {
         name.as_key(self)
     }

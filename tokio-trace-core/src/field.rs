@@ -59,7 +59,18 @@
 use super::Meta;
 use std::{any::TypeId, borrow::Borrow, fmt};
 
+/// Trait implemented to allow a type to be used as a field key.
+///
+/// **Note**: Although this is implemented for both the [`Key`] type *and* any
+/// type that can be borrowed as an `&str`, only `Key` allows _O_(1) access.
+/// Indexing a field with a string results in an iterative search that performs
+/// string comparisons. Thus, if possible, once the key for a field is known, it
+/// should be used whenever possible.
 pub trait AsKey {
+    /// Attempts to convert `&self` into a `Key` with the specified `metadata`.
+    ///
+    /// If `metadata` defines a key corresponding to this field, then the key is
+    /// returned. Otherwise, this function returns `None`.
     fn as_key<'a>(&self, metadata: &'a Meta<'a>) -> Option<Key<'a>>;
 }
 
@@ -106,7 +117,13 @@ pub trait IntoValue: AsValue {
 
 /// An opaque key allowing _O_(1) access to a field in a `Span` or `Event`'s
 /// key-value data.
-#[derive(Clone, Eq, PartialEq)]
+///
+/// As keys are defined by the _metadata_ of a span or event, rather than by an
+/// individual instance of a span or event, a key may be used to access the same
+/// field across all instances of a given span or event with the same metadata.
+/// Thus, when a subscriber observes a new span or event, it need only access a
+/// field by name _once_, and use the key for that name for all other accesses.
+#[derive(Clone, Eq, PartialEq, Hash)]
 pub struct Key<'a> {
     i: usize,
     metadata: &'a Meta<'a>,
