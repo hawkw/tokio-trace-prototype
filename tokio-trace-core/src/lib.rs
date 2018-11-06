@@ -156,25 +156,25 @@ use value::BorrowedValue;
 #[derive(Clone)]
 pub struct Field(usize);
 
-pub trait FieldIndex {
+pub trait AsField {
     fn as_field<'a>(&self, metadata: &Meta<'a>) -> Option<Field>;
 }
 
-impl FieldIndex for Field {
+impl AsField for Field {
     #[inline]
     fn as_field<'a>(&self, _metadata: &Meta<'a>) -> Option<Field> {
         Some(Field(self.0))
     }
 }
 
-impl<'f> FieldIndex for &'f Field {
+impl<'f> AsField for &'f Field {
     #[inline]
     fn as_field<'a>(&self, _metadata: &Meta<'a>) -> Option<Field> {
         Some(Field(self.0))
     }
 }
 
-impl<T> FieldIndex for T
+impl<T> AsField for T
 where
     T: Borrow<str>,
 {
@@ -365,7 +365,7 @@ impl<'a> Event<'a> {
 
     /// Borrows the value of the field named `name`, if it exists. Otherwise,
     /// returns `None`.
-    pub fn field<Q: FieldIndex>(&self, name: Q) -> Option<value::BorrowedValue> {
+    pub fn field<Q: AsField>(&self, name: Q) -> Option<value::BorrowedValue> {
         let Field(i) = name.as_field(self.meta)?;
         self.field_values.get(i).map(|&val| value::borrowed(val))
     }
