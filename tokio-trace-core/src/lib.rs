@@ -139,16 +139,16 @@ pub enum Level {
 
 #[doc(hidden)]
 pub mod callsite;
-pub mod field;
 pub mod dispatcher;
+pub mod field;
 pub mod span;
 pub mod subscriber;
 
 pub use self::{
     dispatcher::Dispatch,
+    field::{AsKey, AsValue, IntoValue, Key, Value},
     span::{Data as SpanData, Id as SpanId, Span},
     subscriber::Subscriber,
-    field::{Key, AsField, AsValue, IntoValue, Value},
 };
 use field::BorrowedValue;
 
@@ -346,7 +346,7 @@ impl<'a> Event<'a> {
 
     /// Borrows the value of the field named `name`, if it exists. Otherwise,
     /// returns `None`.
-    pub fn field<Q: AsField>(&self, name: Q) -> Option<field::BorrowedValue> {
+    pub fn field<Q: AsKey>(&self, name: Q) -> Option<field::BorrowedValue> {
         let field::Key { i, .. } = name.as_field(self.meta)?;
         self.field_values.get(i).map(|&val| field::borrowed(val))
     }

@@ -2,9 +2,9 @@
 extern crate tokio_trace;
 
 use tokio_trace::{
-    span,
+    field, span,
     subscriber::{self, Subscriber},
-    Event, field, IntoValue, Level, Meta, Value,
+    Event, IntoValue, Level, Meta, Value,
 };
 
 use std::{

@@ -1,5 +1,5 @@
 //! Subscribers collect and record trace data.
-use {span, Event, Key, IntoValue, Meta, SpanId};
+use {span, Event, IntoValue, Key, Meta, SpanId};
 
 /// Trait representing the functions required to collect trace data.
 ///
@@ -223,7 +223,7 @@ mod test_support {
 
     use super::*;
     use span::{self, MockSpan};
-    use {Event, field::Key, IntoValue, Meta, SpanData, SpanId};
+    use {field::Key, Event, IntoValue, Meta, SpanData, SpanId};
 
     use std::{
         collections::{HashMap, VecDeque},

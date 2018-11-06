@@ -28,8 +28,7 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT},
 };
 use tokio_trace::{
-    field,
-    span,
+    field, span,
     subscriber::{self, Subscriber},
     Event, IntoValue, Meta,
 };

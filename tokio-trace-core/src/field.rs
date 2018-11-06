@@ -56,10 +56,10 @@
 //! indefinitely, they are not heap-allocated by default, to avoid unnecessary
 //! allocations, but the `IntoValue` trait presents `Subscriber`s with the
 //! _option_ to box values should they need to do so.
-use std::{any::TypeId, borrow::Borrow, fmt};
 use super::Meta;
+use std::{any::TypeId, borrow::Borrow, fmt};
 
-pub trait AsField {
+pub trait AsKey {
     fn as_field<'a>(&self, metadata: &'a Meta<'a>) -> Option<Key<'a>>;
 }
 
@@ -200,9 +200,9 @@ where
     DisplayValue(t)
 }
 
-// ===== impl AsField =====
+// ===== impl AsKey =====
 
-impl<'f> AsField for Key<'f> {
+impl<'f> AsKey for Key<'f> {
     #[inline]
     fn as_field<'a>(&self, metadata: &'a Meta<'a>) -> Option<Key<'a>> {
         if metadata == self.metadata {
@@ -216,7 +216,7 @@ impl<'f> AsField for Key<'f> {
     }
 }
 
-impl<'f> AsField for &'f Key<'f> {
+impl<'f> AsKey for &'f Key<'f> {
     #[inline]
     fn as_field<'a>(&self, metadata: &'a Meta<'a>) -> Option<Key<'a>> {
         if metadata == self.metadata {
@@ -230,7 +230,7 @@ impl<'f> AsField for &'f Key<'f> {
     }
 }
 
-impl<T> AsField for T
+impl<T> AsKey for T
 where
     T: Borrow<str>,
 {

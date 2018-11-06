@@ -7,8 +7,8 @@ use std::{
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 use {
+    field::{AsKey, IntoValue, Key, OwnedValue},
     subscriber::{AddValueError, FollowsError, Subscriber},
-    field::{AsField, Key, IntoValue, OwnedValue},
     DebugFields, Dispatch, StaticMeta,
 };
 
@@ -196,7 +196,7 @@ impl Span {
     /// `name` must name a field already defined by this span's metadata, and
     /// the field must not already have a value. If this is not the case, this
     /// function returns an [`AddValueError`](::subscriber::AddValueError).
-    pub fn add_value<Q: AsField>(
+    pub fn add_value<Q: AsKey>(
         &self,
         field: Q,
         value: &dyn IntoValue,
@@ -322,7 +322,7 @@ impl Data {
 
     /// Borrows the value of the field named `name`, if it exists. Otherwise,
     /// returns `None`.
-    pub fn field<Q: AsField>(&self, key: Q) -> Option<&OwnedValue>
+    pub fn field<Q: AsKey>(&self, key: Q) -> Option<&OwnedValue>
     where
         &'static str: PartialEq<Q>,
     {
@@ -342,7 +342,7 @@ impl Data {
     /// `name` must name a field already defined by this span's metadata, and
     /// the field must not already have a value. If this is not the case, this
     /// function returns an [`AddValueError`](::subscriber::AddValueError).
-    pub fn add_value<Q: AsField>(
+    pub fn add_value<Q: AsKey>(
         &mut self,
         name: Q,
         value: &dyn IntoValue,
@@ -470,7 +470,7 @@ impl Enter {
     /// `name` must name a field already defined by this span's metadata, and
     /// the field must not already have a value. If this is not the case, this
     /// function returns an [`AddValueError`](::subscriber::AddValueError).
-    pub fn add_value<Q: AsField>(
+    pub fn add_value<Q: AsKey>(
         &self,
         field: Q,
         value: &dyn IntoValue,
@@ -650,8 +650,8 @@ pub use self::test_support::*;
 #[cfg(any(test, feature = "test-support"))]
 mod test_support {
     #![allow(missing_docs)]
-    use std::collections::HashMap;
     use field::OwnedValue;
+    use std::collections::HashMap;
 
     /// A mock span.
     ///
