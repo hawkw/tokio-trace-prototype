@@ -153,7 +153,9 @@ pub use self::{
 };
 use value::BorrowedValue;
 
-#[derive(Clone)]
+/// An opaque key allowing _O_(1) access to a field in a `Span` or `Event`'s
+/// key-value data.
+#[derive(Clone, Eq, PartialEq)]
 pub struct Field<'a> {
     i: usize,
     metadata: &'a Meta<'a>,
@@ -374,11 +376,14 @@ impl<'a> Meta<'a> {
             .map(|i| Field { i, metadata: &self })
     }
 
-    pub fn first_field(&'a self) -> Field<'a> {
-        Field {
+    pub fn first_field(&'a self) -> Option<Field<'a>> {
+        if self.field_names.len() == 0 {
+            return None;
+        }
+        Some(Field {
             i: 0,
             metadata: self,
-        }
+        })
     }
 }
 
@@ -459,19 +464,29 @@ impl PartialEq for Level {
 }
 
 impl<'a> Field<'a> {
-    pub fn first(metadata: &'a Meta<'a>) -> Self {
-        Field { i: 0, metadata }
-    }
-
-    pub fn next(&self) -> Self {
-        Field {
+    /// Returns the next field in the metadata's set of fields, if one exists.
+    /// Otherwise, if this is the last field, returns `None`.
+    pub fn next(&self) -> Option<Self> {
+        if self.i > self.metadata.field_names.len() {
+            return None;
+        }
+        Some(Field {
             i: self.i + 1,
             metadata: self.metadata,
-        }
+        })
     }
 
+    /// Returns a string representing the name of the field, or `None` if the
+    /// field does not exist.
     pub fn name(&self) -> Option<&str> {
         self.metadata.field_names.get(self.i).map(|&n| n)
+    }
+
+    /// Returns `true` if this is the last key in the metadata's fields.
+    ///
+    /// If this returns `true`, then `self.next()` will return `None`.
+    pub fn is_last(&self) -> bool {
+        self.i == self.metadata.field_names.len()
     }
 }
 

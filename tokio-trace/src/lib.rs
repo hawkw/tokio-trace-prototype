@@ -37,14 +37,16 @@ macro_rules! span {
                 let span = Span::new(dispatch.clone(), meta);
                 // Depending on how many fields are generated, this may or may
                 // not actually be used, but it doesn't make sense to repeat it.
-                #[allow(unused_variables, unused_mut)]
-                let mut key = meta.first_field();
+                #[allow(unused_variables,unused_mut)]
+                let mut next_key = meta.first_field();
                 $(
-                    span!(@ add_value: span, $k, &key, $($val)*);
-                    // Similarly, if this is the last key, the incremented value
-                    // won't be used...
-                    #[allow(unused_assignments)] {
-                        key = key.next();
+                    if let Some(key) = next_key {
+                        span!(@ add_value: span, $k, &key, $($val)*);
+                        // Similarly, if this is the last key, the incremented value
+                        // won't be used...
+                        #[allow(unused_assignments)] {
+                            next_key = key.next();
+                        }
                     }
                 )*
                 span
@@ -53,7 +55,7 @@ macro_rules! span {
     };
     (@ add_value: $span:expr, $k:expr, $i:expr, $val:expr) => (
         $span.add_value($i, $val)
-            .expect(concat!("adding value for field ", stringify!($k), " failed"));
+            .expect(concat!("adding value for field '", stringify!($k), "' failed"));
     );
     (@ add_value: $span:expr, $k:expr, $i:expr,) => (
         // skip
