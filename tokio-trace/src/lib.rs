@@ -31,14 +31,14 @@ macro_rules! span {
     ($name:expr) => { span!($name,) };
     ($name:expr, $($k:ident $( = $val:expr )* ) ,*) => {
         {
-            use $crate::{callsite, Dispatch, Span, Field};
+            use $crate::{callsite, Dispatch, Span};
             let callsite = callsite! { span: $name, $( $k ),* };
             Dispatch::current().if_enabled(&callsite, |dispatch, meta| {
                 let span = Span::new(dispatch.clone(), meta);
                 // Depending on how many fields are generated, this may or may
                 // not actually be used, but it doesn't make sense to repeat it.
                 #[allow(unused_variables, unused_mut)]
-                let mut key = Field::first();
+                let mut key = meta.first_field();
                 $(
                     span!(@ add_value: span, $k, &key, $($val)*);
                     // Similarly, if this is the last key, the incremented value

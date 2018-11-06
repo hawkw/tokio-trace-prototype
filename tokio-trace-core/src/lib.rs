@@ -154,23 +154,40 @@ pub use self::{
 use value::BorrowedValue;
 
 #[derive(Clone)]
-pub struct Field(usize);
-
-pub trait AsField {
-    fn as_field<'a>(&self, metadata: &Meta<'a>) -> Option<Field>;
+pub struct Field<'a> {
+    i: usize,
+    metadata: &'a Meta<'a>,
 }
 
-impl AsField for Field {
+pub trait AsField {
+    fn as_field<'a>(&self, metadata: &'a Meta<'a>) -> Option<Field<'a>>;
+}
+
+impl<'f> AsField for Field<'f> {
     #[inline]
-    fn as_field<'a>(&self, _metadata: &Meta<'a>) -> Option<Field> {
-        Some(Field(self.0))
+    fn as_field<'a>(&self, metadata: &'a Meta<'a>) -> Option<Field<'a>> {
+        if metadata == self.metadata {
+            Some(Field {
+                i: self.i,
+                metadata,
+            })
+        } else {
+            None
+        }
     }
 }
 
-impl<'f> AsField for &'f Field {
+impl<'f> AsField for &'f Field<'f> {
     #[inline]
-    fn as_field<'a>(&self, _metadata: &Meta<'a>) -> Option<Field> {
-        Some(Field(self.0))
+    fn as_field<'a>(&self, metadata: &'a Meta<'a>) -> Option<Field<'a>> {
+        if metadata == self.metadata {
+            Some(Field {
+                i: self.i,
+                metadata,
+            })
+        } else {
+            None
+        }
     }
 }
 
@@ -179,7 +196,7 @@ where
     T: Borrow<str>,
 {
     #[inline]
-    fn as_field<'a>(&self, metadata: &Meta<'a>) -> Option<Field> {
+    fn as_field<'a>(&self, metadata: &'a Meta<'a>) -> Option<Field<'a>> {
         metadata.field_for(self.borrow())
     }
 }
@@ -346,12 +363,19 @@ impl<'a> Meta<'a> {
         }
     }
 
-    pub fn field_keys(&self) -> impl Iterator<Item = (&'a str, Field)> {
-        self.field_names.iter().enumerate().map(|(i, &name)| (name, Field(i)))
+    pub fn fields(&'a self) -> impl Iterator<Item = Field<'a>> {
+        (0..self.field_names.len()).map(move |i| Field { i, metadata: self, })
     }
 
-    pub fn field_for(&self, name: &str) -> Option<Field> {
-        self.field_names.iter().position(|&f| f == name).map(Field)
+    pub fn field_for(&'a self, name: &str) -> Option<Field<'a>> {
+        self.field_names.iter().position(|&f| f == name).map(|i| Field { i, metadata: &self, })
+    }
+
+    pub fn first_field(&'a self) -> Field<'a> {
+        Field {
+            i: 0,
+            metadata: self,
+        }
     }
 }
 
@@ -366,7 +390,7 @@ impl<'a> Event<'a> {
     /// Borrows the value of the field named `name`, if it exists. Otherwise,
     /// returns `None`.
     pub fn field<Q: AsField>(&self, name: Q) -> Option<value::BorrowedValue> {
-        let Field(i) = name.as_field(self.meta)?;
+        let Field { i, .. } = name.as_field(self.meta)?;
         self.field_values.get(i).map(|&val| value::borrowed(val))
     }
 
@@ -431,12 +455,28 @@ impl PartialEq for Level {
     }
 }
 
-impl Field {
-    pub fn first() -> Self {
-        Field(0)
+impl<'a> Field<'a> {
+    pub fn first(metadata: &'a Meta<'a>) -> Self {
+        Field {
+            i: 0,
+            metadata,
+        }
     }
 
     pub fn next(&self) -> Self {
-        Field(self.0 + 1)
+        Field {
+            i: self.i + 1,
+            metadata: self.metadata,
+        }
+    }
+
+    pub fn name(&self) -> Option<&str> {
+        self.metadata.field_names.get(self.i).map(|&n| n)
+    }
+}
+
+impl<'a> fmt::Display for Field<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.pad(self.name().unwrap_or("???"))
     }
 }
