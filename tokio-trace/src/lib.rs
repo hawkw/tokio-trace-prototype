@@ -100,7 +100,7 @@ pub use self::{
     tokio_trace_core::{
         callsite,
         field::{self, AsValue, IntoValue, Value},
-        Event, Field, Level, Meta,
+        Event, Level, Meta,
     },
 };
 

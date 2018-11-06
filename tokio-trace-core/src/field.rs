@@ -60,7 +60,7 @@ use std::{any::TypeId, borrow::Borrow, fmt};
 use super::Meta;
 
 pub trait AsField {
-    fn as_field<'a>(&self, metadata: &'a Meta<'a>) -> Option<Field<'a>>;
+    fn as_field<'a>(&self, metadata: &'a Meta<'a>) -> Option<Key<'a>>;
 }
 
 /// A formattable field value of an erased type.
@@ -107,7 +107,7 @@ pub trait IntoValue: AsValue {
 /// An opaque key allowing _O_(1) access to a field in a `Span` or `Event`'s
 /// key-value data.
 #[derive(Clone, Eq, PartialEq)]
-pub struct Field<'a> {
+pub struct Key<'a> {
     pub(crate) i: usize,
     pub(crate) metadata: &'a Meta<'a>,
 }
@@ -202,11 +202,11 @@ where
 
 // ===== impl AsField =====
 
-impl<'f> AsField for Field<'f> {
+impl<'f> AsField for Key<'f> {
     #[inline]
-    fn as_field<'a>(&self, metadata: &'a Meta<'a>) -> Option<Field<'a>> {
+    fn as_field<'a>(&self, metadata: &'a Meta<'a>) -> Option<Key<'a>> {
         if metadata == self.metadata {
-            Some(Field {
+            Some(Key {
                 i: self.i,
                 metadata,
             })
@@ -216,11 +216,11 @@ impl<'f> AsField for Field<'f> {
     }
 }
 
-impl<'f> AsField for &'f Field<'f> {
+impl<'f> AsField for &'f Key<'f> {
     #[inline]
-    fn as_field<'a>(&self, metadata: &'a Meta<'a>) -> Option<Field<'a>> {
+    fn as_field<'a>(&self, metadata: &'a Meta<'a>) -> Option<Key<'a>> {
         if metadata == self.metadata {
-            Some(Field {
+            Some(Key {
                 i: self.i,
                 metadata,
             })
@@ -235,7 +235,7 @@ where
     T: Borrow<str>,
 {
     #[inline]
-    fn as_field<'a>(&self, metadata: &'a Meta<'a>) -> Option<Field<'a>> {
+    fn as_field<'a>(&self, metadata: &'a Meta<'a>) -> Option<Key<'a>> {
         metadata.field_for(self.borrow())
     }
 }
@@ -382,14 +382,14 @@ impl fmt::Debug for OwnedValue {
 
 // ===== impl Field =====
 
-impl<'a> Field<'a> {
+impl<'a> Key<'a> {
     /// Returns the next field in the metadata's set of fields, if one exists.
     /// Otherwise, if this is the last field, returns `None`.
     pub fn next(&self) -> Option<Self> {
         if self.i > self.metadata.field_names.len() {
             return None;
         }
-        Some(Field {
+        Some(Key {
             i: self.i + 1,
             metadata: self.metadata,
         })
@@ -409,7 +409,7 @@ impl<'a> Field<'a> {
     }
 }
 
-impl<'a> fmt::Display for Field<'a> {
+impl<'a> fmt::Display for Key<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.pad(self.name().unwrap_or("???"))
     }

@@ -4,7 +4,7 @@ extern crate tokio_trace;
 use tokio_trace::{
     span,
     subscriber::{self, Subscriber},
-    Event, Field, IntoValue, Level, Meta, Value,
+    Event, field, IntoValue, Level, Meta, Value,
 };
 
 use std::{
@@ -41,7 +41,7 @@ impl Subscriber for CounterSubscriber {
     fn add_value(
         &self,
         span: &span::Id,
-        name: &Field,
+        name: &field::Key,
         value: &dyn IntoValue,
     ) -> Result<(), subscriber::AddValueError> {
         self.spans

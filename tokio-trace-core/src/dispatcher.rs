@@ -1,6 +1,6 @@
 use {
     callsite,
-    field::Field,
+    field::Key,
     span::{self, Span},
     subscriber::{self, Subscriber},
     Event, IntoValue, Meta,
@@ -163,7 +163,7 @@ impl Subscriber for Dispatch {
     fn add_value(
         &self,
         span: &span::Id,
-        name: &Field,
+        name: &Key,
         value: &dyn IntoValue,
     ) -> Result<(), subscriber::AddValueError> {
         self.subscriber.add_value(span, name, value)
@@ -214,7 +214,7 @@ impl Subscriber for NoSubscriber {
     fn add_value(
         &self,
         _span: &span::Id,
-        _name: &Field,
+        _name: &Key,
         _value: &dyn IntoValue,
     ) -> Result<(), subscriber::AddValueError> {
         Ok(())

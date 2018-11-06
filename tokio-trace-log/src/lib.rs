@@ -28,9 +28,10 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT},
 };
 use tokio_trace::{
+    field,
     span,
     subscriber::{self, Subscriber},
-    Event, Field, IntoValue, Meta,
+    Event, IntoValue, Meta,
 };
 use tokio_trace_subscriber::SpanRef;
 
@@ -187,7 +188,7 @@ impl Subscriber for TraceLogger {
     fn add_value(
         &self,
         _span: &span::Id,
-        _name: &Field,
+        _name: &field::Key,
         _value: &dyn IntoValue,
     ) -> Result<(), subscriber::AddValueError> {
         // XXX eventually this should Do Something...

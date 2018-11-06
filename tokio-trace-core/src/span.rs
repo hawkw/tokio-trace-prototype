@@ -8,7 +8,7 @@ use std::{
 };
 use {
     subscriber::{AddValueError, FollowsError, Subscriber},
-    field::{AsField, Field, IntoValue, OwnedValue},
+    field::{AsField, Key, IntoValue, OwnedValue},
     DebugFields, Dispatch, StaticMeta,
 };
 
@@ -347,7 +347,7 @@ impl Data {
         name: Q,
         value: &dyn IntoValue,
     ) -> Result<(), AddValueError> {
-        if let Some(Field { i, .. }) = name.as_field(self.static_meta) {
+        if let Some(Key { i, .. }) = name.as_field(self.static_meta) {
             let field = &mut self.field_values[i];
             if field.is_some() {
                 Err(AddValueError::FieldAlreadyExists)

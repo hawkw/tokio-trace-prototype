@@ -148,7 +148,7 @@ pub use self::{
     dispatcher::Dispatch,
     span::{Data as SpanData, Id as SpanId, Span},
     subscriber::Subscriber,
-    field::{Field, AsField, AsValue, IntoValue, Value},
+    field::{Key, AsField, AsValue, IntoValue, Value},
 };
 use field::BorrowedValue;
 
@@ -314,22 +314,22 @@ impl<'a> Meta<'a> {
         }
     }
 
-    pub fn fields(&'a self) -> impl Iterator<Item = Field<'a>> {
-        (0..self.field_names.len()).map(move |i| Field { i, metadata: self })
+    pub fn fields(&'a self) -> impl Iterator<Item = field::Key<'a>> {
+        (0..self.field_names.len()).map(move |i| Key { i, metadata: self })
     }
 
-    pub fn field_for(&'a self, name: &str) -> Option<Field<'a>> {
+    pub fn field_for(&'a self, name: &str) -> Option<field::Key<'a>> {
         self.field_names
             .iter()
             .position(|&f| f == name)
-            .map(|i| Field { i, metadata: &self })
+            .map(|i| Key { i, metadata: &self })
     }
 
-    pub fn first_field(&'a self) -> Option<Field<'a>> {
+    pub fn first_field(&'a self) -> Option<field::Key<'a>> {
         if self.field_names.len() == 0 {
             return None;
         }
-        Some(Field {
+        Some(Key {
             i: 0,
             metadata: self,
         })
@@ -347,7 +347,7 @@ impl<'a> Event<'a> {
     /// Borrows the value of the field named `name`, if it exists. Otherwise,
     /// returns `None`.
     pub fn field<Q: AsField>(&self, name: Q) -> Option<field::BorrowedValue> {
-        let Field { i, .. } = name.as_field(self.meta)?;
+        let field::Key { i, .. } = name.as_field(self.meta)?;
         self.field_values.get(i).map(|&val| field::borrowed(val))
     }
 
