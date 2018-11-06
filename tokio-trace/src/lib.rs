@@ -35,10 +35,17 @@ macro_rules! span {
             let callsite = callsite! { span: $name, $( $k ),* };
             Dispatch::current().if_enabled(&callsite, |dispatch, meta| {
                 let span = Span::new(dispatch.clone(), meta);
+                // Depending on how many fields are generated, this may or may
+                // not actually be used, but it doesn't make sense to repeat it.
+                #[allow(unused_variables, unused_mut)]
                 let mut key = Field::first();
                 $(
                     span!(@ add_value: span, $k, &key, $($val)*);
-                    key = key.next();
+                    // Similarly, if this is the last key, the incremented value
+                    // won't be used...
+                    #[allow(unused_assignments)] {
+                        key = key.next();
+                    }
                 )*
                 span
             }).unwrap_or_else(Span::new_disabled)
