@@ -1,5 +1,5 @@
 //! Subscribers collect and record trace data.
-use {span, Event, IntoValue, Meta, SpanId, Field};
+use {span, Event, Field, IntoValue, Meta, SpanId};
 
 /// Trait representing the functions required to collect trace data.
 ///

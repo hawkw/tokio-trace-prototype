@@ -1,8 +1,8 @@
 use tokio_trace::{
-    Field,
     span::{Data, Id},
     subscriber::{AddValueError, FollowsError},
     value::{IntoValue, OwnedValue},
+    Field,
 };
 
 use std::{

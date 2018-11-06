@@ -7,10 +7,9 @@ use std::{
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 use {
-    Field, AsField,
     subscriber::{AddValueError, FollowsError, Subscriber},
     value::{IntoValue, OwnedValue},
-    DebugFields, Dispatch, StaticMeta,
+    AsField, DebugFields, Dispatch, Field, StaticMeta,
 };
 
 thread_local! {
@@ -203,7 +202,8 @@ impl Span {
         value: &dyn IntoValue,
     ) -> Result<(), AddValueError> {
         if let Some(ref inner) = self.inner {
-            let key = field.as_field(inner.meta)
+            let key = field
+                .as_field(inner.meta)
                 .ok_or(::subscriber::AddValueError::NoField)?;
             inner.add_value(key, value)
         } else {
@@ -484,7 +484,6 @@ impl Enter {
         } else {
             Ok(())
         }
-
     }
 
     /// Indicates that the span with the given ID has an indirect causal

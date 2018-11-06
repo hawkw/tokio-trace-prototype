@@ -71,7 +71,7 @@
 //! [metadata]: struct.Meta.html
 #![warn(missing_docs)]
 
-use std::{fmt, slice, borrow::Borrow};
+use std::{borrow::Borrow, fmt, slice};
 
 #[macro_export]
 macro_rules! callsite {
@@ -364,11 +364,14 @@ impl<'a> Meta<'a> {
     }
 
     pub fn fields(&'a self) -> impl Iterator<Item = Field<'a>> {
-        (0..self.field_names.len()).map(move |i| Field { i, metadata: self, })
+        (0..self.field_names.len()).map(move |i| Field { i, metadata: self })
     }
 
     pub fn field_for(&'a self, name: &str) -> Option<Field<'a>> {
-        self.field_names.iter().position(|&f| f == name).map(|i| Field { i, metadata: &self, })
+        self.field_names
+            .iter()
+            .position(|&f| f == name)
+            .map(|i| Field { i, metadata: &self })
     }
 
     pub fn first_field(&'a self) -> Field<'a> {
@@ -457,10 +460,7 @@ impl PartialEq for Level {
 
 impl<'a> Field<'a> {
     pub fn first(metadata: &'a Meta<'a>) -> Self {
-        Field {
-            i: 0,
-            metadata,
-        }
+        Field { i: 0, metadata }
     }
 
     pub fn next(&self) -> Self {
