@@ -8,8 +8,8 @@ use std::{
 };
 use {
     subscriber::{AddValueError, FollowsError, Subscriber},
-    value::{IntoValue, OwnedValue},
-    AsField, DebugFields, Dispatch, Field, StaticMeta,
+    field::{AsField, Field, IntoValue, OwnedValue},
+    DebugFields, Dispatch, StaticMeta,
 };
 
 thread_local! {
@@ -651,7 +651,7 @@ pub use self::test_support::*;
 mod test_support {
     #![allow(missing_docs)]
     use std::collections::HashMap;
-    use value::OwnedValue;
+    use field::OwnedValue;
 
     /// A mock span.
     ///

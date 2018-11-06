@@ -1,4 +1,4 @@
-//! Arbitrarily-typed field values.
+//! `Span` and `Event` key-value data.
 //!
 //! Spans and events may be annotated with key-value data, referred to as known
 //! as _fields_. These fields consist of a mapping from a `&'static str` to a
@@ -57,6 +57,11 @@
 //! allocations, but the `IntoValue` trait presents `Subscriber`s with the
 //! _option_ to box values should they need to do so.
 use std::{any::TypeId, borrow::Borrow, fmt};
+use super::Meta;
+
+pub trait AsField {
+    fn as_field<'a>(&self, metadata: &'a Meta<'a>) -> Option<Field<'a>>;
+}
 
 /// A formattable field value of an erased type.
 pub trait Value: fmt::Debug + Send + Sync {
@@ -99,6 +104,14 @@ pub trait IntoValue: AsValue {
     fn into_value(&self) -> OwnedValue;
 }
 
+/// An opaque key allowing _O_(1) access to a field in a `Span` or `Event`'s
+/// key-value data.
+#[derive(Clone, Eq, PartialEq)]
+pub struct Field<'a> {
+    pub(crate) i: usize,
+    pub(crate) metadata: &'a Meta<'a>,
+}
+
 /// A borrowed value of an erased type.
 ///
 /// Like `Any`,`BorrowedValue`s may attempt to downcast the value to
@@ -134,7 +147,7 @@ pub fn borrowed<'a>(t: &'a dyn AsValue) -> BorrowedValue<'a> {
 /// # Examples
 /// ```
 /// # extern crate tokio_trace_core as tokio_trace;
-/// use tokio_trace::value;
+/// use tokio_trace::field;
 /// # use std::fmt;
 /// # fn main() {
 ///
@@ -150,10 +163,10 @@ pub fn borrowed<'a>(t: &'a dyn AsValue) -> BorrowedValue<'a> {
 /// let foo = Foo;
 /// assert_eq!("Foo".to_owned(), format!("{:?}", foo));
 ///
-/// let display_foo = value::display(foo.clone());
+/// let display_foo = field::display(foo.clone());
 /// assert_eq!(
 ///     format!("{}", foo),
-///     format!("{:?}", value::borrowed(&display_foo)),
+///     format!("{:?}", field::borrowed(&display_foo)),
 /// );
 /// # }
 /// ```
@@ -171,8 +184,8 @@ pub fn borrowed<'a>(t: &'a dyn AsValue) -> BorrowedValue<'a> {
 /// #       f.pad("Hello, I'm Foo")
 /// #   }
 /// # }
-/// use tokio_trace::value::{self, Value, IntoValue};
-/// let foo = value::display(Foo);
+/// use tokio_trace::field::{self, Value, IntoValue};
+/// let foo = field::display(Foo);
 ///
 /// let owned_value = foo.into_value();
 /// assert_eq!("Hello, I'm Foo".to_owned(), format!("{:?}", owned_value));
@@ -185,6 +198,46 @@ where
     T: AsValue + fmt::Display,
 {
     DisplayValue(t)
+}
+
+// ===== impl AsField =====
+
+impl<'f> AsField for Field<'f> {
+    #[inline]
+    fn as_field<'a>(&self, metadata: &'a Meta<'a>) -> Option<Field<'a>> {
+        if metadata == self.metadata {
+            Some(Field {
+                i: self.i,
+                metadata,
+            })
+        } else {
+            None
+        }
+    }
+}
+
+impl<'f> AsField for &'f Field<'f> {
+    #[inline]
+    fn as_field<'a>(&self, metadata: &'a Meta<'a>) -> Option<Field<'a>> {
+        if metadata == self.metadata {
+            Some(Field {
+                i: self.i,
+                metadata,
+            })
+        } else {
+            None
+        }
+    }
+}
+
+impl<T> AsField for T
+where
+    T: Borrow<str>,
+{
+    #[inline]
+    fn as_field<'a>(&self, metadata: &'a Meta<'a>) -> Option<Field<'a>> {
+        metadata.field_for(self.borrow())
+    }
 }
 
 // ===== impl AsValue =====
@@ -324,6 +377,41 @@ impl<'a> Value for &'a OwnedValue {
 impl fmt::Debug for OwnedValue {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.0.fmt_value(f)
+    }
+}
+
+// ===== impl Field =====
+
+impl<'a> Field<'a> {
+    /// Returns the next field in the metadata's set of fields, if one exists.
+    /// Otherwise, if this is the last field, returns `None`.
+    pub fn next(&self) -> Option<Self> {
+        if self.i > self.metadata.field_names.len() {
+            return None;
+        }
+        Some(Field {
+            i: self.i + 1,
+            metadata: self.metadata,
+        })
+    }
+
+    /// Returns a string representing the name of the field, or `None` if the
+    /// field does not exist.
+    pub fn name(&self) -> Option<&str> {
+        self.metadata.field_names.get(self.i).map(|&n| n)
+    }
+
+    /// Returns `true` if this is the last key in the metadata's fields.
+    ///
+    /// If this returns `true`, then `self.next()` will return `None`.
+    pub fn is_last(&self) -> bool {
+        self.i == self.metadata.field_names.len()
+    }
+}
+
+impl<'a> fmt::Display for Field<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.pad(self.name().unwrap_or("???"))
     }
 }
 

@@ -223,7 +223,7 @@ mod test_support {
 
     use super::*;
     use span::{self, MockSpan};
-    use {Event, Field, IntoValue, Meta, SpanData, SpanId};
+    use {Event, field::Field, IntoValue, Meta, SpanData, SpanId};
 
     use std::{
         collections::{HashMap, VecDeque},

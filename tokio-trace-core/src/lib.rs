@@ -71,7 +71,7 @@
 //! [metadata]: struct.Meta.html
 #![warn(missing_docs)]
 
-use std::{borrow::Borrow, fmt, slice};
+use std::{fmt, slice};
 
 #[macro_export]
 macro_rules! callsite {
@@ -139,69 +139,18 @@ pub enum Level {
 
 #[doc(hidden)]
 pub mod callsite;
-
+pub mod field;
 pub mod dispatcher;
 pub mod span;
 pub mod subscriber;
-pub mod value;
 
 pub use self::{
     dispatcher::Dispatch,
     span::{Data as SpanData, Id as SpanId, Span},
     subscriber::Subscriber,
-    value::{AsValue, IntoValue, Value},
+    field::{Field, AsField, AsValue, IntoValue, Value},
 };
-use value::BorrowedValue;
-
-/// An opaque key allowing _O_(1) access to a field in a `Span` or `Event`'s
-/// key-value data.
-#[derive(Clone, Eq, PartialEq)]
-pub struct Field<'a> {
-    i: usize,
-    metadata: &'a Meta<'a>,
-}
-
-pub trait AsField {
-    fn as_field<'a>(&self, metadata: &'a Meta<'a>) -> Option<Field<'a>>;
-}
-
-impl<'f> AsField for Field<'f> {
-    #[inline]
-    fn as_field<'a>(&self, metadata: &'a Meta<'a>) -> Option<Field<'a>> {
-        if metadata == self.metadata {
-            Some(Field {
-                i: self.i,
-                metadata,
-            })
-        } else {
-            None
-        }
-    }
-}
-
-impl<'f> AsField for &'f Field<'f> {
-    #[inline]
-    fn as_field<'a>(&self, metadata: &'a Meta<'a>) -> Option<Field<'a>> {
-        if metadata == self.metadata {
-            Some(Field {
-                i: self.i,
-                metadata,
-            })
-        } else {
-            None
-        }
-    }
-}
-
-impl<T> AsField for T
-where
-    T: Borrow<str>,
-{
-    #[inline]
-    fn as_field<'a>(&self, metadata: &'a Meta<'a>) -> Option<Field<'a>> {
-        metadata.field_for(self.borrow())
-    }
-}
+use field::BorrowedValue;
 
 /// `Event`s represent single points in time where something occurred during the
 /// execution of a program.
@@ -397,9 +346,9 @@ impl<'a> Event<'a> {
 
     /// Borrows the value of the field named `name`, if it exists. Otherwise,
     /// returns `None`.
-    pub fn field<Q: AsField>(&self, name: Q) -> Option<value::BorrowedValue> {
+    pub fn field<Q: AsField>(&self, name: Q) -> Option<field::BorrowedValue> {
         let Field { i, .. } = name.as_field(self.meta)?;
-        self.field_values.get(i).map(|&val| value::borrowed(val))
+        self.field_values.get(i).map(|&val| field::borrowed(val))
     }
 
     /// Returns an iterator over all the field names and values on this event.
@@ -409,7 +358,7 @@ impl<'a> Event<'a> {
             .filter_map(move |(idx, &name)| {
                 self.field_values
                     .get(idx)
-                    .map(|&val| (name, value::borrowed(val)))
+                    .map(|&val| (name, field::borrowed(val)))
             })
     }
 
@@ -460,38 +409,5 @@ impl PartialEq for Level {
     #[inline]
     fn eq(&self, other: &Level) -> bool {
         *self as usize == *other as usize
-    }
-}
-
-impl<'a> Field<'a> {
-    /// Returns the next field in the metadata's set of fields, if one exists.
-    /// Otherwise, if this is the last field, returns `None`.
-    pub fn next(&self) -> Option<Self> {
-        if self.i > self.metadata.field_names.len() {
-            return None;
-        }
-        Some(Field {
-            i: self.i + 1,
-            metadata: self.metadata,
-        })
-    }
-
-    /// Returns a string representing the name of the field, or `None` if the
-    /// field does not exist.
-    pub fn name(&self) -> Option<&str> {
-        self.metadata.field_names.get(self.i).map(|&n| n)
-    }
-
-    /// Returns `true` if this is the last key in the metadata's fields.
-    ///
-    /// If this returns `true`, then `self.next()` will return `None`.
-    pub fn is_last(&self) -> bool {
-        self.i == self.metadata.field_names.len()
-    }
-}
-
-impl<'a> fmt::Display for Field<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.pad(self.name().unwrap_or("???"))
     }
 }

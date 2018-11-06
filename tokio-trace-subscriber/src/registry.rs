@@ -1,7 +1,7 @@
 use tokio_trace::{
     span::{Data, Id},
     subscriber::{AddValueError, FollowsError},
-    value::{IntoValue, OwnedValue},
+    field::{IntoValue, OwnedValue},
     Field,
 };
 

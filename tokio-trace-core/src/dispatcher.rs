@@ -1,8 +1,9 @@
 use {
     callsite,
+    field::Field,
     span::{self, Span},
     subscriber::{self, Subscriber},
-    Event, Field, IntoValue, Meta,
+    Event, IntoValue, Meta,
 };
 
 use std::{
