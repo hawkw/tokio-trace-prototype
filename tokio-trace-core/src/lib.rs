@@ -324,6 +324,11 @@ impl<'a> Meta<'a> {
     pub fn field_for<Q: field::AsKey>(&'a self, name: &Q) -> Option<field::Key<'a>> {
         name.as_key(self)
     }
+
+    /// Returns `true` if `self` contains a field for the given `key`.
+    pub fn contains_key(&self, key: &field::Key<'a>) -> bool {
+        key.metadata() == self && key.as_usize() <= self.field_names.len()
+    }
 }
 
 // ===== impl Event =====
@@ -342,45 +347,43 @@ impl<'a> Event<'a> {
     }
 
     /// Returns an iterator over all the field names and values on this event.
-    pub fn fields<'b: 'a>(&'b self) -> impl Iterator<Item = (&'a str, BorrowedValue<'b>)> {
-        self.field_names()
-            .enumerate()
-            .filter_map(move |(idx, &name)| {
-                self.field_values
-                    .get(idx)
-                    .map(|&val| (name, field::borrowed(val)))
-            })
+    pub fn fields<'b: 'a>(&'b self) -> impl Iterator<Item = (field::Key<'a>, BorrowedValue<'b>)> {
+        self.meta.fields().filter_map(move |key| {
+            let val = self.field(&key)?;
+            Some((key, val))
+        })
     }
 
     /// Returns a struct that can be used to format all the fields on this
     /// `Event` with `fmt::Debug`.
-    pub fn debug_fields<'b: 'a>(&'b self) -> DebugFields<'b, Self, BorrowedValue<'b>> {
+    pub fn debug_fields<'b: 'a>(&'b self) -> DebugFields<'b, 'b, Self, BorrowedValue<'a>> {
         DebugFields(self)
     }
 }
 
 impl<'a> IntoIterator for &'a Event<'a> {
-    type Item = (&'a str, BorrowedValue<'a>);
-    type IntoIter = Box<Iterator<Item = (&'a str, BorrowedValue<'a>)> + 'a>; // TODO: unbox
+    type Item = (field::Key<'a>, BorrowedValue<'a>);
+    type IntoIter = Box<Iterator<Item = (field::Key<'a>, BorrowedValue<'a>)> + 'a>; // TODO: unbox
     fn into_iter(self) -> Self::IntoIter {
         Box::new(self.fields())
     }
 }
 
 /// Formats the key-value fields of a `Span` or `Event` with `fmt::Debug`.
-pub struct DebugFields<'a, I: 'a, T: 'a>(&'a I)
+pub struct DebugFields<'a, 'b: 'a, I: 'a, T: 'a>(&'a I)
 where
-    &'a I: IntoIterator<Item = (&'a str, T)>;
+    &'a I: IntoIterator<Item = (field::Key<'b>, T)>;
 
-impl<'a, I: 'a, T: 'a> fmt::Debug for DebugFields<'a, I, T>
+impl<'a, 'b: 'a, I: 'a, T: 'a> fmt::Debug for DebugFields<'a, 'b, I, T>
 where
-    &'a I: IntoIterator<Item = (&'a str, T)>,
+    &'a I: IntoIterator<Item = (field::Key<'b>, T)>,
     T: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.0
             .into_iter()
-            .fold(&mut f.debug_struct(""), |s, (name, value)| {
+            .fold(&mut f.debug_struct(""), |s, (key, value)| {
+                let name = key.name().unwrap_or("???");
                 s.field(name, &value)
             }).finish()
     }

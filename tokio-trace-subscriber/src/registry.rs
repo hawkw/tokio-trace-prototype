@@ -100,7 +100,7 @@ impl<'a, 'b> cmp::PartialEq<SpanRef<'b>> for SpanRef<'a> {
 impl<'a> cmp::Eq for SpanRef<'a> {}
 
 impl<'a> IntoIterator for &'a SpanRef<'a> {
-    type Item = (&'a str, &'a OwnedValue);
+    type Item = (field::Key<'a>, &'a OwnedValue);
     type IntoIter = Box<Iterator<Item = Self::Item> + 'a>; // TODO: unbox
     fn into_iter(self) -> Self::IntoIter {
         self.data

@@ -81,11 +81,12 @@ impl Subscriber for CounterSubscriber {
         if let Some(span) = self.spans.read().unwrap().get(&span) {
             let registry = self.counters.0.read().unwrap();
             for (counter, value) in span.fields().into_iter().filter_map(|(k, v)| {
-                if !k.contains("count") {
+                let name = k.name()?;
+                if !name.contains("count") {
                     return None;
                 }
                 let v = v.downcast_ref::<usize>()?;
-                let c = registry.get(k)?;
+                let c = registry.get(&name)?;
                 Some((c, v))
             }) {
                 counter.fetch_add(*value, Ordering::Release);

@@ -65,7 +65,7 @@ impl SloggishSubscriber {
 
     fn print_kvs<'a, I, T>(&self, writer: &mut impl Write, kvs: I, leading: &str) -> io::Result<()>
     where
-        I: IntoIterator<Item = (&'a str, T)>,
+        I: IntoIterator<Item = (tokio_trace::field::Key<'a>, T)>,
         T: fmt::Debug,
     {
         let mut kvs = kvs.into_iter();
@@ -74,12 +74,12 @@ impl SloggishSubscriber {
                 writer,
                 "{}{}: {:?}",
                 leading,
-                Style::new().bold().paint(k),
+                Style::new().bold().paint(k.as_ref()),
                 v
             )?;
         }
         for (k, v) in kvs {
-            write!(writer, ", {}: {:?}", Style::new().bold().paint(k), v)?;
+            write!(writer, ", {}: {:?}", Style::new().bold().paint(k.as_ref()), v)?;
         }
         Ok(())
     }

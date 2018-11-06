@@ -414,6 +414,10 @@ impl<'a> Key<'a> {
         self.i
     }
 
+    pub(crate) fn metadata(&self) -> &Meta<'a> {
+        self.metadata
+    }
+
     // /// Returns the next field in the metadata's set of fields, if one exists.
     // /// Otherwise, if this is the last field, returns `None`.
     // pub fn next(&self) -> Option<Self> {
@@ -428,7 +432,7 @@ impl<'a> Key<'a> {
 
     /// Returns a string representing the name of the field, or `None` if the
     /// field does not exist.
-    pub fn name(&self) -> Option<&str> {
+    pub fn name(&self) -> Option<&'a str> {
         self.metadata.field_names.get(self.i).map(|&n| n)
     }
 
@@ -443,6 +447,12 @@ impl<'a> Key<'a> {
 impl<'a> fmt::Display for Key<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.pad(self.name().unwrap_or("???"))
+    }
+}
+
+impl<'a> AsRef<str> for Key<'a> {
+    fn as_ref(&self) -> &str {
+        self.name().unwrap_or("???")
     }
 }
 

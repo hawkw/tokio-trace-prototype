@@ -307,34 +307,37 @@ impl Data {
     }
 
     /// Returns an iterator over the names of all the fields on this span.
-    pub fn field_names<'a>(&self) -> slice::Iter<&'a str> {
-        self.static_meta.field_names.iter()
+    pub fn field_keys(&self) -> impl Iterator<Item = Key<'static>> {
+        self.static_meta.fields()
     }
 
     /// Returns true if a field named 'name' has been declared on this span,
     /// even if the field does not currently have a value.
-    pub fn has_field<Q>(&self, key: Q) -> bool
-    where
-        &'static str: PartialEq<Q>,
-    {
-        self.field_names().any(|&name| name == key)
+    pub fn has_field<Q: AsKey>(&self, key: Q) -> bool {
+        if let Some(key) = key.as_key(self.static_meta) {
+            self.static_meta.contains_key(&key)
+        } else {
+            false
+        }
     }
 
     /// Borrows the value of the field named `name`, if it exists. Otherwise,
     /// returns `None`.
-    pub fn field<Q: AsKey>(&self, key: Q) -> Option<&OwnedValue>
-    where
-        &'static str: PartialEq<Q>,
-    {
-        self.field_names()
-            .position(|&field_name| field_name == key)
-            .and_then(|i| self.field_values.get(i)?.as_ref())
+    pub fn field<Q: AsKey>(&self, key: Q) -> Option<&OwnedValue> {
+        key.as_key(&self.static_meta)
+            .and_then(|key| {
+                let i = key.as_usize();
+                self.field_values.get(i)?.as_ref()
+            })
     }
 
     /// Returns an iterator over all the field names and values on this span.
-    pub fn fields<'a>(&'a self) -> impl Iterator<Item = (&'a str, &'a OwnedValue)> {
-        self.field_names()
-            .filter_map(move |&name| self.field(name).map(move |val| (name, val)))
+    pub fn fields<'a>(&'a self) -> impl Iterator<Item = (Key<'static>, &'a OwnedValue)> {
+        self.field_keys()
+            .filter_map(move |key| {
+                let val = self.field_values.get(key.as_usize())?.as_ref()?;
+                Some((key, val))
+            })
     }
 
     /// Edits the span data to add the given `value` to the field named `name`.
@@ -362,14 +365,14 @@ impl Data {
 
     /// Returns a struct that can be used to format all the fields on this
     /// span with `fmt::Debug`.
-    pub fn debug_fields<'a>(&'a self) -> DebugFields<'a, Self, &'a OwnedValue> {
+    pub fn debug_fields<'a>(&'a self) -> DebugFields<'a, 'static, Self, &'a OwnedValue> {
         DebugFields(self)
     }
 }
 
 impl<'a> IntoIterator for &'a Data {
-    type Item = (&'a str, &'a OwnedValue);
-    type IntoIter = Box<Iterator<Item = (&'a str, &'a OwnedValue)> + 'a>; // TODO: unbox
+    type Item = (Key<'static>, &'a OwnedValue);
+    type IntoIter = Box<Iterator<Item = Self::Item> + 'a>; // TODO: unbox
     fn into_iter(self) -> Self::IntoIter {
         Box::new(self.fields())
     }
