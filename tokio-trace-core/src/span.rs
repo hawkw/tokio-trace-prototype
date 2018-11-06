@@ -324,20 +324,18 @@ impl Data {
     /// Borrows the value of the field named `name`, if it exists. Otherwise,
     /// returns `None`.
     pub fn field<Q: AsKey>(&self, key: Q) -> Option<&OwnedValue> {
-        key.as_key(&self.static_meta)
-            .and_then(|key| {
-                let i = key.as_usize();
-                self.field_values.get(i)?.as_ref()
-            })
+        key.as_key(&self.static_meta).and_then(|key| {
+            let i = key.as_usize();
+            self.field_values.get(i)?.as_ref()
+        })
     }
 
     /// Returns an iterator over all the field names and values on this span.
     pub fn fields<'a>(&'a self) -> impl Iterator<Item = (Key<'static>, &'a OwnedValue)> {
-        self.field_keys()
-            .filter_map(move |key| {
-                let val = self.field_values.get(key.as_usize())?.as_ref()?;
-                Some((key, val))
-            })
+        self.field_keys().filter_map(move |key| {
+            let val = self.field_values.get(key.as_usize())?.as_ref()?;
+            Some((key, val))
+        })
     }
 
     /// Edits the span data to add the given `value` to the field named `name`.

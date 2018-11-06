@@ -79,7 +79,12 @@ impl SloggishSubscriber {
             )?;
         }
         for (k, v) in kvs {
-            write!(writer, ", {}: {:?}", Style::new().bold().paint(k.as_ref()), v)?;
+            write!(
+                writer,
+                ", {}: {:?}",
+                Style::new().bold().paint(k.as_ref()),
+                v
+            )?;
         }
         Ok(())
     }

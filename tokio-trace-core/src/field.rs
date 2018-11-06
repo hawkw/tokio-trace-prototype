@@ -254,7 +254,8 @@ where
     #[inline]
     fn as_key<'a>(&self, metadata: &'a Meta<'a>) -> Option<Key<'a>> {
         let name = self.borrow();
-        metadata.field_names
+        metadata
+            .field_names
             .iter()
             .position(|&f| f == name)
             .map(|i| Key::new(i, metadata))
@@ -405,9 +406,7 @@ impl fmt::Debug for OwnedValue {
 
 impl<'a> Key<'a> {
     pub(crate) fn new(i: usize, metadata: &'a Meta<'a>) -> Self {
-        Self {
-            i, metadata,
-        }
+        Self { i, metadata }
     }
 
     pub(crate) fn as_usize(&self) -> usize {
@@ -418,30 +417,11 @@ impl<'a> Key<'a> {
         self.metadata
     }
 
-    // /// Returns the next field in the metadata's set of fields, if one exists.
-    // /// Otherwise, if this is the last field, returns `None`.
-    // pub fn next(&self) -> Option<Self> {
-    //     if self.i > self.metadata.field_names.len() {
-    //         return None;
-    //     }
-    //     Some(Key {
-    //         i: self.i + 1,
-    //         metadata: self.metadata,
-    //     })
-    // }
-
     /// Returns a string representing the name of the field, or `None` if the
     /// field does not exist.
     pub fn name(&self) -> Option<&'a str> {
         self.metadata.field_names.get(self.i).map(|&n| n)
     }
-
-    // /// Returns `true` if this is the last key in the metadata's fields.
-    // ///
-    // /// If this returns `true`, then `self.next()` will return `None`.
-    // pub fn is_last(&self) -> bool {
-    //     self.i == self.metadata.field_names.len()
-    // }
 }
 
 impl<'a> fmt::Display for Key<'a> {
