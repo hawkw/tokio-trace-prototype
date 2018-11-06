@@ -60,7 +60,7 @@ use super::Meta;
 use std::{any::TypeId, borrow::Borrow, fmt};
 
 pub trait AsKey {
-    fn as_field<'a>(&self, metadata: &'a Meta<'a>) -> Option<Key<'a>>;
+    fn as_key<'a>(&self, metadata: &'a Meta<'a>) -> Option<Key<'a>>;
 }
 
 /// A formattable field value of an erased type.
@@ -204,7 +204,7 @@ where
 
 impl<'f> AsKey for Key<'f> {
     #[inline]
-    fn as_field<'a>(&self, metadata: &'a Meta<'a>) -> Option<Key<'a>> {
+    fn as_key<'a>(&self, metadata: &'a Meta<'a>) -> Option<Key<'a>> {
         if metadata == self.metadata {
             Some(Key {
                 i: self.i,
@@ -218,7 +218,7 @@ impl<'f> AsKey for Key<'f> {
 
 impl<'f> AsKey for &'f Key<'f> {
     #[inline]
-    fn as_field<'a>(&self, metadata: &'a Meta<'a>) -> Option<Key<'a>> {
+    fn as_key<'a>(&self, metadata: &'a Meta<'a>) -> Option<Key<'a>> {
         if metadata == self.metadata {
             Some(Key {
                 i: self.i,
@@ -235,7 +235,7 @@ where
     T: Borrow<str>,
 {
     #[inline]
-    fn as_field<'a>(&self, metadata: &'a Meta<'a>) -> Option<Key<'a>> {
+    fn as_key<'a>(&self, metadata: &'a Meta<'a>) -> Option<Key<'a>> {
         metadata.field_for(self.borrow())
     }
 }

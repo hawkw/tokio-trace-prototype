@@ -203,7 +203,7 @@ impl Span {
     ) -> Result<(), AddValueError> {
         if let Some(ref inner) = self.inner {
             let key = field
-                .as_field(inner.meta)
+                .as_key(inner.meta)
                 .ok_or(::subscriber::AddValueError::NoField)?;
             inner.add_value(key, value)
         } else {
@@ -347,7 +347,7 @@ impl Data {
         name: Q,
         value: &dyn IntoValue,
     ) -> Result<(), AddValueError> {
-        if let Some(Key { i, .. }) = name.as_field(self.static_meta) {
+        if let Some(Key { i, .. }) = name.as_key(self.static_meta) {
             let field = &mut self.field_values[i];
             if field.is_some() {
                 Err(AddValueError::FieldAlreadyExists)
@@ -475,7 +475,7 @@ impl Enter {
         field: Q,
         value: &dyn IntoValue,
     ) -> Result<(), AddValueError> {
-        if let Some(field) = field.as_field(self.meta) {
+        if let Some(field) = field.as_key(self.meta) {
             match self.subscriber.add_value(&self.id, &field, value) {
                 Ok(()) => Ok(()),
                 Err(AddValueError::NoSpan) => panic!("span should still exist!"),

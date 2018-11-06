@@ -347,7 +347,7 @@ impl<'a> Event<'a> {
     /// Borrows the value of the field named `name`, if it exists. Otherwise,
     /// returns `None`.
     pub fn field<Q: AsKey>(&self, name: Q) -> Option<field::BorrowedValue> {
-        let field::Key { i, .. } = name.as_field(self.meta)?;
+        let field::Key { i, .. } = name.as_key(self.meta)?;
         self.field_values.get(i).map(|&val| field::borrowed(val))
     }
 
