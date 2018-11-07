@@ -136,9 +136,9 @@ impl Subscriber for SloggishSubscriber {
     }
 
     #[inline]
-    fn observe_event<'event, 'meta: 'event>(
+    fn observe_event<'a>(
         &self,
-        event: &'event tokio_trace::Event<'event, 'meta>,
+        event: &'a tokio_trace::Event<'a>,
     ) {
         let mut stderr = self.stderr.lock();
 
