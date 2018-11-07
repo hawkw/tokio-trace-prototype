@@ -203,6 +203,9 @@ pub struct Event<'a> {
 /// Therefore, filtering is based on metadata, rather than  on the constructed
 /// span or event.
 ///
+/// **Note**: The implementation of `PartialEq` for `Meta` is address-based,
+/// *not* structural equality. This is intended as a performance optimization,
+/// as metadata are intended to be created statically once per callsite.
 /// [`Span`]: ::span::Span
 /// [`Event`]: ::Event
 /// [`Subscriber`]: ::Subscriber
@@ -329,25 +332,12 @@ impl<'a> Meta<'a> {
     pub fn contains_key(&self, key: &field::Key<'a>) -> bool {
         key.metadata() == self && key.as_usize() <= self.field_names.len()
     }
-
-    #[inline]
-    fn callsite_eq(&self, other: &Meta<'a>) -> Option<bool> {
-        Some(self.line? == other.line? && self.file? == other.file?)
-    }
 }
 
 impl<'a> PartialEq for Meta<'a> {
     #[inline]
     fn eq(&self, other: &Meta<'a>) -> bool {
-        // If both sets of metadata have a callsite, we can compare them based
-        // on that callsite only, as an optimization.
-        if let Some(eq) = self.callsite_eq(other) {
-            return eq;
-        }
-        self.line == other.line
-            && self.file == other.file
-            && self.target == other.target
-            && self.name == other.name
+        ::std::ptr::eq(self, other)
     }
 }
 
