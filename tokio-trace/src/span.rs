@@ -297,7 +297,8 @@ impl Shared {
         value: &dyn IntoValue,
     ) -> Result<(), subscriber::AddValueError> {
         if let Some(ref inner) = self.inner {
-            let field = field.as_key(inner.metadata())
+            let field = field
+                .as_key(inner.metadata())
                 .ok_or(subscriber::AddValueError::NoField)?;
             inner.add_value(&field, value)
         } else {

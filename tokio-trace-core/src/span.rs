@@ -8,10 +8,9 @@ use std::{
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 use {
-    Meta,
     field::{IntoValue, Key, OwnedValue},
     subscriber::{AddValueError, FollowsError, Subscriber},
-    DebugFields, Dispatch, StaticMeta,
+    DebugFields, Dispatch, Meta, StaticMeta,
 };
 
 thread_local! {
@@ -197,7 +196,9 @@ impl Span {
     where
         Q: Borrow<str>,
     {
-        self.inner.as_ref().and_then(|inner| inner.meta.field_for(name))
+        self.inner
+            .as_ref()
+            .and_then(|inner| inner.meta.field_for(name))
     }
 
     /// Sets the field on this span named `name` to the given `value`.
@@ -205,11 +206,7 @@ impl Span {
     /// `name` must name a field already defined by this span's metadata, and
     /// the field must not already have a value. If this is not the case, this
     /// function returns an [`AddValueError`](::subscriber::AddValueError).
-    pub fn add_value(
-        &self,
-        field: &Key,
-        value: &dyn IntoValue,
-    ) -> Result<(), AddValueError> {
+    pub fn add_value(&self, field: &Key, value: &dyn IntoValue) -> Result<(), AddValueError> {
         if let Some(ref inner) = self.inner {
             inner.add_value(field, value)
         } else {
@@ -355,11 +352,7 @@ impl Data {
     /// `name` must name a field already defined by this span's metadata, and
     /// the field must not already have a value. If this is not the case, this
     /// function returns an [`AddValueError`](::subscriber::AddValueError).
-    pub fn add_value(
-        &mut self,
-        key: &Key,
-        value: &dyn IntoValue,
-    ) -> Result<(), AddValueError> {
+    pub fn add_value(&mut self, key: &Key, value: &dyn IntoValue) -> Result<(), AddValueError> {
         if !self.has_field(key) {
             return Err(AddValueError::NoField);
         }
@@ -482,11 +475,7 @@ impl Enter {
     /// `name` must name a field already defined by this span's metadata, and
     /// the field must not already have a value. If this is not the case, this
     /// function returns an [`AddValueError`](::subscriber::AddValueError).
-    pub fn add_value(
-        &self,
-        field: &Key,
-        value: &dyn IntoValue,
-    ) -> Result<(), AddValueError> {
+    pub fn add_value(&self, field: &Key, value: &dyn IntoValue) -> Result<(), AddValueError> {
         if !self.meta.contains_key(field) {
             return Err(AddValueError::NoField);
         }
@@ -537,7 +526,6 @@ impl Enter {
     pub fn metadata(&self) -> &'static Meta<'static> {
         self.meta
     }
-
 
     fn new(id: Id, subscriber: Dispatch, parent: Option<Id>, meta: &'static StaticMeta) -> Self {
         Self {

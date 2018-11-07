@@ -71,7 +71,7 @@
 //! [metadata]: struct.Meta.html
 #![warn(missing_docs)]
 
-use std::{fmt, slice, borrow::Borrow};
+use std::{borrow::Borrow, fmt, slice};
 
 #[macro_export]
 macro_rules! callsite {
@@ -329,7 +329,10 @@ impl<'a> Meta<'a> {
         Q: Borrow<str>,
     {
         let name = &name.borrow();
-        self.field_names.iter().position(|f| f == name).map(|i| Key::new(i, self))
+        self.field_names
+            .iter()
+            .position(|f| f == name)
+            .map(|i| Key::new(i, self))
     }
 
     /// Returns `true` if `self` contains a field for the given `key`.
@@ -364,7 +367,9 @@ impl<'a> Event<'a> {
         if !self.has_field(key) {
             return None;
         }
-        self.field_values.get(key.as_usize()).map(|&val| field::borrowed(val))
+        self.field_values
+            .get(key.as_usize())
+            .map(|&val| field::borrowed(val))
     }
 
     /// Returns an iterator over all the field names and values on this event.

@@ -98,10 +98,7 @@ pub use self::{
     field::{AsValue, IntoValue, Value},
     span::{Data as SpanData, Id as SpanId, Span},
     subscriber::Subscriber,
-    tokio_trace_core::{
-        callsite,
-        Event, Level, Meta,
-    },
+    tokio_trace_core::{callsite, Event, Level, Meta},
 };
 
 #[doc(hidden)]
