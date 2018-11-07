@@ -146,7 +146,7 @@ pub mod subscriber;
 
 pub use self::{
     dispatcher::Dispatch,
-    field::{AsKey, AsValue, IntoValue, Key, Value},
+    field::{AsValue, IntoValue, Key, Value},
     span::{Data as SpanData, Id as SpanId, Span},
     subscriber::Subscriber,
 };
@@ -327,7 +327,6 @@ impl<'a> Meta<'a> {
     pub fn field_for<Q>(&'a self, name: &Q) -> Option<field::Key<'a>>
     where
         Q: Borrow<str>,
-        Q: Eq,
     {
         let name = &name.borrow();
         self.field_names.iter().position(|f| f == name).map(|i| Key::new(i, self))
@@ -354,11 +353,18 @@ impl<'a> Event<'a> {
         self.meta.field_names.iter()
     }
 
+    #[inline]
+    pub fn has_field(&self, key: &field::Key) -> bool {
+        self.meta.contains_key(key)
+    }
+
     /// Borrows the value of the field named `name`, if it exists. Otherwise,
     /// returns `None`.
-    pub fn field<Q: AsKey>(&self, name: Q) -> Option<field::BorrowedValue> {
-        let i = name.as_key(self.meta)?.as_usize();
-        self.field_values.get(i).map(|&val| field::borrowed(val))
+    pub fn field(&self, key: &field::Key) -> Option<field::BorrowedValue> {
+        if !self.has_field(key) {
+            return None;
+        }
+        self.field_values.get(key.as_usize()).map(|&val| field::borrowed(val))
     }
 
     /// Returns an iterator over all the field names and values on this event.

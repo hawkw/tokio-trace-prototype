@@ -296,10 +296,11 @@ impl Shared {
         field: &'static str,
         value: &dyn IntoValue,
     ) -> Result<(), subscriber::AddValueError> {
-        self.inner
-            .as_ref()
-            .map(|inner| inner.add_value(field, value))
-            .unwrap_or(Ok(()))
+        // self.inner
+        //     .as_ref()
+        //     .map(|inner| inner.add_value(field, value))
+        //     .unwrap_or(Ok(()))
+        unimplemented!()
     }
 
     /// Indicates that the span with the given ID has an indirect causal

@@ -8,7 +8,7 @@ use std::{
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 use {
-    field::{AsKey, IntoValue, Key, OwnedValue},
+    field::{IntoValue, Key, OwnedValue},
     subscriber::{AddValueError, FollowsError, Subscriber},
     DebugFields, Dispatch, StaticMeta,
 };
@@ -195,7 +195,6 @@ impl Span {
     pub fn field_for<Q>(&self, name: &Q) -> Option<Key<'static>>
     where
         Q: Borrow<str>,
-        Q: Eq,
     {
         self.inner.as_ref().and_then(|inner| inner.meta.field_for(name))
     }
@@ -205,16 +204,13 @@ impl Span {
     /// `name` must name a field already defined by this span's metadata, and
     /// the field must not already have a value. If this is not the case, this
     /// function returns an [`AddValueError`](::subscriber::AddValueError).
-    pub fn add_value<Q: AsKey>(
+    pub fn add_value(
         &self,
-        field: Q,
+        field: &Key,
         value: &dyn IntoValue,
     ) -> Result<(), AddValueError> {
         if let Some(ref inner) = self.inner {
-            let key = field
-                .as_key(inner.meta)
-                .ok_or(::subscriber::AddValueError::NoField)?;
-            inner.add_value(key, value)
+            inner.add_value(field, value)
         } else {
             Ok(())
         }
@@ -323,28 +319,26 @@ impl Data {
     pub fn field_for<Q>(&self, name: &Q) -> Option<Key<'static>>
     where
         Q: Borrow<str>,
-        Q: Eq,
     {
         self.static_meta.field_for(name)
     }
 
     /// Returns true if a field named 'name' has been declared on this span,
     /// even if the field does not currently have a value.
-    pub fn has_field<Q: AsKey>(&self, key: Q) -> bool {
-        if let Some(key) = key.as_key(self.static_meta) {
-            self.static_meta.contains_key(&key)
-        } else {
-            false
-        }
+    #[inline]
+    pub fn has_field(&self, key: &Key) -> bool {
+        self.static_meta.contains_key(key)
     }
 
     /// Borrows the value of the field named `name`, if it exists. Otherwise,
     /// returns `None`.
-    pub fn field<Q: AsKey>(&self, key: Q) -> Option<&OwnedValue> {
-        key.as_key(&self.static_meta).and_then(|key| {
-            let i = key.as_usize();
-            self.field_values.get(i)?.as_ref()
-        })
+    pub fn field(&self, key: &Key) -> Option<&OwnedValue> {
+        if !self.has_field(key) {
+            return None;
+        }
+
+        let i = key.as_usize();
+        self.field_values.get(i)?.as_ref()
     }
 
     /// Returns an iterator over all the field names and values on this span.
@@ -355,26 +349,25 @@ impl Data {
         })
     }
 
-    /// Edits the span data to add the given `value` to the field named `name`.
+    /// Edits the span data to add the given `value` to the field indexed by `key`.
     ///
     /// `name` must name a field already defined by this span's metadata, and
     /// the field must not already have a value. If this is not the case, this
     /// function returns an [`AddValueError`](::subscriber::AddValueError).
-    pub fn add_value<Q: AsKey>(
+    pub fn add_value(
         &mut self,
-        name: Q,
+        key: &Key,
         value: &dyn IntoValue,
     ) -> Result<(), AddValueError> {
-        if let Some(i) = name.as_key(self.static_meta).as_ref().map(Key::as_usize) {
-            let field = &mut self.field_values[i];
-            if field.is_some() {
-                Err(AddValueError::FieldAlreadyExists)
-            } else {
-                *field = Some(value.into_value());
-                Ok(())
-            }
+        if !self.has_field(key) {
+            return Err(AddValueError::NoField);
+        }
+        let field = &mut self.field_values[key.as_usize()];
+        if field.is_some() {
+            Err(AddValueError::FieldAlreadyExists)
         } else {
-            Err(AddValueError::NoField)
+            *field = Some(value.into_value());
+            Ok(())
         }
     }
 
@@ -488,19 +481,19 @@ impl Enter {
     /// `name` must name a field already defined by this span's metadata, and
     /// the field must not already have a value. If this is not the case, this
     /// function returns an [`AddValueError`](::subscriber::AddValueError).
-    pub fn add_value<Q: AsKey>(
+    pub fn add_value(
         &self,
-        field: Q,
+        field: &Key,
         value: &dyn IntoValue,
     ) -> Result<(), AddValueError> {
-        if let Some(field) = field.as_key(self.meta) {
-            match self.subscriber.add_value(&self.id, &field, value) {
-                Ok(()) => Ok(()),
-                Err(AddValueError::NoSpan) => panic!("span should still exist!"),
-                Err(e) => Err(e),
-            }
-        } else {
-            Ok(())
+        if !self.meta.contains_key(field) {
+            return Err(AddValueError::NoField);
+        }
+
+        match self.subscriber.add_value(&self.id, &field, value) {
+            Ok(()) => Ok(()),
+            Err(AddValueError::NoSpan) => panic!("span should still exist!"),
+            Err(e) => Err(e),
         }
     }
 
