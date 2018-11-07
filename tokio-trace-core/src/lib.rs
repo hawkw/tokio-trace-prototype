@@ -206,7 +206,7 @@ pub struct Event<'a> {
 /// [`Span`]: ::span::Span
 /// [`Event`]: ::Event
 /// [`Subscriber`]: ::Subscriber
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, Hash)]
 pub struct Meta<'a> {
     /// If this metadata describes a span, the name of the span.
     pub name: Option<&'a str>,
@@ -328,6 +328,26 @@ impl<'a> Meta<'a> {
     /// Returns `true` if `self` contains a field for the given `key`.
     pub fn contains_key(&self, key: &field::Key<'a>) -> bool {
         key.metadata() == self && key.as_usize() <= self.field_names.len()
+    }
+
+    #[inline]
+    fn callsite_eq(&self, other: &Meta<'a>) -> Option<bool> {
+        Some(self.line? == other.line? && self.file? == other.file?)
+    }
+}
+
+impl<'a> PartialEq for Meta<'a> {
+    #[inline]
+    fn eq(&self, other: &Meta<'a>) -> bool {
+        // If both sets of metadata have a callsite, we can compare them based
+        // on that callsite only, as an optimization.
+        if let Some(eq) = self.callsite_eq(other) {
+            return eq;
+        }
+        self.line == other.line
+            && self.file == other.file
+            && self.target == other.target
+            && self.name == other.name
     }
 }
 
