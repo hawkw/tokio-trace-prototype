@@ -1,5 +1,6 @@
 //! Spans represent periods of time in the execution of a program.
 use std::{
+    borrow::Borrow,
     cell::RefCell,
     cmp, fmt,
     hash::{Hash, Hasher},
@@ -191,6 +192,14 @@ impl Span {
         self.inner.as_ref().and_then(Enter::parent)
     }
 
+    pub fn field_for<Q>(&self, name: &Q) -> Option<Key<'static>>
+    where
+        Q: Borrow<str>,
+        Q: Eq,
+    {
+        self.inner.as_ref().and_then(|inner| inner.meta.field_for(name))
+    }
+
     /// Sets the field on this span named `name` to the given `value`.
     ///
     /// `name` must name a field already defined by this span's metadata, and
@@ -309,6 +318,14 @@ impl Data {
     /// Returns an iterator over the names of all the fields on this span.
     pub fn field_keys(&self) -> impl Iterator<Item = Key<'static>> {
         self.static_meta.fields()
+    }
+
+    pub fn field_for<Q>(&self, name: &Q) -> Option<Key<'static>>
+    where
+        Q: Borrow<str>,
+        Q: Eq,
+    {
+        self.static_meta.field_for(name)
     }
 
     /// Returns true if a field named 'name' has been declared on this span,

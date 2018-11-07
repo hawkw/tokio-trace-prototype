@@ -71,7 +71,7 @@
 //! [metadata]: struct.Meta.html
 #![warn(missing_docs)]
 
-use std::{fmt, slice};
+use std::{fmt, slice, borrow::Borrow};
 
 #[macro_export]
 macro_rules! callsite {
@@ -324,8 +324,13 @@ impl<'a> Meta<'a> {
 
     /// Returns a [`Key`](::field::Key) to the field corresponding to `name`, if
     /// one exists, or `None` if no such field exists.
-    pub fn field_for<Q: field::AsKey>(&'a self, name: &Q) -> Option<field::Key<'a>> {
-        name.as_key(self)
+    pub fn field_for<Q>(&'a self, name: &Q) -> Option<field::Key<'a>>
+    where
+        Q: Borrow<str>,
+        Q: Eq,
+    {
+        let name = &name.borrow();
+        self.field_names.iter().position(|f| f == name).map(|i| Key::new(i, self))
     }
 
     /// Returns `true` if `self` contains a field for the given `key`.
