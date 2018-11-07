@@ -203,7 +203,7 @@ pub use tokio_trace_core::span::{mock, MockSpan};
 
 use std::sync::Arc;
 use tokio_trace_core::span::Enter;
-use {subscriber, IntoValue};
+use {field, subscriber, IntoValue};
 
 /// Trait for converting a `Span` into a cloneable `Shared` span.
 pub trait IntoShared {
@@ -291,16 +291,18 @@ impl Shared {
     /// `name` must name a field already defined by this span's metadata, and
     /// the field must not already have a value. If this is not the case, this
     /// function returns an [`AddValueError`](::subscriber::AddValueError).
-    pub fn add_value(
+    pub fn add_value<Q: field::AsKey>(
         &self,
-        field: &'static str,
+        field: &Q,
         value: &dyn IntoValue,
     ) -> Result<(), subscriber::AddValueError> {
-        // self.inner
-        //     .as_ref()
-        //     .map(|inner| inner.add_value(field, value))
-        //     .unwrap_or(Ok(()))
-        unimplemented!()
+        if let Some(ref inner) = self.inner {
+            let field = field.as_key(inner.metadata())
+                .ok_or(subscriber::AddValueError::NoField)?;
+            inner.add_value(&field, value)
+        } else {
+            Ok(())
+        }
     }
 
     /// Indicates that the span with the given ID has an indirect causal

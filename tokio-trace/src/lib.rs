@@ -89,16 +89,17 @@ macro_rules! event {
 }
 
 mod dispatcher;
+pub mod field;
 pub mod span;
 pub mod subscriber;
 
 pub use self::{
     dispatcher::Dispatch,
+    field::{AsValue, IntoValue, Value},
     span::{Data as SpanData, Id as SpanId, Span},
     subscriber::Subscriber,
     tokio_trace_core::{
         callsite,
-        field::{self, AsValue, IntoValue, Value},
         Event, Level, Meta,
     },
 };

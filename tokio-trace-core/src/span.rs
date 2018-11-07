@@ -8,6 +8,7 @@ use std::{
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 use {
+    Meta,
     field::{IntoValue, Key, OwnedValue},
     subscriber::{AddValueError, FollowsError, Subscriber},
     DebugFields, Dispatch, StaticMeta,
@@ -531,6 +532,12 @@ impl Enter {
     pub fn parent(&self) -> Option<Id> {
         self.parent.clone()
     }
+
+    /// Returns the span's metadata.
+    pub fn metadata(&self) -> &'static Meta<'static> {
+        self.meta
+    }
+
 
     fn new(id: Id, subscriber: Dispatch, parent: Option<Id>, meta: &'static StaticMeta) -> Self {
         Self {

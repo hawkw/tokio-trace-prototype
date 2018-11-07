@@ -59,21 +59,6 @@
 use super::Meta;
 use std::{any::TypeId, borrow::Borrow, fmt};
 
-/// Trait implemented to allow a type to be used as a field key.
-///
-/// **Note**: Although this is implemented for both the [`Key`] type *and* any
-/// type that can be borrowed as an `&str`, only `Key` allows _O_(1) access.
-/// Indexing a field with a string results in an iterative search that performs
-/// string comparisons. Thus, if possible, once the key for a field is known, it
-/// should be used whenever possible.
-pub trait AsKey {
-    /// Attempts to convert `&self` into a `Key` with the specified `metadata`.
-    ///
-    /// If `metadata` defines a key corresponding to this field, then the key is
-    /// returned. Otherwise, this function returns `None`.
-    fn as_key<'a>(&self, metadata: &'a Meta<'a>) -> Option<Key<'a>>;
-}
-
 /// A formattable field value of an erased type.
 pub trait Value: fmt::Debug + Send + Sync {
     /// Returns true if the boxed type is the same as `T`
@@ -215,51 +200,6 @@ where
     T: AsValue + fmt::Display,
 {
     DisplayValue(t)
-}
-
-// ===== impl AsKey =====
-
-impl<'f> AsKey for Key<'f> {
-    #[inline]
-    fn as_key<'a>(&self, metadata: &'a Meta<'a>) -> Option<Key<'a>> {
-        if metadata == self.metadata {
-            Some(Key {
-                i: self.i,
-                metadata,
-            })
-        } else {
-            None
-        }
-    }
-}
-
-impl<'f> AsKey for &'f Key<'f> {
-    #[inline]
-    fn as_key<'a>(&self, metadata: &'a Meta<'a>) -> Option<Key<'a>> {
-        if metadata == self.metadata {
-            Some(Key {
-                i: self.i,
-                metadata,
-            })
-        } else {
-            None
-        }
-    }
-}
-
-impl<T> AsKey for T
-where
-    T: Borrow<str>,
-{
-    #[inline]
-    fn as_key<'a>(&self, metadata: &'a Meta<'a>) -> Option<Key<'a>> {
-        let name = self.borrow();
-        metadata
-            .field_names
-            .iter()
-            .position(|&f| f == name)
-            .map(|i| Key::new(i, metadata))
-    }
 }
 
 // ===== impl AsValue =====
@@ -421,6 +361,25 @@ impl<'a> Key<'a> {
     /// field does not exist.
     pub fn name(&self) -> Option<&'a str> {
         self.metadata.field_names.get(self.i).map(|&n| n)
+    }
+
+    /// If `self` indexes the given `metadata`, returns a new key into that
+    /// metadata. Otherwise, returns `None`.
+    ///
+    /// This is essentially just a trick to tell the compiler that the lifetine
+    /// parameters of two references to a metadata are equal if they are the
+    /// same metadata (which can't be inferred when dealing with metadata with
+    /// generic lifetimes).
+    #[inline]
+    pub fn with_metadata<'b>(&self, metadata: &'b Meta<'b>) -> Option<Key<'b>> {
+        if self.metadata == metadata {
+            Some(Key {
+                i: self.i,
+                metadata,
+            })
+        } else {
+            None
+        }
     }
 }
 
