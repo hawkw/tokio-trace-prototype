@@ -31,28 +31,32 @@ macro_rules! span {
     ($name:expr) => { span!($name,) };
     ($name:expr, $($k:ident $( = $val:expr )* ) ,*) => {
         {
-            use $crate::{callsite, Dispatch, Span};
+            use $crate::{callsite, span::AsId, Dispatch, Span};
             let callsite = callsite! { span: $name, $( $k ),* };
             Dispatch::current().if_enabled(&callsite, |dispatch, meta| {
                 let span = Span::new(dispatch.clone(), meta);
                 // Depending on how many fields are generated, this may or may
                 // not actually be used, but it doesn't make sense to repeat it.
-                #[allow(unused_variables,unused_mut)]
-                let mut keys = meta.fields();
-                $(
-                    let key = keys.next()
-                        .expect(concat!("metadata should define a key for '", stringify!($k), "'"));
-                    span!(@ add_value: span, $k, &key, $($val)*);
-                )*
+                #[allow(unused_variables, unused_mut, unused_imports)] {
+                    use $crate::Subscriber;
+                    let id = span.as_id().expect("must have ID");
+                    let mut keys = meta.fields();
+                    $(
+                        let key = keys.next()
+                            .expect(concat!("metadata should define a key for '", stringify!($k), "'"));
+                        span!(@ add_value: &dispatch, &id, $k, &key, $($val)*);
+                    )*
+                }
+
                 span
             }).unwrap_or_else(Span::new_disabled)
         }
     };
-    (@ add_value: $span:expr, $k:expr, $i:expr, $val:expr) => (
-        $span.add_value($i, $val)
+    (@ add_value: $dispatch:expr, $id:expr, $k:expr, $i:expr, $val:expr) => (
+        $dispatch.add_value($id, $i, $val)
             .expect(concat!("adding value for field '", stringify!($k), "' failed"));
     );
-    (@ add_value: $span:expr, $k:expr, $i:expr,) => (
+    (@ add_value: $dispatch:expr, $id:expr, $k:expr, $i:expr,) => (
         // skip
     );
 }
