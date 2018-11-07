@@ -192,13 +192,13 @@ impl Span {
         self.inner.as_ref().and_then(Enter::parent)
     }
 
-    pub fn field_for<Q>(&self, name: &Q) -> Option<Key<'static>>
+    pub fn key_for<Q>(&self, name: &Q) -> Option<Key<'static>>
     where
         Q: Borrow<str>,
     {
         self.inner
             .as_ref()
-            .and_then(|inner| inner.meta.field_for(name))
+            .and_then(|inner| inner.meta.key_for(name))
     }
 
     /// Sets the field on this span named `name` to the given `value`.
@@ -263,6 +263,12 @@ impl Span {
     pub fn id(&self) -> Option<Id> {
         self.inner.as_ref().map(Enter::id)
     }
+
+
+    /// Returns this span's `Meta`, if it is enabled.
+    pub fn metadata(&self) -> Option<&'static Meta<'static>> {
+        self.inner.as_ref().map(|inner| inner.metadata())
+    }
 }
 
 impl fmt::Debug for Span {
@@ -314,11 +320,11 @@ impl Data {
         self.static_meta.fields()
     }
 
-    pub fn field_for<Q>(&self, name: &Q) -> Option<Key<'static>>
+    pub fn key_for<Q>(&self, name: &Q) -> Option<Key<'static>>
     where
         Q: Borrow<str>,
     {
-        self.static_meta.field_for(name)
+        self.static_meta.key_for(name)
     }
 
     /// Returns true if a field named 'name' has been declared on this span,

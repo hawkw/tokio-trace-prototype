@@ -324,7 +324,7 @@ impl<'a> Meta<'a> {
 
     /// Returns a [`Key`](::field::Key) to the field corresponding to `name`, if
     /// one exists, or `None` if no such field exists.
-    pub fn field_for<Q>(&'a self, name: &Q) -> Option<field::Key<'a>>
+    pub fn key_for<Q>(&'a self, name: &Q) -> Option<field::Key<'a>>
     where
         Q: Borrow<str>,
     {

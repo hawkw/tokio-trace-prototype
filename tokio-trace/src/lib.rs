@@ -103,3 +103,7 @@ pub use self::{
 
 #[doc(hidden)]
 pub use tokio_trace_core::Kind;
+
+mod sealed {
+    pub trait Sealed {}
+}

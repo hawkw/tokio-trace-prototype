@@ -32,9 +32,9 @@ impl<'f> AsKey for &'f Key<'f> {
     }
 }
 
-impl<'s> AsKey for &'s str {
+impl AsKey for str {
     #[inline]
     fn as_key<'a>(&self, metadata: &'a Meta<'a>) -> Option<Key<'a>> {
-        metadata.field_for(self)
+        metadata.key_for(&self)
     }
 }
