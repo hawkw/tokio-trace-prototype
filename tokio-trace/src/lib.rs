@@ -31,7 +31,7 @@ macro_rules! span {
     ($name:expr) => { span!($name,) };
     ($name:expr, $($k:ident $( = $val:expr )* ) ,*) => {
         {
-            use $crate::{callsite, span::AsId, Dispatch, Span};
+            use $crate::{callsite, Dispatch, Span};
             let callsite = callsite! { span: $name, $( $k ),* };
             Dispatch::current().if_enabled(&callsite, |dispatch, meta| {
                 let span = Span::new(dispatch.clone(), meta);
@@ -39,7 +39,7 @@ macro_rules! span {
                 // not actually be used, but it doesn't make sense to repeat it.
                 #[allow(unused_variables, unused_mut, unused_imports)] {
                     use $crate::Subscriber;
-                    let id = span.as_id().expect("must have ID");
+                    let id = span.id().expect("span must have an ID if enabled");
                     let mut keys = meta.fields();
                     $(
                         let key = keys.next()
