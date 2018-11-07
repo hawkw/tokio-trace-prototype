@@ -214,22 +214,23 @@ pub trait IntoShared {
 }
 
 pub trait SpanExt: ::sealed::Sealed {
-    fn add_value_for<Q: ?Sized>(&mut self, field: &Q, value: &dyn IntoValue) -> Result<(), subscriber::AddValueError>
+    fn add_value_for<Q: ?Sized>(
+        &mut self,
+        field: &Q,
+        value: &dyn IntoValue,
+    ) -> Result<(), subscriber::AddValueError>
     where
-        Q: field::AsKey,
-    ;
+        Q: field::AsKey;
 
     fn has_field_for<Q: ?Sized>(&self, field: &Q) -> bool
     where
-        Q: field::AsKey,
-    ;
+        Q: field::AsKey;
 }
 
 pub trait DataExt: SpanExt {
     fn field_for<Q: ?Sized + field::AsKey>(&self, field: &Q) -> Option<&field::OwnedValue>
     where
-        Q: field::AsKey,
-    ;
+        Q: field::AsKey;
 }
 
 impl IntoShared for Span {
@@ -351,12 +352,18 @@ impl Shared {
 impl ::sealed::Sealed for Span {}
 
 impl SpanExt for Span {
-    fn add_value_for<Q: ?Sized>(&mut self, field: &Q, value: &dyn IntoValue) -> Result<(), subscriber::AddValueError>
+    fn add_value_for<Q: ?Sized>(
+        &mut self,
+        field: &Q,
+        value: &dyn IntoValue,
+    ) -> Result<(), subscriber::AddValueError>
     where
-        Q: field::AsKey
+        Q: field::AsKey,
     {
         if let Some(meta) = self.metadata() {
-            let key = field.as_key(meta).ok_or(subscriber::AddValueError::NoField)?;
+            let key = field
+                .as_key(meta)
+                .ok_or(subscriber::AddValueError::NoField)?;
             self.add_value(&key, value)
         } else {
             Ok(())
@@ -364,26 +371,34 @@ impl SpanExt for Span {
     }
     fn has_field_for<Q: ?Sized>(&self, field: &Q) -> bool
     where
-        Q: field::AsKey
+        Q: field::AsKey,
     {
-        self.metadata().and_then(|meta| field.as_key(meta)).is_some()
+        self.metadata()
+            .and_then(|meta| field.as_key(meta))
+            .is_some()
     }
 }
 
 impl ::sealed::Sealed for Data {}
 
 impl SpanExt for Data {
-    fn add_value_for<Q: ?Sized>(&mut self, field: &Q, value: &dyn IntoValue) -> Result<(), subscriber::AddValueError>
+    fn add_value_for<Q: ?Sized>(
+        &mut self,
+        field: &Q,
+        value: &dyn IntoValue,
+    ) -> Result<(), subscriber::AddValueError>
     where
-        Q: field::AsKey
+        Q: field::AsKey,
     {
-        let key = field.as_key(self.meta()).ok_or(subscriber::AddValueError::NoField)?;
+        let key = field
+            .as_key(self.meta())
+            .ok_or(subscriber::AddValueError::NoField)?;
         self.add_value(&key, value)
     }
 
     fn has_field_for<Q: ?Sized>(&self, field: &Q) -> bool
     where
-        Q: field::AsKey
+        Q: field::AsKey,
     {
         field.as_key(self.meta()).is_some()
     }
@@ -392,7 +407,7 @@ impl SpanExt for Data {
 impl DataExt for Data {
     fn field_for<Q: ?Sized>(&self, field: &Q) -> Option<&field::OwnedValue>
     where
-        Q: field::AsKey
+        Q: field::AsKey,
     {
         self.field(&field.as_key(self.meta())?)
     }
