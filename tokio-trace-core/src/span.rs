@@ -266,7 +266,6 @@ impl Span {
         self.inner.as_ref().map(Enter::id)
     }
 
-
     /// Returns this span's `Meta`, if it is enabled.
     pub fn metadata(&self) -> Option<&'static Meta<'static>> {
         self.inner.as_ref().map(|inner| inner.metadata())
