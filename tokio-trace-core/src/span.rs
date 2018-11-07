@@ -192,6 +192,8 @@ impl Span {
         self.inner.as_ref().and_then(Enter::parent)
     }
 
+    /// Returns a [`Key`](::field::Key) for the field with the given `name`, if
+    /// one exists,
     pub fn key_for<Q>(&self, name: &Q) -> Option<Key<'static>>
     where
         Q: Borrow<str>,
@@ -320,6 +322,8 @@ impl Data {
         self.static_meta.fields()
     }
 
+    /// Returns a [`Key`](::field::Key) for the field with the given `name`, if
+    /// one exists,
     pub fn key_for<Q>(&self, name: &Q) -> Option<Key<'static>>
     where
         Q: Borrow<str>,

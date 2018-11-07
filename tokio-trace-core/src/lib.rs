@@ -356,6 +356,7 @@ impl<'a> Event<'a> {
         self.meta.field_names.iter()
     }
 
+    /// Returns true if this event has a field for the specified `key`.
     #[inline]
     pub fn has_field(&self, key: &field::Key) -> bool {
         self.meta.contains_key(key)
