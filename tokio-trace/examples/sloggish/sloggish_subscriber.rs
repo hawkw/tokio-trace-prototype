@@ -136,10 +136,7 @@ impl Subscriber for SloggishSubscriber {
     }
 
     #[inline]
-    fn observe_event<'a>(
-        &self,
-        event: &'a tokio_trace::Event<'a>,
-    ) {
+    fn observe_event<'a>(&self, event: &'a tokio_trace::Event<'a>) {
         let mut stderr = self.stderr.lock();
 
         let stack = self.stack.lock().unwrap();
