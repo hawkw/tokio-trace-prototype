@@ -1,5 +1,5 @@
 use std::{cell::Cell, thread::LocalKey, sync::Mutex};
-use {dispatcher::{self, Dispatch}, Meta, Span, Subscriber};
+use {dispatcher::{self, Dispatch}, Meta, Span, subscriber::{Subscriber, Interest}};
 
 lazy_static! {
     static ref REGISTRY: Mutex<Registry> = Mutex::new(Registry {
@@ -9,19 +9,17 @@ lazy_static! {
 }
 
 struct Registry {
-    callsites: Vec<&'static dyn Callsite_>,
-    dispatchers: Vec<dispatcher::FilterHandle>,
+    callsites: Vec<&'static dyn Callsite>,
+    dispatchers: Vec<dispatcher::Registrar>,
 }
 
-pub fn register(callsite: &'static dyn Callsite_) {
+pub fn register(callsite: &'static dyn Callsite) {
     let mut registry = REGISTRY.lock().unwrap();
     let meta = callsite.metadata();
-    registry.dispatchers.retain(|dispatch| {
-        match dispatch.enabled(meta) {
-            Some(enabled) => {
-                if enabled {
-                    callsite.enable();
-                }
+    registry.dispatchers.retain(|registrar| {
+        match registrar.try_register(meta) {
+            Some(interest) => {
+                callsite.add_interest(interest);
                 true
             },
             // TODO: if the dispatcher has been dropped, should we invalidate
@@ -34,54 +32,15 @@ pub fn register(callsite: &'static dyn Callsite_) {
 
 pub(crate) fn register_dispatch(dispatch: &Dispatch) {
     let mut registry = REGISTRY.lock().unwrap();
-    registry.dispatchers.push(dispatch.as_filter());
+    registry.dispatchers.push(dispatch.registrar());
     for callsite in &registry.callsites {
-        if dispatch.enabled(callsite.metadata()) {
-            callsite.enable();
-        }
+        let interest = dispatch.register_callsite(callsite.metadata());
+        callsite.add_interest(interest);
     }
 }
 
-pub trait Callsite_: Sync {
+pub trait Callsite: Sync {
     fn is_enabled(&self, dispatch: &Dispatch) -> bool;
-    fn enable(&self);
-    fn disable(&self);
+    fn add_interest(&self, interest: Interest);
     fn metadata(&self) -> &Meta;
-}
-
-#[derive(Debug)]
-pub struct Callsite(pub(crate) &'static LocalKey<Cache<'static>>);
-
-#[doc(hidden)]
-pub struct Cache<'a> {
-    pub(crate) last_filtered_by: Cell<usize>,
-    pub(crate) cached_filter: Cell<Option<bool>>,
-    pub(crate) meta: &'a Meta<'a>,
-}
-
-impl Callsite {
-    #[doc(hidden)]
-    pub fn new(cache: &'static LocalKey<Cache<'static>>) -> Self {
-        Callsite(cache)
-    }
-
-    #[inline]
-    pub(crate) fn metadata(&self) -> &'static Meta<'static> {
-        self.0.with(|cache| cache.meta)
-    }
-}
-
-impl<'a> Cache<'a> {
-    pub fn new(meta: &'a Meta<'a>) -> Self {
-        Self {
-            last_filtered_by: Cell::new(0),
-            cached_filter: Cell::new(None),
-            meta,
-        }
-    }
-
-    #[inline]
-    pub fn metadata(&self) -> &'a Meta<'a> {
-        self.meta
-    }
 }

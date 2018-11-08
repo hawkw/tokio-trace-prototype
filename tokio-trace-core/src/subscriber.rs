@@ -35,6 +35,9 @@ use {span, Event, IntoValue, Key, Meta, SpanId};
 /// [`new_span`]: ::Span::new_span
 pub trait Subscriber {
     // === Span registry methods ==============================================
+    fn register_callsite(&self, metadata: &Meta) -> Interest {
+        Interest::from_filter(self.enabled(metadata))
+    }
 
     /// Record the construction of a new [`Span`], returning a a new [span ID] for
     /// the span being constructed.
@@ -188,6 +191,13 @@ pub trait Subscriber {
     fn close(&self, span: SpanId);
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub enum Interest {
+    Never = 0,
+    Sometimes = 1,
+    Always = 2,
+}
+
 /// Errors which may prevent a value from being successfully added to a span.
 // TODO: before releasing core 0.1 this needs to be made private, to avoid
 // future breaking changes.
@@ -212,6 +222,15 @@ pub enum FollowsError {
     NoSpan(SpanId),
     /// The span that this span follows from does not exist (it has no ID).
     NoPreceedingId,
+}
+
+impl Interest {
+    pub fn from_filter(filter: bool) -> Self {
+        match filter {
+            true => Interest::Always,
+            false => Interest::Never,
+        }
+    }
 }
 
 #[cfg(any(test, feature = "test-support"))]

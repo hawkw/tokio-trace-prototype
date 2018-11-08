@@ -27,11 +27,7 @@ pub struct Dispatch {
     id: usize,
 }
 
-#[derive(Clone)]
-pub(crate) struct FilterHandle {
-    subscriber: Weak<dyn Subscriber + Send + Sync>,
-    id: usize,
-}
+pub(crate) struct Registrar(Weak<dyn Subscriber + Send + Sync>);
 
 impl Dispatch {
     /// Returns a new `Dispatch` that discards events and spans.
@@ -96,63 +92,60 @@ impl Dispatch {
     /// calls the given closure with the dispatcher and the callsite's metadata,
     /// and returns the result. Otherwise, it returns `None`.
     #[inline]
-    pub fn if_enabled<F, T>(self, callsite: &callsite::Callsite, f: F) -> Option<T>
+    pub fn if_enabled<F, T>(self, callsite: &'static dyn callsite::Callsite, f: F) -> Option<T>
     where
         F: FnOnce(Dispatch, &'static Meta<'static>) -> T,
     {
-        if self.is_enabled(callsite) {
+        if callsite.is_enabled(&self) {
             return Some(f(self, callsite.metadata()));
         }
 
         None
     }
 
-    pub(crate) fn id(&self) -> usize {
-        self.id
-    }
+    // pub(crate) fn id(&self) -> usize {
+    //     self.id
+    // }
 
-    #[inline]
-    fn is_invalid(&self, callsite: &callsite::Callsite) -> bool {
-        callsite.0.with(|cache| {
-            // If the callsite was last filtered by a different subscriber, assume
-            // the filter is no longer valid.
-            if cache.cached_filter.get().is_none() || cache.last_filtered_by.get() != self.id {
-                // Update the stamp on the call site so this subscriber is now the
-                // last to filter it.
-                cache.last_filtered_by.set(self.id);
-                return true;
-            }
+    // #[inline]
+    // fn is_invalid(&self, callsite: &callsite::Callsite) -> bool {
+    //     callsite.0.with(|cache| {
+    //         // If the callsite was last filtered by a different subscriber, assume
+    //         // the filter is no longer valid.
+    //         if cache.cached_filter.get().is_none() || cache.last_filtered_by.get() != self.id {
+    //             // Update the stamp on the call site so this subscriber is now the
+    //             // last to filter it.
+    //             cache.last_filtered_by.set(self.id);
+    //             return true;
+    //         }
 
-            // Otherwise, just ask the subscriber what it thinks.
-            self.subscriber.should_invalidate_filter(&cache.meta)
-        })
-    }
+    //         // Otherwise, just ask the subscriber what it thinks.
+    //         self.subscriber.should_invalidate_filter(&cache.meta)
+    //     })
+    // }
 
-    #[inline]
-    fn is_enabled(&self, callsite: &callsite::Callsite) -> bool {
-        if self.is_invalid(callsite) {
-            callsite.0.with(|cache| {
-                let enabled = self.subscriber.enabled(&cache.meta);
-                cache.cached_filter.set(Some(enabled));
-                enabled
-            })
-        } else if let Some(cached) = callsite.0.with(|cache| cache.cached_filter.get()) {
-            cached
-        } else {
-            callsite.0.with(|cache| {
-                let enabled = self.subscriber.enabled(&cache.meta);
-                cache.cached_filter.set(Some(enabled));
-                enabled
-            })
-        }
-    }
+    // #[inline]
+    // fn is_enabled(&self, callsite: &callsite::Callsite) -> bool {
+    //     if self.is_invalid(callsite) {
+    //         callsite.0.with(|cache| {
+    //             let enabled = self.subscriber.enabled(&cache.meta);
+    //             cache.cached_filter.set(Some(enabled));
+    //             enabled
+    //         })
+    //     } else if let Some(cached) = callsite.0.with(|cache| cache.cached_filter.get()) {
+    //         cached
+    //     } else {
+    //         callsite.0.with(|cache| {
+    //             let enabled = self.subscriber.enabled(&cache.meta);
+    //             cache.cached_filter.set(Some(enabled));
+    //             enabled
+    //         })
+    //     }
+    // }
 
-    pub(crate) fn as_filter(&self) -> FilterHandle {
+    pub(crate) fn registrar(&self) -> Registrar {
         let subscriber = Arc::downgrade(&self.subscriber);
-        FilterHandle {
-            subscriber,
-            id: self.id,
-        }
+        Registrar(Arc::downgrade(&self.subscriber))
     }
 }
 
@@ -169,6 +162,11 @@ impl Default for Dispatch {
 }
 
 impl Subscriber for Dispatch {
+    #[inline]
+    fn register_callsite(&self, metadata: &Meta) -> subscriber::Interest {
+        self.subscriber.register_callsite(metadata)
+    }
+
     #[inline]
     fn new_span(&self, span: span::Data) -> span::Id {
         self.subscriber.new_span(span)
@@ -263,12 +261,8 @@ impl Subscriber for NoSubscriber {
     fn close(&self, _span: span::Id) {}
 }
 
-impl FilterHandle {
-    pub(crate) fn should_deregister(&self) -> bool {
-        self.subscriber.upgrade().is_none()
-    }
-
-    pub(crate) fn enabled(&self, metadata: &Meta) -> Option<bool> {
-        self.subscriber.upgrade().map(|s| s.enabled(metadata))
+impl Registrar {
+    pub(crate) fn try_register(&self, metadata: &Meta) -> Option<subscriber::Interest> {
+        self.0.upgrade().map(|s| s.register_callsite(metadata))
     }
 }
