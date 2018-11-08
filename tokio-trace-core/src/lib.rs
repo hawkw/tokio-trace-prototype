@@ -71,6 +71,9 @@
 //! [metadata]: struct.Meta.html
 #![warn(missing_docs)]
 
+#[macro_use]
+extern crate lazy_static;
+
 use std::{borrow::Borrow, fmt, slice};
 
 #[macro_export]
