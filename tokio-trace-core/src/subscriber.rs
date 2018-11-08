@@ -415,6 +415,7 @@ mod test_support {
         }
 
         fn enter(&self, span: span::Id) {
+            println!("enter: {:?}", span);
             let spans = self.spans.lock().unwrap();
             let span = spans
                 .get(&span)
@@ -449,6 +450,7 @@ mod test_support {
         }
 
         fn exit(&self, span: span::Id) {
+            println!("exit: {:?}", span);
             let spans = self.spans.lock().unwrap();
             let span = spans
                 .get(&span)

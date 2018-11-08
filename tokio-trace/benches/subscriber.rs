@@ -39,10 +39,6 @@ impl tokio_trace::Subscriber for EnabledSubscriber {
         true
     }
 
-    fn should_invalidate_filter(&self, _metadata: &Meta) -> bool {
-        false
-    }
-
     fn observe_event<'event>(&self, event: &'event Event<'event>) {
         let _ = event;
     }
@@ -94,10 +90,6 @@ impl tokio_trace::Subscriber for AddData {
     fn enabled(&self, metadata: &Meta) -> bool {
         let _ = metadata;
         true
-    }
-
-    fn should_invalidate_filter(&self, _metadata: &Meta) -> bool {
-        false
     }
 
     fn observe_event<'event>(&self, event: &'event Event<'event>) {
