@@ -86,65 +86,7 @@ impl Dispatch {
         })
     }
 
-    /// Performs an operation if a callsite is enabled.
-    ///
-    /// If the given callsite is enabled for this subscriber, this function
-    /// calls the given closure with the dispatcher and the callsite's metadata,
-    /// and returns the result. Otherwise, it returns `None`.
-    #[inline]
-    pub fn if_enabled<F, T>(self, callsite: &'static dyn callsite::Callsite, f: F) -> Option<T>
-    where
-        F: FnOnce(Dispatch, &'static Meta<'static>) -> T,
-    {
-        if callsite.is_enabled(&self) {
-            return Some(f(self, callsite.metadata()));
-        }
-
-        None
-    }
-
-    // pub(crate) fn id(&self) -> usize {
-    //     self.id
-    // }
-
-    // #[inline]
-    // fn is_invalid(&self, callsite: &callsite::Callsite) -> bool {
-    //     callsite.0.with(|cache| {
-    //         // If the callsite was last filtered by a different subscriber, assume
-    //         // the filter is no longer valid.
-    //         if cache.cached_filter.get().is_none() || cache.last_filtered_by.get() != self.id {
-    //             // Update the stamp on the call site so this subscriber is now the
-    //             // last to filter it.
-    //             cache.last_filtered_by.set(self.id);
-    //             return true;
-    //         }
-
-    //         // Otherwise, just ask the subscriber what it thinks.
-    //         self.subscriber.should_invalidate_filter(&cache.meta)
-    //     })
-    // }
-
-    // #[inline]
-    // fn is_enabled(&self, callsite: &callsite::Callsite) -> bool {
-    //     if self.is_invalid(callsite) {
-    //         callsite.0.with(|cache| {
-    //             let enabled = self.subscriber.enabled(&cache.meta);
-    //             cache.cached_filter.set(Some(enabled));
-    //             enabled
-    //         })
-    //     } else if let Some(cached) = callsite.0.with(|cache| cache.cached_filter.get()) {
-    //         cached
-    //     } else {
-    //         callsite.0.with(|cache| {
-    //             let enabled = self.subscriber.enabled(&cache.meta);
-    //             cache.cached_filter.set(Some(enabled));
-    //             enabled
-    //         })
-    //     }
-    // }
-
     pub(crate) fn registrar(&self) -> Registrar {
-        let subscriber = Arc::downgrade(&self.subscriber);
         Registrar(Arc::downgrade(&self.subscriber))
     }
 }
