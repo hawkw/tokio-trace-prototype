@@ -1,5 +1,5 @@
 use std::{cell::Cell, thread::LocalKey, sync::Mutex};
-use {Dispatch, Meta, Span, Subscriber};
+use {dispatcher::{self, Dispatch}, Meta, Span, Subscriber};
 
 lazy_static! {
     static ref REGISTRY: Mutex<Registry> = Mutex::new(Registry {
@@ -10,38 +10,42 @@ lazy_static! {
 
 struct Registry {
     callsites: Vec<&'static dyn Callsite_>,
-    dispatchers: Vec<Dispatch>,
+    dispatchers: Vec<dispatcher::FilterHandle>,
 }
 
-pub fn register_callsite(callsite: &'static dyn Callsite_) {
+pub fn register(callsite: &'static dyn Callsite_) {
     let mut registry = REGISTRY.lock().unwrap();
-    for dispatch in &registry.dispatchers {
-        if dispatch.enabled(callsite.metadata()) {
-            callsite.enable();
+    let meta = callsite.metadata();
+    registry.dispatchers.retain(|dispatch| {
+        match dispatch.enabled(meta) {
+            Some(enabled) => {
+                if enabled {
+                    callsite.enable();
+                }
+                true
+            },
+            // TODO: if the dispatcher has been dropped, should we invalidate
+            // any callsites that it previously enabled?
+            None => false,
         }
-    }
+    });
     registry.callsites.push(callsite);
 }
 
 pub(crate) fn register_dispatch(dispatch: &Dispatch) {
     let mut registry = REGISTRY.lock().unwrap();
+    registry.dispatchers.push(dispatch.as_filter());
     for callsite in &registry.callsites {
         if dispatch.enabled(callsite.metadata()) {
             callsite.enable();
         }
     }
-    registry.dispatchers.push(dispatch.clone());
-}
-
-pub(crate) fn deregister_dispatch(id: usize) {
-    let mut registry = REGISTRY.lock().unwrap();
-    registry.dispatchers.retain(|d| d.id() != id);
-    // TODO: should probably check if any callsites are no longer enabled...
 }
 
 pub trait Callsite_: Sync {
     fn is_enabled(&self, dispatch: &Dispatch) -> bool;
     fn enable(&self);
+    fn disable(&self);
     fn metadata(&self) -> &Meta;
 }
 

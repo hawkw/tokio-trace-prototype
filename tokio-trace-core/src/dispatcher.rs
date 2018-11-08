@@ -12,7 +12,7 @@ use std::{
     fmt,
     sync::{
         atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT},
-        Arc,
+        Arc, Weak,
     },
 };
 
@@ -24,6 +24,12 @@ thread_local! {
 #[derive(Clone)]
 pub struct Dispatch {
     subscriber: Arc<dyn Subscriber + Send + Sync>,
+    id: usize,
+}
+
+#[derive(Clone)]
+pub(crate) struct FilterHandle {
+    subscriber: Weak<dyn Subscriber + Send + Sync>,
     id: usize,
 }
 
@@ -140,6 +146,14 @@ impl Dispatch {
             })
         }
     }
+
+    pub(crate) fn as_filter(&self) -> FilterHandle {
+        let subscriber = Arc::downgrade(&self.subscriber);
+        FilterHandle {
+            subscriber,
+            id: self.id,
+        }
+    }
 }
 
 impl fmt::Debug for Dispatch {
@@ -247,4 +261,14 @@ impl Subscriber for NoSubscriber {
     fn exit(&self, _span: span::Id) {}
 
     fn close(&self, _span: span::Id) {}
+}
+
+impl FilterHandle {
+    pub(crate) fn should_deregister(&self) -> bool {
+        self.subscriber.upgrade().is_none()
+    }
+
+    pub(crate) fn enabled(&self, metadata: &Meta) -> Option<bool> {
+        self.subscriber.upgrade().map(|s| s.enabled(metadata))
+    }
 }
