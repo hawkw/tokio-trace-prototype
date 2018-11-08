@@ -46,10 +46,10 @@ pub trait Subscriber {
     /// once for every callsite.
     ///
     /// This function is guaranteed to be called exactly once per callsite on
-    /// every subscriber. The subscriber may store the keys to fields it cares
-    /// in order to reduce the cost of accessing fields by name, preallocate
-    /// storage for that callsite, or perform any other actions it wishes to
-    /// perform once for each callsite.
+    /// every active subscriber. The subscriber may store the keys to fields it
+    /// cares in order to reduce the cost of accessing fields by name,
+    /// preallocate storage for that callsite, or perform any other actions it
+    /// wishes to perform once for each callsite.
     ///
     /// The subscriber should then return an [`Interest`](Interest), indicating
     /// whether it is interested in being notified about that callsite in the
@@ -86,6 +86,9 @@ pub trait Subscriber {
     /// return `Interest::Never`, as a new subscriber may be added that _is_
     /// interested.
     ///
+    /// **Note**: If a subscriber returns `Interest::Never` for a particular
+    /// callsite, it _may_ still see spans and events originating from that
+    /// callsite, if another subscriber expressed interest in it.
     /// [metadata]: ::Meta [`enabled`]: ::Subscriber::enabled
     fn register_callsite(&self, metadata: &Meta) -> Interest {
         Interest::from_filter(self.enabled(metadata))
@@ -207,10 +210,27 @@ pub trait Subscriber {
     fn close(&self, span: SpanId);
 }
 
+/// Indicates a `Subscriber`'s interest in a particular callsite.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum Interest {
+    /// The subscriber is never interested in being notified about a callsite.
+    ///
+    /// If all active subscribers are `Never` interested in a callsite, it will
+    /// be completely disabled unless a new subscriber becomes active.
     Never = 0,
+    /// The subscriber is sometimes interested in being notified about a
+    /// callsite.
+    ///
+    /// If all active subscribers are `Sometimes` or `Never` interested in a
+    /// callsite, the currently active subscriber will be asked to filter that
+    /// callsite every time it creates a span or event. This will be the case
+    /// until a subscriber expresses that it is `always` interested in the
+    /// callsite.
     Sometimes = 1,
+    /// The subscriber is always interested in being notified about a callsite.
+    ///
+    /// If any subscriber expresses that it is `Always` interested in a given
+    /// callsite, then the callsite will always be enabled.
     Always = 2,
 }
 
