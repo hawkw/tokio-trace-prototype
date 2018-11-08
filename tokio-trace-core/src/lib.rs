@@ -105,10 +105,11 @@ macro_rules! callsite {
         })
     });
     (@ $meta:expr ) => ({
-        use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
+        use std::sync::{Once, atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering}};
         use $crate::{callsite, Meta, subscriber::{Subscriber, Interest}};
         static META: Meta<'static> = $meta;
         static INTEREST: AtomicUsize = ATOMIC_USIZE_INIT;
+        static REGISTRATION: Once = Once::new();
         struct MyCallsite;
         impl callsite::Callsite for MyCallsite {
             fn is_enabled(&self, dispatch: &Dispatch) -> bool {
@@ -129,7 +130,9 @@ macro_rules! callsite {
                 &META
             }
         }
-        callsite::register(&MyCallsite);
+        REGISTRATION.call_once(|| {
+            callsite::register(&MyCallsite);
+        });
         &MyCallsite
     })
 }
