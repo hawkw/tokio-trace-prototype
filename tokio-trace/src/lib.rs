@@ -33,7 +33,7 @@ macro_rules! span {
         {
             use $crate::{callsite, Dispatch, Span};
             let callsite = callsite! { span: $name, $( $k ),* };
-            Dispatch::current().if_enabled(&callsite, |dispatch, meta| {
+            Dispatch::current().if_enabled(callsite, |dispatch, meta| {
                 let span = Span::new(dispatch.clone(), meta);
                 // Depending on how many fields are generated, this may or may
                 // not actually be used, but it doesn't make sense to repeat it.
@@ -71,7 +71,7 @@ macro_rules! event {
                 target:
                 $target, $( $k ),*
             };
-            Dispatch::current().if_enabled(&callsite, |dispatch, meta| {
+            Dispatch::current().if_enabled(callsite, |dispatch, meta| {
                 let field_values: &[ &dyn AsValue ] = &[ $( &$val ),* ];
                 dispatch.observe_event(&Event {
                     parent: SpanId::current(),

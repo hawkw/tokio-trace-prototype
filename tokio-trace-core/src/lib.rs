@@ -105,12 +105,32 @@ macro_rules! callsite {
         })
     });
     (@ $meta:expr ) => ({
-        use $crate::{callsite, Meta};
+        use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
+        use $crate::{callsite, Meta, subscriber::{Subscriber, Interest}};
         static META: Meta<'static> = $meta;
-        thread_local! {
-            static CACHE: callsite::Cache<'static> = callsite::Cache::new(&META);
+        static INTEREST: AtomicUsize = ATOMIC_USIZE_INIT;
+        struct MyCallsite;
+        impl callsite::Callsite for MyCallsite {
+            fn is_enabled(&self, dispatch: &Dispatch) -> bool {
+                match INTEREST.load(Ordering::Relaxed) {
+                    i if i == Interest::Always as usize => true,
+                    i if i == Interest::Never as usize => false,
+                    _ => dispatch.enabled(&META),
+                }
+            }
+            fn add_interest(&self, interest: Interest) {
+                let interest = interest as usize;
+                let current_interest = INTEREST.load(Ordering::Relaxed);
+                if interest > current_interest {
+                    INTEREST.store(interest, Ordering::Relaxed);
+                }
+            }
+            fn metadata(&self) -> &Meta {
+                &META
+            }
         }
-        callsite::Callsite::new(&CACHE)
+        callsite::register(&MyCallsite);
+        &MyCallsite
     })
 }
 
