@@ -57,10 +57,12 @@ impl Dispatch {
         S: Subscriber + Send + Sync + 'static,
     {
         static GEN: AtomicUsize = ATOMIC_USIZE_INIT;
-        Dispatch {
+        let me = Dispatch {
             subscriber: Arc::new(subscriber),
             id: GEN.fetch_add(1, Ordering::AcqRel),
-        }
+        };
+        ::callsite::register_dispatch(&me);
+        me
     }
 
     /// Sets this dispatch as the default for the duration of a closure.
@@ -97,6 +99,10 @@ impl Dispatch {
         }
 
         None
+    }
+
+    pub(crate) fn id(&self) -> usize {
+        self.id
     }
 
     #[inline]
