@@ -39,8 +39,26 @@ pub(crate) fn register_dispatch(dispatch: &Dispatch) {
     }
 }
 
+#[cfg(any(test, feature = "test_support"))]
+pub fn reset_registry() {
+    let mut registry = REGISTRY.lock().unwrap();
+    for callsite in &registry.callsites {
+        callsite.remove_interest();
+    }
+    registry.dispatchers.retain(|registrar| {
+        for callsite in &registry.callsites {
+            match registrar.try_register(callsite.metadata()) {
+                Some(interest) => callsite.add_interest(interest),
+                None => return false,
+            }
+        }
+        true
+    })
+}
+
 pub trait Callsite: Sync {
     fn is_enabled(&self, dispatch: &Dispatch) -> bool;
     fn add_interest(&self, interest: Interest);
+    fn remove_interest(&self);
     fn metadata(&self) -> &Meta;
 }
