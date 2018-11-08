@@ -11,7 +11,6 @@ use std::{
     default::Default,
     fmt,
     sync::{
-        atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT},
         Arc, Weak,
     },
 };
@@ -24,7 +23,6 @@ thread_local! {
 #[derive(Clone)]
 pub struct Dispatch {
     subscriber: Arc<dyn Subscriber + Send + Sync>,
-    id: usize,
 }
 
 pub(crate) struct Registrar(Weak<dyn Subscriber + Send + Sync>);
@@ -34,7 +32,6 @@ impl Dispatch {
     pub fn none() -> Self {
         Dispatch {
             subscriber: Arc::new(NoSubscriber),
-            id: 0,
         }
     }
 
@@ -58,12 +55,10 @@ impl Dispatch {
     where
         S: Subscriber + Send + Sync + 'static,
     {
-        static GEN: AtomicUsize = ATOMIC_USIZE_INIT;
         let me = Dispatch {
             subscriber: Arc::new(subscriber),
-            id: GEN.fetch_add(1, Ordering::AcqRel),
         };
-        ::callsite::register_dispatch(&me);
+        callsite::register_dispatch(&me);
         me
     }
 
