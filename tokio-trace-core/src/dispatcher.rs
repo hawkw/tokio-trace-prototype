@@ -110,11 +110,6 @@ impl Subscriber for Dispatch {
     }
 
     #[inline]
-    fn should_invalidate_filter(&self, metadata: &Meta) -> bool {
-        self.subscriber.should_invalidate_filter(metadata)
-    }
-
-    #[inline]
     fn add_value(
         &self,
         span: &span::Id,
