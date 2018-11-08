@@ -105,39 +105,31 @@ macro_rules! callsite {
         use std::sync::{Once, atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering}};
         use $crate::{callsite, Meta, subscriber::{Subscriber, Interest}};
         static META: Meta<'static> = $meta;
-        thread_local! {
-            static INTEREST: AtomicUsize = ATOMIC_USIZE_INIT;
-            static REGISTRATION: Once = Once::new();
-        }
+        static INTEREST: AtomicUsize = ATOMIC_USIZE_INIT;
+        static REGISTRATION: Once = Once::new();
         struct MyCallsite;
         impl callsite::Callsite for MyCallsite {
             fn is_enabled(&self, dispatch: &Dispatch) -> bool {
-                INTEREST.with(|interest| {
-                    let interest = interest.load(Ordering::Relaxed);
-                    match interest {
-                        i if i == Interest::Always as usize => true,
-                        i if i == Interest::Never as usize => false,
-                        _ => dispatch.enabled(&META),
-                    }
-                })
-
+                match INTEREST.load(Ordering::Relaxed) {
+                    i if i == Interest::Always as usize => true,
+                    i if i == Interest::Never as usize => false,
+                    _ => dispatch.enabled(&META),
+                }
             }
             fn add_interest(&self, interest: Interest) {
-                INTEREST.with(|current| {
-                    let interest = interest as usize;
-                    let current_interest = current.load(Ordering::Relaxed);
-                    if interest > current_interest {
-                        current.store(interest, Ordering::Relaxed);
-                    }
-                })
+                let interest = interest as usize;
+                let current_interest = INTEREST.load(Ordering::Relaxed);
+                if interest > current_interest {
+                    INTEREST.store(interest, Ordering::Relaxed);
+                }
             }
             fn metadata(&self) -> &Meta {
                 &META
             }
         }
-        REGISTRATION.with(|registration| registration.call_once(|| {
+        REGISTRATION.call_once(|| {
             callsite::register(&MyCallsite);
-        }));
+        });
         &MyCallsite
     })
 }
