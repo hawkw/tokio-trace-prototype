@@ -13,6 +13,7 @@ mod tests {
 
     #[test]
     fn filters_are_not_reevaluated_for_the_same_span() {
+        ::callsite::reset_registry();
         // Asserts that the `span!` macro caches the result of calling
         // `Subscriber::enabled` for each span.
         let foo_count = Arc::new(AtomicUsize::new(0));
@@ -66,8 +67,10 @@ mod tests {
         });
     }
 
-    #[test]
+    // This is no longer testing the expected behaviour.
+    /*
     fn filters_evaluated_across_threads() {
+        ::callsite::reset_registry();
         fn do_test() -> Span {
             let mut foo = span!("foo");
             let mut bar = foo.enter(|| {
@@ -138,9 +141,11 @@ mod tests {
         let mut bar = thread2.join().unwrap();
         bar.enter(|| {});
     }
+    */
 
     #[test]
     fn filters_are_reevaluated_for_different_call_sites() {
+        ::callsite::reset_registry();
         // Asserts that the `span!` macro caches the result of calling
         // `Subscriber::enabled` for each span.
         let foo_count = Arc::new(AtomicUsize::new(0));
@@ -205,6 +210,7 @@ mod tests {
 
     #[test]
     fn filter_caching_is_lexically_scoped() {
+        ::callsite::reset_registry();
         pub fn my_great_function() -> bool {
             span!("foo").enter(|| true)
         }
