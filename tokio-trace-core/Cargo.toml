@@ -7,8 +7,5 @@ authors = ["Eliza Weisman <eliza@buoyant.io>"]
 default = []
 test-support = []
 
-[dependencies]
-lazy_static = "1"
-
 [dev-dependencies]
 futures = "0.1"
