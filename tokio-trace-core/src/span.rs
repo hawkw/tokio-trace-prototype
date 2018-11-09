@@ -224,7 +224,7 @@ impl Span {
     /// `name` must name a field already defined by this span's metadata, and
     /// the field must not already have a value. If this is not the case, this
     /// function returns an [`AddValueError`](::subscriber::AddValueError).
-    pub fn add_value(&self, field: &Key, value: &dyn IntoValue) -> Result<(), AddValueError> {
+    pub fn add_dyn_value(&self, field: &Key, value: &dyn IntoValue) -> Result<(), AddValueError> {
         if let Some(ref inner) = self.inner {
             inner.add_value(field, value)
         } else {

@@ -114,6 +114,42 @@ pub trait Subscriber {
     /// [`Span`]: ::span::Span
     fn new_span(&self, span: span::Attributes) -> span::Id;
 
+    fn add_usize_value(
+        &self,
+        span: &span::Id,
+        field: &Key,
+        value: usize
+    ) -> Result<(), AddValueError> {
+        self.add_dyn_value(value)
+    }
+
+    fn add_isize_value(
+        &self,
+        span: &span::Id,
+        field: &Key,
+        value: isize
+    ) -> Result<(), AddValueError> {
+        self.add_dyn_value(value)
+    }
+
+    fn add_str_value(
+        &self,
+        span: &span::Id,
+        field: &Key,
+        value: &dyn AsRef<str>,
+    ) -> Result<(), AddValueError> {
+        self.add_dyn_value(value.as_ref())
+    }
+
+    fn add_byte_value(
+        &self,
+        span: &span::Id,
+        field: &Key,
+        value: &dyn AsRef<str>,
+    ) -> Result<(), AddValueError> {
+        self.add_dyn_value(value.as_ref())
+    }
+
     /// Adds a new field to an existing span observed by this `Subscriber`.
     ///
     /// This is expected to return an error under the following conditions:
@@ -121,7 +157,7 @@ pub trait Subscriber {
     /// - The span does not have a field with the given name.
     /// - The span has a field with the given name, but the value has already
     ///   been set.
-    fn add_value(
+    fn add_dyn_value(
         &self,
         span: &span::Id,
         field: &Key,
@@ -394,7 +430,7 @@ mod test_support {
             (self.filter)(meta)
         }
 
-        fn add_value(
+        fn add_dyn_value(
             &self,
             _span: &span::Id,
             _name: &Key,
