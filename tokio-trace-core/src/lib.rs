@@ -180,7 +180,6 @@ pub struct Meta<'a> {
     // to be constructed statically by macros. However, when `const fn`s are
     // available on stable Rust, this will no longer be necessary. Thus, these
     // fields should be made private when `const fn` is stable.
-
     /// If this metadata describes a span, the name of the span.
     pub name: Option<&'a str>,
 
