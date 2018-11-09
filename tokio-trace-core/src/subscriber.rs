@@ -261,6 +261,7 @@ pub enum FollowsError {
 }
 
 impl Interest {
+    /// Construct a new `Interest` from the result of evaluating a filter.
     pub fn from_filter(filter: bool) -> Self {
         match filter {
             true => Interest::Always,

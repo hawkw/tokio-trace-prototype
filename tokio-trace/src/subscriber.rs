@@ -5,11 +5,10 @@ mod tests {
     use std::{
         sync::{
             atomic::{AtomicUsize, Ordering},
-            Arc, Barrier,
+            Arc,
         },
-        thread,
     };
-    use {span, subscriber, Dispatch, Span};
+    use {span, subscriber, Dispatch};
 
     #[test]
     fn filters_are_not_reevaluated_for_the_same_span() {

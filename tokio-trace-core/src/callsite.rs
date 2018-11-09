@@ -1,5 +1,5 @@
-use std::{cell::Cell, thread::LocalKey, sync::Mutex};
-use {dispatcher::{self, Dispatch}, Meta, Span, subscriber::{Subscriber, Interest}};
+use std::sync::Mutex;
+use {dispatcher::{self, Dispatch}, Meta, subscriber::{Subscriber, Interest}};
 
 lazy_static! {
     static ref REGISTRY: Mutex<Registry> = Mutex::new(Registry {
@@ -13,6 +13,9 @@ struct Registry {
     dispatchers: Vec<dispatcher::Registrar>,
 }
 
+/// Register a new `Callsite` with the global registry.
+///
+/// This should be called once per callsite after the callsite has been constructed.
 pub fn register(callsite: &'static dyn Callsite) {
     let mut registry = REGISTRY.lock().unwrap();
     let meta = callsite.metadata();
@@ -39,6 +42,7 @@ pub(crate) fn register_dispatch(dispatch: &Dispatch) {
     }
 }
 
+/// Reset the registry. This is typically only useful in tests.
 #[cfg(any(test, feature = "test-support"))]
 pub fn reset_registry() {
     let mut registry = REGISTRY.lock().unwrap();
