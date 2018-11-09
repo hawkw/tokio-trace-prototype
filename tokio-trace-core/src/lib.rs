@@ -113,17 +113,21 @@ macro_rules! callsite {
         struct MyCallsite;
         impl callsite::Callsite for MyCallsite {
             fn is_enabled(&self, dispatch: &Dispatch) -> bool {
-                match INTEREST.load(Ordering::Relaxed) {
-                    i if i == Interest::Always as usize => true,
-                    i if i == Interest::Never as usize => false,
+                let current_interest = INTEREST.load(Ordering::Relaxed);
+                match Interest::from_usize(current_interest) {
+                    Some(Interest::ALWAYS) => true,
+                    Some(Interest::NEVER) => false,
                     _ => dispatch.enabled(&META),
                 }
             }
             fn add_interest(&self, interest: Interest) {
-                let interest = interest as usize;
                 let current_interest = INTEREST.load(Ordering::Relaxed);
-                if interest > current_interest {
-                    INTEREST.store(interest, Ordering::Relaxed);
+                match Interest::from_usize(current_interest) {
+                    Some(current) if interest > current =>
+                        INTEREST.store(interest.as_usize(), Ordering::Relaxed),
+                    None =>
+                        INTEREST.store(interest.as_usize(), Ordering::Relaxed),
+                    _ => {}
                 }
             }
             fn remove_interest(&self) {

@@ -212,25 +212,12 @@ pub trait Subscriber {
 
 /// Indicates a `Subscriber`'s interest in a particular callsite.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub enum Interest {
-    /// The subscriber is never interested in being notified about a callsite.
-    ///
-    /// If all active subscribers are `Never` interested in a callsite, it will
-    /// be completely disabled unless a new subscriber becomes active.
+pub struct Interest(InterestKind);
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+enum InterestKind {
     Never = 0,
-    /// The subscriber is sometimes interested in being notified about a
-    /// callsite.
-    ///
-    /// If all active subscribers are `Sometimes` or `Never` interested in a
-    /// callsite, the currently active subscriber will be asked to filter that
-    /// callsite every time it creates a span or event. This will be the case
-    /// until a subscriber expresses that it is `always` interested in the
-    /// callsite.
     Sometimes = 1,
-    /// The subscriber is always interested in being notified about a callsite.
-    ///
-    /// If any subscriber expresses that it is `Always` interested in a given
-    /// callsite, then the callsite will always be enabled.
     Always = 2,
 }
 
@@ -264,9 +251,48 @@ impl Interest {
     /// Construct a new `Interest` from the result of evaluating a filter.
     pub fn from_filter(filter: bool) -> Self {
         match filter {
-            true => Interest::Always,
-            false => Interest::Never,
+            true => Interest::ALWAYS,
+            false => Interest::NEVER,
         }
+    }
+
+    /// Indicates that the subscriber is never interested in being notified
+    /// about a callsite.
+    ///
+    /// If all active subscribers are `NEVER` interested in a callsite, it will
+    /// be completely disabled unless a new subscriber becomes active.
+    pub const NEVER: Interest = Interest(InterestKind::Never);
+
+    /// Indicates that the subscriber is sometimes interested in being
+    /// notified about a callsite.
+    ///
+    /// If all active subscribers are `sometimes` or `never` interested in a
+    /// callsite, the currently active subscriber will be asked to filter that
+    /// callsite every time it creates a span or event. This will be the case
+    /// until a subscriber expresses that it is `always` interested in the
+    /// callsite.
+    pub const SOMETIMES: Interest = Interest(InterestKind::Sometimes);
+
+    /// Indicates that the subscriber is always interested in being
+    /// notified about a callsite.
+    ///
+    /// If any subscriber expresses that it is `ALWAYS` interested in a given
+    /// callsite, then the callsite will always be enabled.
+    pub const ALWAYS: Interest = Interest(InterestKind::Always);
+
+    /// Constructs a new `Interest` from a `usize`.
+    pub fn from_usize(u: usize) -> Option<Self> {
+        match u {
+            0 => Some(Interest::NEVER),
+            1 => Some(Interest::SOMETIMES),
+            2 => Some(Interest::ALWAYS),
+            _ => None,
+        }
+    }
+
+    /// Returns an `usize` representing this `Interest`.
+    pub fn as_usize(&self) -> usize {
+        self.0 as usize
     }
 }
 
