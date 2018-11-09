@@ -103,7 +103,6 @@ pub enum Level {
 }
 
 pub mod callsite;
-#[doc(hidden)]
 pub mod dispatcher;
 pub mod field;
 pub mod span;
