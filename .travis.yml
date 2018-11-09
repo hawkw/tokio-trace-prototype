@@ -4,7 +4,7 @@ sudo: false
 jobs:
   include:
   - stage: test
-    script: cargo test --all -- --test-threads 1
+    script: cargo test --all
     name: "tests"
   - script: cargo fmt --all -- --check
     install: rustup component add rustfmt-preview
