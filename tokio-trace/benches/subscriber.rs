@@ -124,11 +124,8 @@ fn span_repeatedly(b: &mut Bencher) {
     }
 
     let n = test::black_box(N_SPANS);
-    tokio_trace::Dispatch::to(EnabledSubscriber).as_default(|| b.iter(||
-        (0..n).fold(mk_span(0), |span, i| {
-            mk_span(i)
-        })
-    ));
+    tokio_trace::Dispatch::to(EnabledSubscriber)
+        .as_default(|| b.iter(|| (0..n).fold(mk_span(0), |span, i| mk_span(i))));
 }
 
 #[bench]

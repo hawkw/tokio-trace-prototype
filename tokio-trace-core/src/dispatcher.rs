@@ -10,9 +10,7 @@ use std::{
     cell::RefCell,
     default::Default,
     fmt,
-    sync::{
-        Arc, Weak,
-    },
+    sync::{Arc, Weak},
 };
 
 thread_local! {

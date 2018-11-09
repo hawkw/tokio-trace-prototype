@@ -2,11 +2,9 @@ pub use tokio_trace_core::subscriber::*;
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        sync::{
-            atomic::{AtomicUsize, Ordering},
-            Arc,
-        },
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
     };
     use {span, subscriber, Dispatch};
 
@@ -148,15 +146,15 @@ mod tests {
             .with_filter(move |meta| {
                 println!("Filter: {:?}", meta.name);
                 match meta.name {
-                Some("charlie") => {
-                    charlie_count2.fetch_add(1, Ordering::Relaxed);
-                    false
-                }
-                Some("dave") => {
-                    dave_count2.fetch_add(1, Ordering::Relaxed);
-                    true
-                }
-                _ => false,
+                    Some("charlie") => {
+                        charlie_count2.fetch_add(1, Ordering::Relaxed);
+                        false
+                    }
+                    Some("dave") => {
+                        dave_count2.fetch_add(1, Ordering::Relaxed);
+                        true
+                    }
+                    _ => false,
                 }
             }).run();
 
@@ -222,15 +220,12 @@ mod tests {
             .exit(span::mock().named(Some("frank")))
             .enter(span::mock().named(Some("emily")))
             .exit(span::mock().named(Some("emily")))
-            .with_filter(move |meta| {
-                match meta.name {
-                    Some("emily") | Some("frank") => {
-                        count2.fetch_add(1, Ordering::Relaxed);
-                        true
-                    },
-                    _ => false,
+            .with_filter(move |meta| match meta.name {
+                Some("emily") | Some("frank") => {
+                    count2.fetch_add(1, Ordering::Relaxed);
+                    true
                 }
-
+                _ => false,
             }).run();
 
         Dispatch::to(subscriber).as_default(|| {

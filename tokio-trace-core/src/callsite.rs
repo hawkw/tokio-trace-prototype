@@ -1,5 +1,9 @@
 use std::sync::Mutex;
-use {dispatcher::{self, Dispatch}, Meta, subscriber::{Subscriber, Interest}};
+use {
+    dispatcher::{self, Dispatch},
+    subscriber::{Interest, Subscriber},
+    Meta,
+};
 
 lazy_static! {
     static ref REGISTRY: Mutex<Registry> = Mutex::new(Registry {
@@ -24,7 +28,7 @@ pub fn register(callsite: &'static dyn Callsite) {
             Some(interest) => {
                 callsite.add_interest(interest);
                 true
-            },
+            }
             // TODO: if the dispatcher has been dropped, should we invalidate
             // any callsites that it previously enabled?
             None => false,
