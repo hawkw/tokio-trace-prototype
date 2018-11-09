@@ -398,7 +398,7 @@ impl<'a> Event<'a> {
     /// [`Callsite`]: ::callsite::Callsite
     pub fn observe(
         callsite: &'a dyn callsite::Callsite,
-        field_values: &[ &dyn field::AsValue ],
+        field_values: &[&dyn field::AsValue],
         follows_from: &[SpanId],
         message: fmt::Arguments<'a>,
     ) {
