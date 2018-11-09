@@ -388,7 +388,8 @@ impl Data {
             // add all the fields.
             let count = self.static_meta.field_names.len();
             self.field_values.reserve(count);
-            self.field_values.extend(iter::repeat(()).map(|_| None).take(count));
+            self.field_values
+                .extend(iter::repeat(()).map(|_| None).take(count));
         }
         let field = &mut self.field_values[key.as_usize()];
         if field.is_some() {
