@@ -4,7 +4,6 @@ use std::{
     cell::RefCell,
     cmp, fmt,
     hash::{Hash, Hasher},
-    iter,
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 use {
@@ -306,16 +305,10 @@ impl fmt::Debug for Span {
 
 impl Data {
     fn new(parent: Option<Id>, static_meta: &'static StaticMeta) -> Self {
-        // Preallocate enough `None`s to hold the unset state of every field
-        // name.
-        let field_values = iter::repeat(())
-            .map(|_| None)
-            .take(static_meta.field_names.len())
-            .collect();
         Data {
             parent,
             static_meta,
-            field_values,
+            field_values: Vec::new(),
         }
     }
 
@@ -382,6 +375,11 @@ impl Data {
     pub fn add_value(&mut self, key: &Key, value: &dyn IntoValue) -> Result<(), AddValueError> {
         if !self.has_field(key) {
             return Err(AddValueError::NoField);
+        }
+        let i = key.as_usize();
+        while self.field_values.len() < i + 1 {
+            // Extend to the given index.
+            self.field_values.push(None);
         }
         let field = &mut self.field_values[key.as_usize()];
         if field.is_some() {
