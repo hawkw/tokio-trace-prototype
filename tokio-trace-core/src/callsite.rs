@@ -32,14 +32,14 @@ pub trait Callsite: Sync {
     /// If the interest is greater than or equal to the callsite's current
     /// interest, this should change whether or not the callsite is enabled.
     ///
-    /// [interest]: ::subscriber::Interest
+    /// [`Interest`]: ::subscriber::Interest
     /// [registering]: ::subscriber::Subscriber::register_callsite
     /// [dispatcher]: ::Dispatch
     fn add_interest(&self, interest: Interest);
 
     /// Remove _all_ [`Interest`] from the callsite, disabling it.
     ///
-    /// [interest]: ::subscriber::Interest
+    /// [`Interest`]: ::subscriber::Interest
     fn remove_interest(&self);
 
     /// Returns the [metadata] associated with the callsite.
