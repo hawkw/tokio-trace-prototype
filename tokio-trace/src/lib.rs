@@ -67,17 +67,13 @@ macro_rules! event {
                 target:
                 $target, $( $k ),*
             };
-            let dispatch = Dispatch::current();
-            if callsite.is_enabled(&dispatch) {
-                let field_values: &[ &dyn AsValue ] = &[ $( &$val ),* ];
-                dispatch.observe_event(&Event {
-                    parent: SpanId::current(),
-                    follows_from: &[],
-                    meta: callsite.metadata(),
-                    field_values: &field_values[..],
-                    message: format_args!( $($arg)+ ),
-                });
-            }
+            let field_values: &[ &dyn AsValue ] = &[ $( &$val ),* ];
+            Event::observe(
+                callsite,
+                &field_values[..],
+                &[],
+                format_args!( $($arg)+ ),
+            );
         }
     });
     ($lvl:expr, { $($k:ident = $val:expr),* }, $($arg:tt)+ ) => (
