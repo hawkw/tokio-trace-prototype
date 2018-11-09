@@ -372,6 +372,12 @@ impl Data {
     /// `name` must name a field already defined by this span's metadata, and
     /// the field must not already have a value. If this is not the case, this
     /// function returns an [`AddValueError`](::subscriber::AddValueError).
+    ///
+    /// **Note**: This function will allocate to grow the vector used internally
+    /// to store the span's field values. Otherwise, if this function is not used,
+    /// the `Data` type will not allocate. Thus, this function should only be
+    /// called by subscribers who wish to allocate to persist field values;
+    /// otherwise, it need not be used.
     pub fn add_value(&mut self, key: &Key, value: &dyn IntoValue) -> Result<(), AddValueError> {
         if !self.has_field(key) {
             return Err(AddValueError::NoField);
