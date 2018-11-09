@@ -1,3 +1,5 @@
+//! Callsites represent the source locations from which spans or events
+//! originate.
 use std::sync::Mutex;
 use {
     dispatcher::{self, Dispatch},
@@ -15,6 +17,35 @@ lazy_static! {
 struct Registry {
     callsites: Vec<&'static dyn Callsite>,
     dispatchers: Vec<dispatcher::Registrar>,
+}
+
+/// Trait implemented by callsites.
+pub trait Callsite: Sync {
+    /// Returns `true` if the callsite is enabled for the given [dispatcher].
+    ///
+    /// [dispatcher]: ::Dispatch
+    fn is_enabled(&self, dispatch: &Dispatch) -> bool;
+
+    /// Adds the [`Interest`] returned by [registering] the callsite with a
+    /// [dispatcher].
+    ///
+    /// If the interest is greater than or equal to the callsite's current
+    /// interest, this should change whether or not the callsite is enabled.
+    ///
+    /// [interest]: ::subscriber::Interest
+    /// [registering]: ::subscriber::Subscriber::register_callsite
+    /// [dispatcher]: ::Dispatch
+    fn add_interest(&self, interest: Interest);
+
+    /// Remove _all_ [`Interest`] from the callsite, disabling it.
+    ///
+    /// [interest]: ::subscriber::Interest
+    fn remove_interest(&self);
+
+    /// Returns the [metadata] associated with the callsite.
+    ///
+    /// [metadata]: ::Meta
+    fn metadata(&self) -> &Meta;
 }
 
 /// Register a new `Callsite` with the global registry.
@@ -52,11 +83,4 @@ pub fn reset_registry() {
     let mut registry = REGISTRY.lock().unwrap();
     registry.callsites.clear();
     registry.dispatchers.clear();
-}
-
-pub trait Callsite: Sync {
-    fn is_enabled(&self, dispatch: &Dispatch) -> bool;
-    fn add_interest(&self, interest: Interest);
-    fn remove_interest(&self);
-    fn metadata(&self) -> &Meta;
 }

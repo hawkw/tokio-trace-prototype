@@ -166,8 +166,8 @@ pub enum Level {
     Trace,
 }
 
-#[doc(hidden)]
 pub mod callsite;
+#[doc(hidden)]
 pub mod dispatcher;
 pub mod field;
 pub mod span;
