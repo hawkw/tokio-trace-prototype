@@ -296,10 +296,7 @@ impl fmt::Debug for Span {
 
 impl Attributes {
     fn new(parent: Option<Id>, metadata: &'static StaticMeta) -> Self {
-        Attributes {
-            parent,
-            metadata,
-        }
+        Attributes { parent, metadata }
     }
 
     /// Returns the name of this span, or `None` if it is unnamed,

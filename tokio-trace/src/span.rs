@@ -201,12 +201,7 @@ pub use tokio_trace_core::span::{Attributes, Id, Span};
 #[cfg(any(test, feature = "test-support"))]
 pub use tokio_trace_core::span::{mock, MockSpan};
 
-use std::{
-    fmt,
-    borrow::Borrow,
-    iter,
-    sync::Arc,
-};
+use std::{borrow::Borrow, fmt, iter, sync::Arc};
 use tokio_trace_core::span::Enter;
 use {field, subscriber, IntoValue, Meta};
 
@@ -278,7 +273,6 @@ pub struct Data {
     /// `self.attributes.field_names[i]`.
     field_values: Vec<Option<field::OwnedValue>>,
 }
-
 
 impl Shared {
     /// Returns a `Shared` span handle that can be cloned.
@@ -460,8 +454,7 @@ impl Data {
     where
         Q: field::AsKey,
     {
-        let key = field
-            .as_key(self.metadata())?;
+        let key = field.as_key(self.metadata())?;
         if !self.has_field(&key) {
             return None;
         }
@@ -471,7 +464,9 @@ impl Data {
     }
 
     /// Returns an iterator over all the field names and values on this span.
-    pub fn fields<'a>(&'a self) -> impl Iterator<Item = (field::Key<'static>, &'a field::OwnedValue)> {
+    pub fn fields<'a>(
+        &'a self,
+    ) -> impl Iterator<Item = (field::Key<'static>, &'a field::OwnedValue)> {
         self.field_keys().filter_map(move |key| {
             let val = self.field_values.get(key.as_usize())?.as_ref()?;
             Some((key, val))
@@ -489,7 +484,11 @@ impl Data {
     /// the `Data` type will not allocate. Thus, this function should only be
     /// called by subscribers who wish to allocate to persist field values;
     /// otherwise, it need not be used.
-    pub fn add_value<Q: ?Sized>(&mut self, field: &Q, value: &dyn field::IntoValue) -> Result<(), ::subscriber::AddValueError>
+    pub fn add_value<Q: ?Sized>(
+        &mut self,
+        field: &Q,
+        value: &dyn field::IntoValue,
+    ) -> Result<(), ::subscriber::AddValueError>
     where
         Q: field::AsKey,
     {
@@ -531,8 +530,12 @@ impl fmt::Debug for Data {
         struct DebugFields<'a>(&'a Data);
         impl<'a> fmt::Debug for DebugFields<'a> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                f.debug_set().entries(self.0.into_iter()
-                    .map(|(k, v)| (k.name().unwrap_or("???"), v))).finish()
+                f.debug_set()
+                    .entries(
+                        self.0
+                            .into_iter()
+                            .map(|(k, v)| (k.name().unwrap_or("???"), v)),
+                    ).finish()
             }
         }
 

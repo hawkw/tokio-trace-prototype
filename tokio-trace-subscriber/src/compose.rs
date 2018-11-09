@@ -99,7 +99,8 @@ where
     }
 
     fn new_span(&self, new_span: span::Attributes) -> span::Id {
-        self.registry.new_span(span::Data::from_attributes(new_span))
+        self.registry
+            .new_span(span::Data::from_attributes(new_span))
     }
 
     fn add_value(
