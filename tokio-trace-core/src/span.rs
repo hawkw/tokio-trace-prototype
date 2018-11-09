@@ -4,6 +4,7 @@ use std::{
     cell::RefCell,
     cmp, fmt,
     hash::{Hash, Hasher},
+    iter,
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 use {
@@ -382,10 +383,12 @@ impl Data {
         if !self.has_field(key) {
             return Err(AddValueError::NoField);
         }
-        let i = key.as_usize();
-        while self.field_values.len() < i + 1 {
-            // Extend to the given index.
-            self.field_values.push(None);
+        if self.field_values.is_empty() {
+            // If we're adding the first field, go ahead and reserve capacity to
+            // add all the fields.
+            let count = self.static_meta.field_names.len();
+            self.field_values.reserve(count);
+            self.field_values.extend(iter::repeat(()).map(|_| None).take(count));
         }
         let field = &mut self.field_values[key.as_usize()];
         if field.is_some() {
