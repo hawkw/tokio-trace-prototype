@@ -113,7 +113,7 @@ pub use self::{
     dispatcher::Dispatch,
     field::{AsValue, IntoValue, Key, Value},
     span::{Attributes as SpanAttributes, Id as SpanId, Span},
-    subscriber::{Subscriber, Interest},
+    subscriber::{Interest, Subscriber},
 };
 use field::BorrowedValue;
 

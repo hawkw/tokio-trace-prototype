@@ -10,7 +10,7 @@ use std::{
 use {
     callsite::Callsite,
     field::{IntoValue, Key, OwnedValue},
-    subscriber::{AddValueError, FollowsError, Subscriber, Interest},
+    subscriber::{AddValueError, FollowsError, Interest, Subscriber},
     DebugFields, Dispatch, Meta, StaticMeta,
 };
 
