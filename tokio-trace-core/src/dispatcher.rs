@@ -34,7 +34,7 @@ impl Dispatch {
 
     pub(crate) fn with_current<T, F>(f: F) -> T
     where
-        F: FnOnce(&Dispatch) -> T
+        F: FnOnce(&Dispatch) -> T,
     {
         if let Some(c) = Span::current().dispatch() {
             f(c)

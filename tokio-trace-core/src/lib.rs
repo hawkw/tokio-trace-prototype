@@ -357,7 +357,6 @@ impl<'a> Event<'a> {
                 });
             }
         })
-
     }
 
     /// Returns an iterator over the names of all the fields on this `Event`.
