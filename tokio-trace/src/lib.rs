@@ -31,19 +31,15 @@ macro_rules! callsite {
     });
     (@ $meta:expr ) => ({
         use std::sync::{Once, atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering}};
-        use $crate::{callsite, Meta, subscriber::{Subscriber, Interest}};
+        use $crate::{callsite, Meta, subscriber::{Interest}};
         static META: Meta<'static> = $meta;
         static INTEREST: AtomicUsize = ATOMIC_USIZE_INIT;
         static REGISTRATION: Once = Once::new();
         struct MyCallsite;
         impl callsite::Callsite for MyCallsite {
-            fn is_enabled(&self, dispatch: &Dispatch) -> bool {
-                let current_interest = INTEREST.load(Ordering::Relaxed);
-                match Interest::from_usize(current_interest) {
-                    Some(Interest::ALWAYS) => true,
-                    Some(Interest::NEVER) => false,
-                    _ => dispatch.enabled(&META),
-                }
+            fn interest(&self) -> Interest {
+                Interest::from_usize(INTEREST.load(Ordering::Relaxed))
+                    .unwrap_or(Interest::SOMETIMES)
             }
             fn add_interest(&self, interest: Interest) {
                 let current_interest = INTEREST.load(Ordering::Relaxed);
