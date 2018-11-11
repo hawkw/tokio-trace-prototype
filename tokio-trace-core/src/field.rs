@@ -57,29 +57,63 @@
 //! allocations, but the `IntoValue` trait presents `Subscriber`s with the
 //! _option_ to box values should they need to do so.
 use super::Meta;
-use std::{any::TypeId, borrow::Borrow, fmt};
+use std::{
+    any::{Any, TypeId},
+    borrow::Borrow,
+    error::Error,
+    fmt,
+    io::{self, Write},
+};
 
-/// A formattable field value of an erased type.
-pub trait Value: fmt::Debug + Send + Sync {
-    /// Returns true if the boxed type is the same as `T`
-    fn is<T: AsValue + 'static>(&self) -> bool
-    where
-        Self: 'static;
+pub type RecordResult = Result<(), Box<dyn Error>>;
 
-    /// Returns some reference to the boxed value if it is of type `T`, or
-    /// `None` if it isn't.
-    fn downcast_ref<T: AsValue + 'static>(&self) -> Option<&T>
-    where
-        Self: 'static;
+pub trait Recorder<'a> {
+    // fn named<'b: 'a>(&'b mut self, name: &'b str) -> &'b dyn Recorder<'b>;
+    fn record_uint(&mut self, value: usize) -> RecordResult {
+        self.record_any(&value)
+    }
+
+    fn record_int(&mut self, value: isize) -> RecordResult {
+        self.record_any(&value)
+    }
+
+    fn record_float(&mut self, value: f64) -> RecordResult {
+        self.record_any(&value)
+    }
+
+    fn record_str(&mut self, value: &'a dyn AsRef<str>) -> RecordResult {
+        self.record_any(&value)
+    }
+
+    fn record_byte(&mut self, value: u8) -> RecordResult {
+        self.record_any(&value)
+    }
+
+    fn record_any(&mut self, value: &'a dyn Value) -> RecordResult {
+        self.record_any(value)
+    }
+
+    fn record_tuple(&mut self, tuple: (&'a dyn Value, &'a dyn Value)) -> RecordResult;
+
+    fn record_map(
+        &mut self,
+        map: &mut dyn Iterator<Item = (&'a dyn Value, &'a dyn Value)>,
+    ) -> RecordResult;
+
+    fn record_list(&mut self, list: &mut dyn Iterator<Item = &'a dyn Value>) -> RecordResult;
+
+    fn record_struct(
+        &mut self,
+        name: &'a dyn AsRef<str>,
+        strct: &mut dyn Iterator<Item = (&'a dyn AsRef<str>, &'a dyn Value)>,
+    ) -> RecordResult;
+    fn finish(self) -> RecordResult;
 }
 
-/// Trait implemented by types which may be converted into a `Value`.
-///
-/// Implementors of `AsValue` must provide an implementation of the `fmt_value`
-/// function, which describes how to format a value of this type.
-pub trait AsValue: Send + Sync {
-    /// Formats the value with the given formatter.
-    fn fmt_value(&self, f: &mut fmt::Formatter) -> fmt::Result;
+/// A formattable field value of an erased type.
+pub trait Value: Send + Sync {
+    /// Records the value with the given `Recorder`.
+    fn record(&self, &mut dyn Recorder);
 
     #[doc(hidden)]
     fn type_id(&self) -> TypeId
@@ -88,6 +122,84 @@ pub trait AsValue: Send + Sync {
     {
         TypeId::of::<Self>()
     }
+}
+
+pub struct DebugWriter<W>(W);
+
+impl<'a, W> Recorder<'a> for DebugWriter<W>
+where
+    W: Write,
+{
+    fn record_tuple(&mut self, tuple: (&'a dyn Value, &'a dyn Value)) -> RecordResult {
+        self.record_any(&tuple)
+    }
+
+    fn record_any(&mut self, value: &'a dyn Value) -> RecordResult {
+        write!(&mut self.0, "{:?}", value).map_err(Box::new)
+    }
+
+    fn record_map(
+        &mut self,
+        map: &mut dyn Iterator<Item = (&'a dyn Value, &'a dyn Value)>,
+    ) -> RecordResult {
+        struct Debug<'a>(&'a mut dyn Iterator<Item = (&'a dyn Value, &'a dyn Value)>);
+        impl<'a> fmt::Debug for Debug<'a> {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.debug_map().entries(self.0).finish()
+            }
+        }
+        write!(self.0, "{:?}", Debug(map)).map_err(Box::new)
+    }
+
+    fn record_list(&mut self, list: &mut dyn Iterator<Item = &'a dyn Value>) -> RecordResult {
+        struct Debug<'a>(&'a mut dyn Iterator<Item = &'a dyn Value>);
+        impl<'a> fmt::Debug for Debug<'a> {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.debug_list().entries(self.0).finish()
+            }
+        }
+        write!(self.0, "{:?}", Debug(list)).map_err(Box::new)
+    }
+
+    fn record_struct(
+        &mut self,
+        name: &'a dyn AsRef<str>,
+        fields: &mut dyn Iterator<Item = (&'a dyn AsRef<str>, &'a dyn Value)>,
+    ) -> RecordResult {
+        struct Debug<'a> {
+            name: &'a str,
+            fields: &'a mut dyn Iterator<Item = (&'a dyn AsRef<str>, &'a dyn Value)>,
+        }
+        impl<'a> fmt::Debug for Debug<'a> {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                self.fields
+                    .fold(
+                        f.debug_struct(self.name.as_ref()),
+                        |debug, (name, value)| debug.field(name.as_ref(), value),
+                    ).finish()
+            }
+        }
+        write!(self.0, "{:?}", Debug { name, fields }).map_err(Box::new)
+    }
+
+    fn finish(self) -> RecordResult {
+        self.0.flush().map_err(Box::new)
+    }
+}
+
+impl<W: Write> DebugWriter<W> {
+    pub fn new_named(writer: W, field: &Key) -> Result<Self, io::Error> {
+        write!(&mut writer, "{}: ", field.name().unwrap_or("???"))?;
+        Ok(DebugWriter(writer))
+    }
+}
+
+/// Trait implemented by types which may be converted into a `Value`.
+///
+/// Implementors of `AsValue` must provide an implementation of the `fmt_value`
+/// function, which describes how to format a value of this type.
+pub trait AsValue: Send + Sync {
+
 }
 
 /// Trait representing a type which may be converted into an `OwnedValue`.

@@ -1,5 +1,5 @@
 //! Subscribers collect and record trace data.
-use {span, Event, IntoValue, Key, Meta, SpanId};
+use {field, span, Event, Meta, SpanId};
 
 /// Trait representing the functions required to collect trace data.
 ///
@@ -114,42 +114,6 @@ pub trait Subscriber {
     /// [`Span`]: ::span::Span
     fn new_span(&self, span: span::Attributes) -> span::Id;
 
-    fn add_usize_value(
-        &self,
-        span: &span::Id,
-        field: &Key,
-        value: usize
-    ) -> Result<(), AddValueError> {
-        self.add_dyn_value(value)
-    }
-
-    fn add_isize_value(
-        &self,
-        span: &span::Id,
-        field: &Key,
-        value: isize
-    ) -> Result<(), AddValueError> {
-        self.add_dyn_value(value)
-    }
-
-    fn add_str_value(
-        &self,
-        span: &span::Id,
-        field: &Key,
-        value: &dyn AsRef<str>,
-    ) -> Result<(), AddValueError> {
-        self.add_dyn_value(value.as_ref())
-    }
-
-    fn add_byte_value(
-        &self,
-        span: &span::Id,
-        field: &Key,
-        value: &dyn AsRef<str>,
-    ) -> Result<(), AddValueError> {
-        self.add_dyn_value(value.as_ref())
-    }
-
     /// Adds a new field to an existing span observed by this `Subscriber`.
     ///
     /// This is expected to return an error under the following conditions:
@@ -157,11 +121,11 @@ pub trait Subscriber {
     /// - The span does not have a field with the given name.
     /// - The span has a field with the given name, but the value has already
     ///   been set.
-    fn add_dyn_value(
+    fn add_value(
         &self,
         span: &span::Id,
-        field: &Key,
-        value: &dyn IntoValue,
+        field: &field::Key,
+        value: &dyn field::Value,
     ) -> Result<(), AddValueError>;
 
     /// Adds an indication that `span` follows from the span with the id
@@ -342,7 +306,10 @@ mod test_support {
 
     use super::*;
     use span::{self, MockSpan};
-    use {field::Key, Event, IntoValue, Meta, SpanAttributes, SpanId};
+    use {
+        field::{Key, Value},
+        Event, IntoValue, Meta, SpanAttributes, SpanId
+    };
 
     use std::{
         collections::{HashMap, VecDeque},
@@ -430,11 +397,11 @@ mod test_support {
             (self.filter)(meta)
         }
 
-        fn add_dyn_value(
+        fn add_value(
             &self,
             _span: &span::Id,
             _name: &Key,
-            _value: &dyn IntoValue,
+            _value: &dyn Value,
         ) -> Result<(), AddValueError> {
             // TODO: it should be possible to expect values...
             Ok(())

@@ -1,9 +1,8 @@
 use {
-    callsite,
-    field::Key,
+    callsite, field,
     span::{self, Span},
     subscriber::{self, Subscriber},
-    Event, IntoValue, Meta,
+    Event, Meta,
 };
 
 use std::{
@@ -97,50 +96,14 @@ impl Subscriber for Dispatch {
         self.subscriber.new_span(span)
     }
 
-    fn add_usize_value(
-        &self,
-        span: &span::Id,
-        field: &Key,
-        value: usize
-    ) -> Result<(), subscriber::AddValueError> {
-        self.subscriber.add_usize_value(span, name, value)
-    }
-
-    fn add_isize_value(
-        &self,
-        span: &span::Id,
-        field: &Key,
-        value: isize
-    ) -> Result<(), subscriber::AddValueError> {
-        self.subscriber.add_isize_value(span, name, value)
-    }
-
-    fn add_str_value(
-        &self,
-        span: &span::Id,
-        field: &Key,
-        value: &dyn AsRef<str>,
-    ) -> Result<(), subscriber::AddValueError> {
-        self.subscriber.add_str_value(span, name, value)
-    }
-
-    fn add_byte_value(
-        &self,
-        span: &span::Id,
-        field: &Key,
-        value: u8,
-    ) -> Result<(), subscriber::AddValueError> {
-        self.subscriber.add_byte_value(span, name, value)
-    }
-
     #[inline]
-    fn add_dyn_value(
+    fn add_value(
         &self,
         span: &span::Id,
-        name: &Key,
-        value: &dyn IntoValue,
+        name: &field::Key,
+        value: &dyn field::Value,
     ) -> Result<(), subscriber::AddValueError> {
-        self.subscriber.add_dyn_value(span, name, value)
+        self.subscriber.add_value(span, name, value)
     }
 
     #[inline]
@@ -185,11 +148,11 @@ impl Subscriber for NoSubscriber {
         span::Id::from_u64(0)
     }
 
-    fn add_dyn_value(
+    fn add_value(
         &self,
         _span: &span::Id,
-        _name: &Key,
-        _value: &dyn IntoValue,
+        _name: &field::Key,
+        _value: &dyn field::Value,
     ) -> Result<(), subscriber::AddValueError> {
         Ok(())
     }
