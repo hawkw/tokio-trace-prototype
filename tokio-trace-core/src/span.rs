@@ -9,7 +9,7 @@ use std::{
 };
 use {
     callsite::Callsite,
-    field::{IntoValue, Key, OwnedValue},
+    field::{self, Key},
     subscriber::{AddValueError, FollowsError, Interest, Subscriber},
     DebugFields, Dispatch, Meta, StaticMeta,
 };
@@ -224,7 +224,7 @@ impl Span {
     /// `name` must name a field already defined by this span's metadata, and
     /// the field must not already have a value. If this is not the case, this
     /// function returns an [`AddValueError`](::subscriber::AddValueError).
-    pub fn add_dyn_value(&self, field: &Key, value: &dyn IntoValue) -> Result<(), AddValueError> {
+    pub fn add_value(&self, field: &Key, value: &dyn field::Value) -> Result<(), AddValueError> {
         if let Some(ref inner) = self.inner {
             inner.add_value(field, value)
         } else {
@@ -427,7 +427,7 @@ impl Enter {
     /// `name` must name a field already defined by this span's metadata, and
     /// the field must not already have a value. If this is not the case, this
     /// function returns an [`AddValueError`](::subscriber::AddValueError).
-    pub fn add_value(&self, field: &Key, value: &dyn IntoValue) -> Result<(), AddValueError> {
+    pub fn add_value(&self, field: &Key, value: &dyn field::Value) -> Result<(), AddValueError> {
         if !self.meta.contains_key(field) {
             return Err(AddValueError::NoField);
         }

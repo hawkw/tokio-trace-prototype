@@ -181,7 +181,7 @@ pub trait Subscriber {
     /// [`Span`]: ::span::Span
     /// [`SpanId`]: ::span::Id
     /// [`State`]: ::span::State
-    fn enter(&self, span: SpanId);
+    fn enter(&self, span: span::Id);
 
     /// Records that a [`Span`] has been exited.
     ///
@@ -192,7 +192,7 @@ pub trait Subscriber {
     /// Exiting a span does not imply that the span will not be re-entered.
     /// [`Span`]: ::span::Span
     /// [`SpanId`]: ::span::Id
-    fn exit(&self, span: SpanId);
+    fn exit(&self, span: span::Id);
 
     /// Records that a [`Span`] has been closed.
     ///
@@ -207,7 +207,7 @@ pub trait Subscriber {
     ///
     /// [`Span`]: ::span::Span
     /// [`SpanId`]: ::span::Id
-    fn close(&self, span: SpanId);
+    fn close(&self, span: span::Id);
 }
 
 /// Indicates a `Subscriber`'s interest in a particular callsite.

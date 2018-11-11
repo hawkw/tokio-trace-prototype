@@ -58,8 +58,7 @@
 //! _option_ to box values should they need to do so.
 use super::Meta;
 use std::{
-    any::{Any, TypeId},
-    borrow::Borrow,
+    any::TypeId,
     error::Error,
     fmt,
     io::{self, Write},
@@ -111,9 +110,9 @@ pub trait Recorder<'a> {
 }
 
 /// A formattable field value of an erased type.
-pub trait Value: Send + Sync {
+pub trait Value: fmt::Debug + Send + Sync {
     /// Records the value with the given `Recorder`.
-    fn record(&self, &mut dyn Recorder);
+    fn record(&self, &mut dyn Recorder) -> RecordResult;
 
     #[doc(hidden)]
     fn type_id(&self) -> TypeId
@@ -194,23 +193,6 @@ impl<W: Write> DebugWriter<W> {
     }
 }
 
-/// Trait implemented by types which may be converted into a `Value`.
-///
-/// Implementors of `AsValue` must provide an implementation of the `fmt_value`
-/// function, which describes how to format a value of this type.
-pub trait AsValue: Send + Sync {
-
-}
-
-/// Trait representing a type which may be converted into an `OwnedValue`.
-///
-/// References to types implementing `IntoValue` may be formatted (as `Value`s),
-/// _or_ may be converted into owned `OwnedValue`s. In addition to being owned,
-/// instances of `OwnedValue` may also be downcast to their original erased type.
-pub trait IntoValue: AsValue {
-    /// Converts this type into an `OwnedValue`.
-    fn into_value(&self) -> OwnedValue;
-}
 
 /// An opaque key allowing _O_(1) access to a field in a `Span` or `Event`'s
 /// key-value data.
@@ -226,34 +208,9 @@ pub struct Key<'a> {
     metadata: &'a Meta<'a>,
 }
 
-/// A borrowed value of an erased type.
-///
-/// Like `Any`,`BorrowedValue`s may attempt to downcast the value to
-/// a concrete type. However, unlike `Any`, `BorrowedValue`s are constructed
-/// from types known to implement `AsValue`, providing the `fmt_value` method.
-/// This means that arbitrary `BorrowedValue`s may be formatted using the erased
-/// type's `fmt_value` implementation, _even when the erased type is no longer
-/// known_.
-pub struct BorrowedValue<'a>(&'a dyn AsValue);
-
 /// A `Value` which is formatted using `fmt::Display` rather than `fmt::Debug`.
 #[derive(Clone)]
 pub struct DisplayValue<T: fmt::Display>(T);
-
-/// An owned value of an erased type.
-///
-/// Like `Any`, references to `OwnedValue` may attempt to downcast the value to
-/// a concrete type. However, unlike `Any`, `OwnedValue`s are constructed from
-/// types known to implement `AsValue`, providing the `fmt_value` method.
-/// This means that arbitrary `OwnedValue`s may be formatted using the erased
-/// type's `fmt_value` implementation, _even when the erased type is no longer
-/// known_.
-pub struct OwnedValue(Box<dyn AsValue>);
-
-/// Converts a reference to a `T` into a `BorrowedValue`.
-pub fn borrowed<'a>(t: &'a dyn AsValue) -> BorrowedValue<'a> {
-    BorrowedValue(t)
-}
 
 /// Wraps a type implementing `fmt::Display` so that its `Display`
 /// implementation will be used when formatting it as a `Value`.
@@ -309,7 +266,7 @@ pub fn borrowed<'a>(t: &'a dyn AsValue) -> BorrowedValue<'a> {
 /// ```
 pub fn display<T>(t: T) -> DisplayValue<T>
 where
-    T: AsValue + fmt::Display,
+    T: Value + fmt::Display,
 {
     DisplayValue(t)
 }
@@ -317,10 +274,10 @@ where
 // ===== impl AsValue =====
 
 // Copied from `std::any::Any`.
-impl AsValue + 'static {
+impl Value + 'static {
     /// Returns true if the boxed type is the same as `T`
     #[inline]
-    fn is<T: AsValue + 'static>(&self) -> bool
+    fn is<T: Value + 'static>(&self) -> bool
     where
         Self: 'static,
     {
@@ -336,69 +293,22 @@ impl AsValue + 'static {
 
     /// Returns some reference to the boxed value if it is of type `T`, or
     /// `None` if it isn't.
-    fn downcast_ref<T: AsValue + 'static>(&self) -> Option<&T>
+    fn downcast_ref<T: Value + 'static>(&self) -> Option<&T>
     where
         Self: 'static,
     {
         if self.is::<T>() {
-            unsafe { Some(&*(self as *const AsValue as *const T)) }
+            unsafe { Some(&*(self as *const Value as *const T)) }
         } else {
             None
         }
     }
 }
-
-impl<T> AsValue for T
-where
-    T: fmt::Debug + Send + Sync,
-{
-    fn fmt_value(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Debug::fmt(self, f)
-    }
-}
-
-// ===== impl IntoValue =====
-
-impl<T, V> IntoValue for T
-where
-    T: ToOwned<Owned = V> + AsValue,
-    V: Borrow<T> + AsValue + 'static,
-{
-    fn into_value(&self) -> OwnedValue {
-        OwnedValue(Box::new(self.to_owned()))
-    }
-}
-
-// ===== impl BorrowedValue =====
-
-impl<'a> fmt::Debug for BorrowedValue<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.0.fmt_value(f)
-    }
-}
-
-impl<'a> Value for BorrowedValue<'a> {
-    #[inline]
-    fn downcast_ref<T: AsValue + 'static>(&self) -> Option<&T>
-    where
-        Self: 'static,
-    {
-        self.0.downcast_ref::<T>()
-    }
-
-    fn is<T: AsValue + 'static>(&self) -> bool
-    where
-        Self: 'static,
-    {
-        self.0.is::<T>()
-    }
-}
-
 // ===== impl DisplayValue =====
 
-impl<T: AsValue + fmt::Display> AsValue for DisplayValue<T> {
-    fn fmt_value(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Display::fmt(&self.0, f)
+impl<T: Value + fmt::Display> Value for DisplayValue<T> {
+    fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
+        self.0.record(recorder)
     }
 
     #[doc(hidden)]
@@ -410,47 +320,9 @@ impl<T: AsValue + fmt::Display> AsValue for DisplayValue<T> {
     }
 }
 
-// ===== impl OwnedValue =====
-
-impl Value for OwnedValue {
-    #[inline]
-    fn downcast_ref<T: AsValue + 'static>(&self) -> Option<&T>
-    where
-        Self: 'static,
-    {
-        self.0.as_ref().downcast_ref::<T>()
-    }
-
-    #[inline]
-    fn is<T: AsValue + 'static>(&self) -> bool
-    where
-        Self: 'static,
-    {
-        self.0.as_ref().is::<T>()
-    }
-}
-
-impl<'a> Value for &'a OwnedValue {
-    #[inline]
-    fn downcast_ref<T: AsValue + 'static>(&self) -> Option<&T>
-    where
-        Self: 'static,
-    {
-        (*self).downcast_ref()
-    }
-
-    #[inline]
-    fn is<T: AsValue + 'static>(&self) -> bool
-    where
-        Self: 'static,
-    {
-        (*self).is::<T>()
-    }
-}
-
-impl fmt::Debug for OwnedValue {
+impl<T: Value + fmt::Display> fmt::Debug for DisplayValue<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.0.fmt_value(f)
+        write!(f, "{}", self.0)
     }
 }
 
