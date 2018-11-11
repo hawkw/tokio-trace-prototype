@@ -113,7 +113,7 @@ pub use self::{
     dispatcher::Dispatch,
     field::{Key, Value},
     span::{Attributes as SpanAttributes, Id as SpanId, Span},
-    subscriber::Subscriber,
+    subscriber::{Subscriber, Interest},
 };
 
 /// `Event`s represent single points in time where something occurred during the

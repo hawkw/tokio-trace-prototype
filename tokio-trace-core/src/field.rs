@@ -104,7 +104,7 @@ pub trait Recorder<'a> {
     fn record_struct(
         &mut self,
         name: &'a dyn AsRef<str>,
-        strct: &mut dyn Iterator<Item = (&'a dyn AsRef<str>, &'a dyn Value)>,
+        strct: &mut dyn Iterator<Item = (&'a dyn AsRef<str>, &'a (dyn Value +'a) )>,
     ) -> RecordResult;
     fn finish(self) -> RecordResult;
 }
@@ -130,59 +130,64 @@ where
     W: Write,
 {
     fn record_tuple(&mut self, tuple: (&'a dyn Value, &'a dyn Value)) -> RecordResult {
-        self.record_any(&tuple)
+        // self.record_any(&tuple)
+        unimplemented!()
     }
 
     fn record_any(&mut self, value: &'a dyn Value) -> RecordResult {
-        write!(&mut self.0, "{:?}", value).map_err(Box::new)
+        write!(&mut self.0, "{:?}", value).map_err(Into::into)
     }
 
     fn record_map(
         &mut self,
         map: &mut dyn Iterator<Item = (&'a dyn Value, &'a dyn Value)>,
     ) -> RecordResult {
-        struct Debug<'a>(&'a mut dyn Iterator<Item = (&'a dyn Value, &'a dyn Value)>);
-        impl<'a> fmt::Debug for Debug<'a> {
+        struct Debug<'a, T: 'a>(&'a mut dyn Iterator<Item = (&'a dyn Value, T)>);
+        impl<'a, &'a T: fmt::Debug + 'a> fmt::Debug for Debug<'a, T> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 f.debug_map().entries(self.0).finish()
             }
         }
-        write!(self.0, "{:?}", Debug(map)).map_err(Box::new)
+        write!(self.0, "{:?}", &Debug(map)).map_err(Into::into)
     }
 
     fn record_list(&mut self, list: &mut dyn Iterator<Item = &'a dyn Value>) -> RecordResult {
-        struct Debug<'a>(&'a mut dyn Iterator<Item = &'a dyn Value>);
-        impl<'a> fmt::Debug for Debug<'a> {
+        struct Debug<'a, T: ?Sized + 'a>(&'a mut dyn Iterator<Item = T>);
+        impl<'a, T: fmt::Debug + 'a> fmt::Debug for Debug<'a, T> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 f.debug_list().entries(self.0).finish()
             }
         }
-        write!(self.0, "{:?}", Debug(list)).map_err(Box::new)
+        write!(self.0, "{:?}", Debug(list)).map_err(Into::into)
     }
 
     fn record_struct(
         &mut self,
         name: &'a dyn AsRef<str>,
-        fields: &mut dyn Iterator<Item = (&'a dyn AsRef<str>, &'a dyn Value)>,
+        fields: &mut dyn Iterator<Item = (&'a dyn AsRef<str>, &'a (dyn Value + 'a))>,
     ) -> RecordResult {
-        struct Debug<'a> {
-            name: &'a str,
-            fields: &'a mut dyn Iterator<Item = (&'a dyn AsRef<str>, &'a dyn Value)>,
-        }
-        impl<'a> fmt::Debug for Debug<'a> {
-            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                self.fields
-                    .fold(
-                        f.debug_struct(self.name.as_ref()),
-                        |debug, (name, value)| debug.field(name.as_ref(), value),
-                    ).finish()
-            }
-        }
-        write!(self.0, "{:?}", Debug { name, fields }).map_err(Box::new)
+        // struct Debug<'a, T: 'a> {
+        //     name: &'a str,
+        //     fields: &'a mut dyn Iterator<Item = (&'a dyn AsRef<str>, T)>,
+        // }
+        // impl<'a, T: fmt::Debug + 'a> fmt::Debug for Debug<'a, T> {
+        //     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        //         let mut debug = f.debug_struct(self.name.as_ref());
+        //         self.fields
+        //             .fold(
+        //                 &mut debug,
+        //                 |debug, (name, value)| debug.field(name.as_ref(), &value),
+        //             );
+        //         debug.finish()
+        //     }
+        // }
+        // write!(self.0, "{:?}", Debug { name: name.as_ref(), fields
+        // }).map_err(From::from)
+        unimplemented!()
     }
 
     fn finish(self) -> RecordResult {
-        self.0.flush().map_err(Box::new)
+        self.0.flush().map_err(From::from)
     }
 }
 

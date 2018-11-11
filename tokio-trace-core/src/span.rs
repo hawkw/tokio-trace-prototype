@@ -608,7 +608,7 @@ pub use self::test_support::*;
 #[cfg(any(test, feature = "test-support"))]
 mod test_support {
     #![allow(missing_docs)]
-    use field::OwnedValue;
+    use field;
     use std::collections::HashMap;
 
     /// A mock span.
