@@ -59,6 +59,7 @@
 use super::Meta;
 use std::{
     any::TypeId,
+    cell::Cell,
     error::Error,
     fmt,
     io::{self, Write},
@@ -88,9 +89,7 @@ pub trait Recorder {
         self.record_any(&value)
     }
 
-    fn record_any(&mut self, value: &dyn Value) -> RecordResult {
-        self.record_any(value)
-    }
+    fn record_any(&mut self, value: &dyn Value) -> RecordResult;
 
     fn record_tuple(&mut self, tuple: (&dyn Value, &dyn Value)) -> RecordResult;
 
@@ -142,23 +141,24 @@ where
         &mut self,
         map: &mut dyn Iterator<Item = (&dyn Value, &dyn Value)>,
     ) -> RecordResult {
-        struct Debug<'a, A: 'a, B: ?Sized + 'a>(&'a mut dyn Iterator<Item = (A, B)>);
+        // TODO: this is...not great.
+        struct Debug<'a, A: 'a, B: ?Sized + 'a>(Cell<Option<&'a mut dyn Iterator<Item = (A, B)>>>);
         impl<'a, A: fmt::Debug + 'a, B: fmt::Debug + 'a> fmt::Debug for Debug<'a, A, B> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                f.debug_map().entries(self.0).finish()
+                f.debug_map().entries(self.0.replace(None).expect("should not be formatted twice")).finish()
             }
         }
-        write!(self.0, "{:?}", Debug(map)).map_err(Into::into)
+        write!(self.0, "{:?}", Debug(Cell::new(Some(map)))).map_err(Into::into)
     }
 
     fn record_list(&mut self, list: &mut dyn Iterator<Item = &dyn Value>) -> RecordResult {
-        struct Debug<'a, T: ?Sized + 'a>(&'a mut dyn Iterator<Item = T>);
+        struct Debug<'a, T: ?Sized + 'a>(Cell<Option<&'a mut dyn Iterator<Item = T>>>);
         impl<'a, T: fmt::Debug + 'a> fmt::Debug for Debug<'a, T> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                f.debug_list().entries(self.0).finish()
+                f.debug_list().entries(self.0.replace(None).expect("should not be formatted twice")).finish()
             }
         }
-        write!(self.0, "{:?}", Debug(list)).map_err(Into::into)
+        write!(self.0, "{:?}", Debug(Cell::new(Some(list)))).map_err(Into::into)
     }
 
     fn record_struct(
@@ -166,33 +166,34 @@ where
         name: &dyn AsRef<str>,
         fields: &mut dyn Iterator<Item = (&dyn AsRef<str>, &(dyn Value))>,
     ) -> RecordResult {
-        // struct Debug<'a, T: 'a> {
-        //     name: &'a str,
-        //     fields: &'a mut dyn Iterator<Item = (&'a dyn AsRef<str>, T)>,
-        // }
-        // impl<'a, T: fmt::Debug + 'a> fmt::Debug for Debug<'a, T> {
-        //     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        //         let mut debug = f.debug_struct(self.name.as_ref());
-        //         self.fields
-        //             .fold(
-        //                 &mut debug,
-        //                 |debug, (name, value)| debug.field(name.as_ref(), &value),
-        //             );
-        //         debug.finish()
-        //     }
-        // }
-        // write!(self.0, "{:?}", Debug { name: name.as_ref(), fields
-        // }).map_err(From::from)
-        unimplemented!()
+        let name = name.as_ref();
+        struct Debug<'a, 'b, A: 'a, B: ?Sized + 'a> {
+            name: &'b str,
+            fields: Cell<Option<&'a mut dyn Iterator<Item = (A, B)>>>,
+        }
+        impl<'a, 'b, A: AsRef<str> + 'a, B: fmt::Debug + 'a> fmt::Debug for Debug<'a, 'b, A, B> {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                let mut debug = f.debug_struct(self.name.as_ref());
+                self.fields.replace(None).expect("should not be formatted twice")
+                    .fold(
+                        &mut debug,
+                        |debug, (name, value)| debug.field(name.as_ref(), &value),
+                    );
+                debug.finish()
+            }
+        }
+        let fields = Cell::new(Some(fields));
+        write!(self.0, "{:?}", Debug { name, fields
+        }).map_err(From::from)
     }
 
-    fn finish(self) -> RecordResult {
+    fn finish(mut self) -> RecordResult {
         self.0.flush().map_err(From::from)
     }
 }
 
 impl<W: Write> DebugWriter<W> {
-    pub fn new_named(writer: W, field: &Key) -> Result<Self, io::Error> {
+    pub fn new_named(mut writer: W, field: &Key) -> Result<Self, io::Error> {
         write!(&mut writer, "{}: ", field.name().unwrap_or("???"))?;
         Ok(DebugWriter(writer))
     }

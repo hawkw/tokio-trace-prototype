@@ -308,7 +308,7 @@ mod test_support {
     use span::{self, MockSpan};
     use {
         field::{Key, Value},
-        Event, IntoValue, Meta, SpanAttributes, SpanId
+        Event, Meta, SpanAttributes, SpanId
     };
 
     use std::{

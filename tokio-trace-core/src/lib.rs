@@ -378,6 +378,7 @@ impl<'a> Event<'a> {
         }
         self.field_values
             .get(key.as_usize())
+            .map(|&v| v)
     }
 
     /// Returns an iterator over all the field names and values on this event.

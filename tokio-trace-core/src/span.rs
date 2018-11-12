@@ -618,7 +618,7 @@ mod test_support {
     #[derive(Default)]
     pub struct MockSpan {
         pub name: Option<Option<&'static str>>,
-        pub fields: HashMap<String, Box<OwnedValue>>,
+        pub fields: HashMap<String, Box<dyn field::Value>>,
         // TODO: more
     }
 
