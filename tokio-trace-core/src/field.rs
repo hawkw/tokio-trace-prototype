@@ -93,7 +93,6 @@ pub trait Recorder {
         self.record_fmt(format_args!("{:?}", value))
     }
 
-    fn record_tuple(&mut self, tuple: (&dyn Value, &dyn Value)) -> RecordResult;
     fn record_kv(&mut self, k: &dyn Value, v: &dyn Value) -> RecordResult;
     fn record_fmt(&mut self, args: fmt::Arguments) -> RecordResult;
 
@@ -105,6 +104,9 @@ pub trait Recorder {
 
     fn open_struct(&mut self, name: &str) -> RecordResult;
     fn close_struct(&mut self) -> RecordResult;
+
+    fn open_tuple(&mut self) -> RecordResult;
+    fn close_tuple(&mut self) -> RecordResult;
 
     fn finish(self) -> RecordResult;
 }
@@ -158,11 +160,6 @@ impl<W> Recorder for DebugWriter<W>
 where
     W: Write,
 {
-    fn record_tuple(&mut self, tuple: (&dyn Value, &dyn Value)) -> RecordResult {
-        // self.record_any(&tuple)
-        unimplemented!()
-    }
-
     fn record_fmt(&mut self, args: fmt::Arguments) -> RecordResult {
         self.0.write_fmt(args).map_err(Into::into)
     }
@@ -188,6 +185,14 @@ where
     }
 
     fn close_struct(&mut self) -> RecordResult {
+        unimplemented!()
+    }
+
+    fn open_tuple(&mut self) -> RecordResult {
+        unimplemented!()
+    }
+
+    fn close_tuple(&mut self) -> RecordResult {
         unimplemented!()
     }
 

@@ -453,15 +453,6 @@ impl<F> field::Recorder for RecordFmt<F>
 where
     F: fmt::Write
 {
-    fn record_tuple(&mut self, tuple: (&dyn field::Value, &dyn field::Value)) -> field::RecordResult {
-        self.maybe_comma()?;
-        self.write.write_char('(')?;
-        tuple.0.record(self)?;
-        self.write.write_str(", ")?;
-        tuple.1.record(self)?;
-        self.write.write_char(')')?;
-        Ok(())
-    }
     fn record_kv(&mut self, k: &dyn field::Value, v: &dyn field::Value) -> field::RecordResult {
         self.maybe_comma()?;
         k.record(self)?;
@@ -492,6 +483,7 @@ where
         self.write.write_char('[')?;
         Ok(())
     }
+
     fn close_list(&mut self) -> field::RecordResult {
         self.comma_delimited = false;
         self.write.write_char(']')?;
@@ -508,6 +500,18 @@ where
     fn close_struct(&mut self) -> field::RecordResult {
         self.comma_delimited = false;
         self.write.write_char('}')?;
+        Ok(())
+    }
+
+    fn open_tuple(&mut self) -> field::RecordResult {
+        self.maybe_comma()?;
+        self.write.write_char('(')?;
+        Ok(())
+    }
+
+    fn close_tuple(&mut self) -> field::RecordResult {
+        self.comma_delimited = false;
+        self.write.write_char(')')?;
         Ok(())
     }
 
