@@ -89,10 +89,13 @@ pub trait Recorder {
         self.record_any(&value)
     }
 
-    fn record_any(&mut self, value: &dyn Value) -> RecordResult;
+    fn record_any(&mut self, value: &dyn Value) -> RecordResult {
+        self.record_fmt(format_args!("{:?}", value))
+    }
 
     fn record_tuple(&mut self, tuple: (&dyn Value, &dyn Value)) -> RecordResult;
     fn record_kv(&mut self, k: &dyn Value, v: &dyn Value) -> RecordResult;
+    fn record_fmt(&mut self, args: fmt::Arguments) -> RecordResult;
 
     fn open_map(&mut self) -> RecordResult;
     fn close_map(&mut self) -> RecordResult;
@@ -160,8 +163,8 @@ where
         unimplemented!()
     }
 
-    fn record_any(&mut self, value: &dyn Value) -> RecordResult {
-        write!(&mut self.0, "{:?}", value).map_err(Into::into)
+    fn record_fmt(&mut self, args: fmt::Arguments) -> RecordResult {
+        self.0.write_fmt(args).map_err(Into::into)
     }
 
     fn open_map(&mut self) -> RecordResult {
@@ -218,70 +221,85 @@ pub struct Key<'a> {
     metadata: &'a Meta<'a>,
 }
 
-/// A `Value` which is formatted using `fmt::Display` rather than `fmt::Debug`.
+/// A `Value` which serializes as a string using `fmt::Display`.
 #[derive(Clone)]
 pub struct DisplayValue<T: fmt::Display>(T);
 
-/// Wraps a type implementing `fmt::Display` so that its `Display`
-/// implementation will be used when formatting it as a `Value`.
-///
-/// # Examples
-/// ```
-/// # extern crate tokio_trace_core as tokio_trace;
-/// use tokio_trace::field;
-/// # use std::fmt;
-/// # fn main() {
-///
-/// #[derive(Clone, Debug)]
-/// struct Foo;
-///
-/// impl fmt::Display for Foo {
-///     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-///         f.pad("Hello, I'm Foo")
-///     }
-/// }
-///
-/// let foo = Foo;
-/// assert_eq!("Foo".to_owned(), format!("{:?}", foo));
-///
-/// let display_foo = field::display(foo.clone());
-/// assert_eq!(
-///     format!("{}", foo),
-///     format!("{:?}", field::borrowed(&display_foo)),
-/// );
-/// # }
-/// ```
-///
-/// ```
-/// # extern crate tokio_trace_core as tokio_trace;
-/// # use std::fmt;
-/// # fn main() {
-/// #
-/// # #[derive(Clone, Debug)]
-/// # struct Foo;
-/// #
-/// # impl fmt::Display for Foo {
-/// #   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-/// #       f.pad("Hello, I'm Foo")
-/// #   }
-/// # }
-/// use tokio_trace::field::{self, Value, IntoValue};
-/// let foo = field::display(Foo);
-///
-/// let owned_value = foo.into_value();
-/// assert_eq!("Hello, I'm Foo".to_owned(), format!("{:?}", owned_value));
-///
-/// assert!(owned_value.downcast_ref::<Foo>().is_some());
-/// # }
-/// ```
-pub fn display<T>(t: T) -> DisplayValue<T>
-where
-    T: Value + fmt::Display,
-{
-    DisplayValue(t)
-}
+/// A `Value` which serializes as a string using `fmt::Debug`.
+#[derive(Clone)]
+pub struct DebugValue<T: fmt::Debug>(T);
 
-// ===== impl AsValue =====
+// ===== impl Value =====
+
+impl Value {
+    /// Wraps a type implementing `fmt::Display` so that its `Display`
+    /// implementation will be used when formatting it as a `Value`.
+    ///
+    /// # Examples
+    /// ```
+    /// # extern crate tokio_trace_core as tokio_trace;
+    /// use tokio_trace::field;
+    /// # use std::fmt;
+    /// # fn main() {
+    ///
+    /// #[derive(Clone, Debug)]
+    /// struct Foo;
+    ///
+    /// impl fmt::Display for Foo {
+    ///     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    ///         f.pad("Hello, I'm Foo")
+    ///     }
+    /// }
+    ///
+    /// let foo = Foo;
+    /// assert_eq!("Foo".to_owned(), format!("{:?}", foo));
+    ///
+    /// let display_foo = field::display(foo.clone());
+    /// assert_eq!(
+    ///     format!("{}", foo),
+    ///     format!("{:?}", field::borrowed(&display_foo)),
+    /// );
+    /// # }
+    /// ```
+    ///
+    /// ```
+    /// # extern crate tokio_trace_core as tokio_trace;
+    /// # use std::fmt;
+    /// # fn main() {
+    /// #
+    /// # #[derive(Clone, Debug)]
+    /// # struct Foo;
+    /// #
+    /// # impl fmt::Display for Foo {
+    /// #   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    /// #       f.pad("Hello, I'm Foo")
+    /// #   }
+    /// # }
+    /// use tokio_trace::field::{self, Value, IntoValue};
+    /// let foo = field::display(Foo);
+    ///
+    /// let owned_value = foo.into_value();
+    /// assert_eq!("Hello, I'm Foo".to_owned(), format!("{:?}", owned_value));
+    ///
+    /// assert!(owned_value.downcast_ref::<Foo>().is_some());
+    /// # }
+    /// ```
+    pub fn display<T>(t: T) -> DisplayValue<T>
+    where
+        T: fmt::Display,
+    {
+        DisplayValue(t)
+    }
+
+    /// Wraps a type implementing `fmt::Debug` as a `Value` that can be
+    /// serialized using its `Debug` implementation.
+    pub fn debug<T>(t: T) -> DebugValue<T>
+    where
+        T: fmt::Debug,
+    {
+        DebugValue(t)
+    }
+}
 
 // Copied from `std::any::Any`.
 impl Value + 'static {
@@ -314,11 +332,12 @@ impl Value + 'static {
         }
     }
 }
+
 // ===== impl DisplayValue =====
 
-impl<T: Value + fmt::Display> Value for DisplayValue<T> {
+impl<T: fmt::Display + Send + Sync> Value for DisplayValue<T> {
     fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
-        self.0.record(recorder)
+        recorder.record_fmt(format_args!("{}", self.0))
     }
 
     #[doc(hidden)]
@@ -326,13 +345,35 @@ impl<T: Value + fmt::Display> Value for DisplayValue<T> {
     where
         Self: 'static,
     {
-        self.0.type_id()
+        TypeId::of::<T>()
     }
 }
 
-impl<T: Value + fmt::Display> fmt::Debug for DisplayValue<T> {
+impl<T: fmt::Display> fmt::Debug for DisplayValue<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+// ===== impl DebugValue =====
+
+impl<T: fmt::Debug + Send + Sync> Value for DebugValue<T> {
+    fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
+        recorder.record_fmt(format_args!("{:?}", self.0))
+    }
+
+    #[doc(hidden)]
+    fn type_id(&self) -> TypeId
+    where
+        Self: 'static,
+    {
+        TypeId::of::<T>()
+    }
+}
+
+impl<T: fmt::Debug> fmt::Debug for DebugValue<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self.0)
     }
 }
 
@@ -439,7 +480,6 @@ impl<'a> Value for Key<'a> {
         recorder.record_str(self.name().unwrap_or("???"))
     }
 }
-
 
 #[cfg(test)]
 mod tests {
