@@ -42,7 +42,7 @@ impl RspBody {
 }
 
 impl Body for RspBody {
-    type Attributes = Bytes;
+    type Data = Bytes;
 
     fn is_end_stream(&self) -> bool {
         self.0.as_ref().map(|b| b.is_empty()).unwrap_or(false)
