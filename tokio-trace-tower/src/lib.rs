@@ -6,6 +6,7 @@ extern crate tokio_trace_futures;
 
 use std::fmt;
 use tokio_trace_futures::{Instrument, Instrumented};
+use tokio_trace::field::Value;
 use tower_service::Service;
 
 // TODO: Can this still be `Clone` (some kind of SharedSpan type?)
@@ -40,7 +41,8 @@ where
         let span = &mut self.span;
         let inner = &mut self.inner;
         span.enter(|| {
-            span!("request", request = &req).enter(move || inner.call(req).in_current_span())
+            // TODO: custom `Value` impls for `http` types would be nice...
+            span!("request", request = &Value::debug(req)).enter(move || inner.call(req).in_current_span())
         })
     }
 }
