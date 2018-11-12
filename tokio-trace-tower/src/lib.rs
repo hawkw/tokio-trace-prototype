@@ -42,7 +42,7 @@ where
         let inner = &mut self.inner;
         span.enter(|| {
             // TODO: custom `Value` impls for `http` types would be nice...
-            span!("request", request = &Value::debug(req)).enter(move || inner.call(req).in_current_span())
+            span!("request", request = &Value::debug(&req)).enter(move || inner.call(req).in_current_span())
         })
     }
 }
