@@ -409,17 +409,16 @@ impl<'a> fmt::Debug for LogField<'a> {
         write!(f, "{}=", name)?;
         let mut f = RecordFmt::new(f);
         self.val.record(&mut f).map_err(|_| fmt::Error)?;
-        let mut f = f.into_inner();
+        let f = f.into_inner();
         write!(f, ";")?;
         Ok(())
     }
 }
 
-
 struct RecordFmt<F> {
     write: F,
-    comma_delimited: bool,
-    will_be_comma: bool,
+    comma_delimited: usize,
+    add_comma: bool,
 }
 
 impl<F> RecordFmt<F>
@@ -429,8 +428,8 @@ where
     fn new(write: F) -> Self {
         Self {
             write,
-            comma_delimited: false,
-            will_be_comma: false,
+            comma_delimited: 0,
+            add_comma: false,
         }
     }
 
@@ -439,12 +438,25 @@ where
     }
 
     fn maybe_comma(&mut self)  -> fmt::Result {
-        if self.comma_delimited {
+        if self.comma_delimited > 0 {
             self.write.write_str(", ")?;
-        } else if self.will_be_comma {
-            self.comma_delimited = true;
-            self.will_be_comma = false;
+        } else if self.add_comma {
+            self.comma_delimited += 1;
+            self.add_comma = false;
         }
+        Ok(())
+    }
+
+    fn open(&mut self, c: char) -> field::RecordResult {
+        self.maybe_comma()?;
+        self.write.write_char(c)?;
+        self.add_comma = true;
+        Ok(())
+    }
+
+    fn close(&mut self, c: char) -> field::RecordResult {
+        self.write.write_char(c)?;
+        self.comma_delimited.saturating_sub(1);
         Ok(())
     }
 }
@@ -466,53 +478,36 @@ where
     }
 
     fn open_map(&mut self) -> field::RecordResult {
-        self.maybe_comma()?;
-        self.will_be_comma = true;
-        self.write.write_char('{')?;
-        Ok(())
+        self.open('{')
     }
+
     fn close_map(&mut self) -> field::RecordResult {
-        self.comma_delimited = false;
-        self.write.write_char('}')?;
-        Ok(())
+        self.close('}')
     }
 
     fn open_list(&mut self) -> field::RecordResult {
-        self.maybe_comma()?;
-        self.will_be_comma = true;
-        self.write.write_char('[')?;
-        Ok(())
+        self.open('[')
     }
 
     fn close_list(&mut self) -> field::RecordResult {
-        self.comma_delimited = false;
-        self.write.write_char(']')?;
-        Ok(())
+        self.close(']')
     }
 
     fn open_struct(&mut self, name: &str) -> field::RecordResult {
-        self.maybe_comma()?;
-        self.will_be_comma = true;
-        self.write.write_fmt(format_args!("{} {{", name))?;
-        Ok(())
+        self.write.write_fmt(format_args!("{} ", name))?;
+        self.open('{')
     }
 
     fn close_struct(&mut self) -> field::RecordResult {
-        self.comma_delimited = false;
-        self.write.write_char('}')?;
-        Ok(())
+        self.close('}')
     }
 
     fn open_tuple(&mut self) -> field::RecordResult {
-        self.maybe_comma()?;
-        self.write.write_char('(')?;
-        Ok(())
+        self.open('(')
     }
 
     fn close_tuple(&mut self) -> field::RecordResult {
-        self.comma_delimited = false;
-        self.write.write_char(')')?;
-        Ok(())
+        self.close(')')
     }
 
     fn finish(self) -> field::RecordResult {
