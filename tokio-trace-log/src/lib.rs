@@ -24,8 +24,11 @@ extern crate tokio_trace;
 extern crate tokio_trace_subscriber;
 
 use std::{
+    collections::HashMap,
     fmt, io,
-    sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT},
+    sync::{
+        Mutex, atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT}
+    },
 };
 use tokio_trace::{
     field, span,
@@ -134,7 +137,10 @@ pub struct LogTracer {
 
 /// A `tokio_trace_subscriber::Observe` implementation that logs all recorded
 /// trace events.
-pub struct TraceLogger;
+pub struct TraceLogger {
+    // TODO: the hashmap can definitely be replaced with some kind of arena eventually.
+    in_progress: Mutex<HashMap<span::Id, LineBuilder>>,
+}
 
 struct LogFields<'a, 'b: 'a, I: 'a>(&'a I)
 where
@@ -170,7 +176,50 @@ impl log::Log for LogTracer {
 
 impl TraceLogger {
     pub fn new() -> Self {
-        TraceLogger
+        TraceLogger {
+            in_progress: Mutex::new(HashMap::new()),
+        }
+    }
+}
+
+struct LineBuilder {
+    attrs: span::Attributes,
+    line: String,
+}
+
+impl LineBuilder {
+    fn new(attrs: span::Attributes) -> Self {
+        Self {
+            attrs,
+            line: String::new(),
+        }
+    }
+
+    fn add_field(&mut self, key: &field::Key, val: &dyn field::Value) -> field::RecordResult {
+        use std::fmt::Write;
+        write!(&mut self.line, " {:?}", LogField { key, val })?;
+        Ok(())
+    }
+
+    fn finish(self) {
+        let meta = self.attrs.metadata();
+        let log_meta = meta.as_log();
+        let logger = log::logger();
+        if logger.enabled(&log_meta) {
+            logger.log(
+                &log::Record::builder()
+                    .metadata(log_meta)
+                    .module_path(meta.module_path)
+                    .file(meta.file)
+                    .line(meta.line)
+                    .args(format_args!(
+                        "close {}; parent={:?};{}",
+                        meta.name.unwrap_or(""),
+                        self.attrs.parent(),
+                        self.line,
+                    )).build()
+            );
+        }
     }
 }
 
@@ -182,21 +231,7 @@ impl Subscriber for TraceLogger {
     fn new_span(&self, new_span: span::Attributes) -> span::Id {
         static NEXT_ID: AtomicUsize = ATOMIC_USIZE_INIT;
         let id = span::Id::from_u64(NEXT_ID.fetch_add(1, Ordering::SeqCst) as u64);
-        let meta = new_span.metadata();
-        let logger = log::logger();
-        logger.log(
-            &log::Record::builder()
-                .metadata(meta.as_log())
-                .module_path(meta.module_path)
-                .file(meta.file)
-                .line(meta.line)
-                .args(format_args!(
-                    "new_span: {}; span={:?}; parent={:?};",
-                    meta.name.unwrap_or(""),
-                    id,
-                    new_span.parent(),
-                )).build(),
-        );
+        self.in_progress.lock().unwrap().insert(id.clone(), LineBuilder::new(new_span));
         id
     }
 
@@ -206,16 +241,13 @@ impl Subscriber for TraceLogger {
         key: &field::Key,
         val: &dyn field::Value,
     ) -> Result<(), subscriber::AddValueError> {
-        // TODO: can we just save the fields and log the span on close?
-        log::logger().log(
-            &log::Record::builder()
-                .args(format_args!(
-                    "add_field: span={:?}; {:?}",
-                    span,
-                    LogField { key, val }
-                )).build(),
-        );
-        Ok(())
+        if let Some(span) = self.in_progress.lock().unwrap().get_mut(span) {
+            // TODO: this needs to return the error instead.
+            span.add_field(key, val).unwrap();
+            Ok(())
+        } else {
+            Err(subscriber::AddValueError::NoSpan)
+        }
     }
 
     fn add_follows_from(
@@ -274,13 +306,9 @@ impl Subscriber for TraceLogger {
     }
 
     fn close(&self, span: span::Id) {
-        let logger = log::logger();
-        logger.log(
-            &log::Record::builder()
-                .level(log::Level::Trace)
-                .args(format_args!("close: id={:?};", span))
-                .build(),
-        );
+        if let Some(line) = self.in_progress.lock().unwrap().remove(&span) {
+            line.finish()
+        }
     }
 }
 
