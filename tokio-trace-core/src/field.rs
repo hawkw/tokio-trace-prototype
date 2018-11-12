@@ -154,63 +154,104 @@ pub trait Value: fmt::Debug + Send + Sync {
     }
 }
 
-pub struct DebugWriter<W>(W);
+pub struct DebugRecorder<W> {
+    write: W,
+    comma_delimited: usize,
+    add_comma: bool,
+}
 
-impl<W> Recorder for DebugWriter<W>
+impl<W> DebugRecorder<W>
+where
+    W: Write,
+{
+    pub fn new(write: W) -> Self {
+        Self {
+            write,
+            comma_delimited: 0,
+            add_comma: false,
+        }
+    }
+
+    fn maybe_comma(&mut self) -> io::Result<()> {
+        if self.comma_delimited > 0 {
+            self.write.write_all(b", ")?;
+        } else if self.add_comma {
+            self.comma_delimited += 1;
+            self.add_comma = false;
+        }
+        Ok(())
+    }
+
+    fn open(&mut self, args: fmt::Arguments) -> RecordResult {
+        self.maybe_comma()?;
+        self.write.write_fmt(args)?;
+        self.add_comma = true;
+        Ok(())
+    }
+
+    fn close(&mut self, args: fmt::Arguments) -> RecordResult {
+        self.write.write_fmt(args)?;
+        self.comma_delimited.saturating_sub(1);
+        Ok(())
+    }
+
+}
+
+impl<W> Recorder for DebugRecorder<W>
 where
     W: Write,
 {
     fn record_fmt(&mut self, args: fmt::Arguments) -> RecordResult {
-        self.0.write_fmt(args).map_err(Into::into)
+        self.maybe_comma()?;
+        self.write.write_fmt(args)?;
+        Ok(())
     }
 
     fn open_map(&mut self) -> RecordResult {
-        unimplemented!()
+        self.open(format_args!("{{"))
     }
 
     fn close_map(&mut self) -> RecordResult {
-        unimplemented!()
+        self.close(format_args!("}}"))
     }
 
     fn open_list(&mut self) -> RecordResult {
-        unimplemented!()
+        self.open(format_args!("["))
     }
 
     fn close_list(&mut self) -> RecordResult {
-        unimplemented!()
+        self.open(format_args!("]"))
     }
 
     fn open_struct(&mut self, name: &str) -> RecordResult {
-        unimplemented!()
+        self.open(format_args!("{} {{", name))
     }
 
     fn close_struct(&mut self) -> RecordResult {
-        unimplemented!()
+        self.close(format_args!("}}"))
     }
 
     fn open_tuple(&mut self) -> RecordResult {
-        unimplemented!()
+        self.open(format_args!("["))
     }
 
     fn close_tuple(&mut self) -> RecordResult {
-        unimplemented!()
+        self.open(format_args!("]"))
     }
 
     fn record_kv(&mut self, k: &dyn Value, v: &dyn Value) -> RecordResult {
-        unimplemented!()
+        self.maybe_comma()?;
+        k.record(self)?;
+        self.write.write_all(b": ")?;
+        v.record(self)?;
+        Ok(())
     }
 
     fn finish(mut self) -> RecordResult {
-        self.0.flush().map_err(From::from)
+        self.write.flush()?;
+        Ok(())
     }
 }
-
-impl<W: Write> DebugWriter<W> {
-    pub fn new(writer: W) -> Self {
-        DebugWriter(writer)
-    }
-}
-
 
 /// An opaque key allowing _O_(1) access to a field in a `Span` or `Event`'s
 /// key-value data.
