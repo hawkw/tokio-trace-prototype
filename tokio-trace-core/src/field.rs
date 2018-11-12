@@ -89,6 +89,10 @@ pub trait Recorder {
         self.record_any(&value)
     }
 
+    fn record_bool(&mut self, value: bool) -> RecordResult {
+        self.record_any(&value)
+    }
+
     fn record_any(&mut self, value: &dyn Value) -> RecordResult {
         self.record_fmt(format_args!("{:?}", value))
     }
@@ -512,7 +516,8 @@ impl_values! {
     record_uint(usize, u32, u16 as u64),
     record_int(i64),
     record_int(isize, i32, i16, i8 as i64),
-    record_float(f64, f32 as f64)
+    record_float(f64, f32 as f64),
+    record_bool(bool)
 }
 
 impl<'a> Value for &'a str {
