@@ -102,8 +102,8 @@ pub trait Recorder {
 
     fn record_struct(
         &mut self,
-        name: &dyn AsRef<str>,
-        strct: &mut dyn Iterator<Item = (&dyn AsRef<str>, &dyn Value)>,
+        name: &str,
+        strct: &mut dyn Iterator<Item = (&str, &dyn Value)>,
     ) -> RecordResult;
     fn finish(self) -> RecordResult;
 }
@@ -163,15 +163,14 @@ where
 
     fn record_struct(
         &mut self,
-        name: &dyn AsRef<str>,
-        fields: &mut dyn Iterator<Item = (&dyn AsRef<str>, &(dyn Value))>,
+        name: &str,
+        fields: &mut dyn Iterator<Item = (&str, &(dyn Value))>,
     ) -> RecordResult {
-        let name = name.as_ref();
-        struct Debug<'a, 'b, A: 'a, B: ?Sized + 'a> {
+        struct Debug<'a, 'b, 'c: 'a, T: ?Sized + 'a> {
             name: &'b str,
-            fields: Cell<Option<&'a mut dyn Iterator<Item = (A, B)>>>,
+            fields: Cell<Option<&'a mut dyn Iterator<Item = (&'c str, T)>>>,
         }
-        impl<'a, 'b, A: AsRef<str> + 'a, B: fmt::Debug + 'a> fmt::Debug for Debug<'a, 'b, A, B> {
+        impl<'a, 'b, 'c: 'a, T: fmt::Debug + 'a> fmt::Debug for Debug<'a, 'b, 'c, T> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 let mut debug = f.debug_struct(self.name.as_ref());
                 self.fields.replace(None).expect("should not be formatted twice")
@@ -446,44 +445,43 @@ mod tests {
         }
     }
 
+    impl Value for Foo {
+        fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
+            let mut fields = ::std::iter::once::<(&str, &dyn Value)>(("bar", &self.bar));
+            recorder.record_struct(&"Foo", &mut fields)
+        }
+    }
+
     #[test]
     fn display_value_formats_with_display() {
         let foo = Foo { bar: "foo" };
         let display_foo = display(foo.clone());
 
         assert_eq!(
-            format!("{:?}", BorrowedValue(&foo)),
+            format!("{:?}", foo),
             "Foo { bar: \"foo\" }".to_owned()
         );
         assert_eq!(
-            format!("{:?}", BorrowedValue(&display_foo)),
+            format!("{:?}", display_foo),
             format!("{}", foo)
         );
     }
 
     #[test]
-    fn display_value_is_into_value() {
+    fn display_value_is_value() {
         let foo = Foo { bar: "foo" };
         let display_foo = display(foo.clone());
 
-        let owned_value: OwnedValue = display_foo.into_value();
-        assert_eq!(format!("{:?}", owned_value), format!("{}", foo));
+        let value: &dyn Value = &display_foo;
+        assert_eq!(format!("{:?}", value), format!("{}", foo));
     }
 
     #[test]
     fn display_value_downcasts_to_original_type() {
         let foo = Foo { bar: "foo" };
         let display_foo = display(foo);
+        let value: &dyn Value = &display_foo;
 
-        let owned_value: OwnedValue = display_foo.into_value();
-        assert!(owned_value.downcast_ref::<Foo>().is_some());
-    }
-
-    #[test]
-    fn owned_value_downcasts_to_original_type() {
-        let foo = Foo { bar: "foo" };
-
-        let owned_value: OwnedValue = foo.into_value();
-        assert!(owned_value.downcast_ref::<Foo>().is_some());
+        assert!(value.downcast_ref::<Foo>().is_some());
     }
 }
