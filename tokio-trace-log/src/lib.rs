@@ -30,7 +30,7 @@ use std::{
 use tokio_trace::{
     field, span,
     subscriber::{self, Subscriber},
-    Event, IntoValue, Meta,
+    Event, Meta,
 };
 use tokio_trace_subscriber::SpanRef;
 /// Format a log record as a trace event in the current span.
@@ -136,9 +136,9 @@ pub struct LogTracer {
 /// trace events.
 pub struct TraceLogger;
 
-struct LogFields<'a, 'b: 'a, I: 'a, T: 'a>(&'a I)
+struct LogFields<'a, 'b: 'a, I: 'a>(&'a I)
 where
-    &'a I: IntoIterator<Item = (tokio_trace::field::Key<'b>, T)>;
+    &'a I: IntoIterator<Item = (field::Key<'b>, &'b field::Value)>;
 
 // ===== impl LogTracer =====
 
@@ -202,11 +202,19 @@ impl Subscriber for TraceLogger {
 
     fn add_value(
         &self,
-        _span: &span::Id,
-        _name: &field::Key,
-        _value: &dyn field::Value,
+        span: &span::Id,
+        key: &field::Key,
+        val: &dyn field::Value,
     ) -> Result<(), subscriber::AddValueError> {
-        // XXX eventually this should Do Something...
+        // TODO: can we just save the fields and log the span on close?
+        log::logger().log(
+            &log::Record::builder()
+                .args(format_args!(
+                    "add_field: span={:?}; {:?}",
+                    span,
+                    LogField { key, val }
+                )).build(),
+        );
         Ok(())
     }
 
@@ -276,118 +284,234 @@ impl Subscriber for TraceLogger {
     }
 }
 
-impl tokio_trace_subscriber::Observe for TraceLogger {
-    fn observe_event<'a>(&self, event: &'a Event<'a>) {
-        <Self as Subscriber>::observe_event(&self, event)
-    }
+// impl tokio_trace_subscriber::Observe for TraceLogger {
+//     fn observe_event<'a>(&self, event: &'a Event<'a>) {
+//         <Self as Subscriber>::observe_event(&self, event)
+//     }
 
-    fn enter(&self, span: &SpanRef) {
-        if let Some(data) = span.data {
-            let meta = data.metadata();
-            let log_meta = meta.as_log();
-            let logger = log::logger();
-            if logger.enabled(&log_meta) {
-                logger.log(
-                    &log::Record::builder()
-                        .metadata(log_meta)
-                        .module_path(meta.module_path)
-                        .file(meta.file)
-                        .line(meta.line)
-                        .args(format_args!(
-                            "enter: {}; span={:?}; parent={:?}; {:?}",
-                            meta.name.unwrap_or(""),
-                            span.id,
-                            data.parent(),
-                            LogFields(span),
-                        )).build(),
-                );
-            }
-        } else {
-            <Self as Subscriber>::enter(&self, span.id.clone())
-        }
-    }
+//     fn enter(&self, span: &SpanRef) {
+//         if let Some(data) = span.data {
+//             let meta = data.metadata();
+//             let log_meta = meta.as_log();
+//             let logger = log::logger();
+//             if logger.enabled(&log_meta) {
+//                 logger.log(
+//                     &log::Record::builder()
+//                         .metadata(log_meta)
+//                         .module_path(meta.module_path)
+//                         .file(meta.file)
+//                         .line(meta.line)
+//                         .args(format_args!(
+//                             "enter: {}; span={:?}; parent={:?}; {:?}",
+//                             meta.name.unwrap_or(""),
+//                             span.id,
+//                             data.parent(),
+//                             LogFields(span),
+//                         )).build(),
+//                 );
+//             }
+//         } else {
+//             <Self as Subscriber>::enter(&self, span.id.clone())
+//         }
+//     }
 
-    fn exit(&self, span: &SpanRef) {
-        if let Some(data) = span.data {
-            let meta = data.metadata();
-            let log_meta = meta.as_log();
-            let logger = log::logger();
-            if logger.enabled(&log_meta) {
-                logger.log(
-                    &log::Record::builder()
-                        .metadata(log_meta)
-                        .module_path(meta.module_path)
-                        .file(meta.file)
-                        .line(meta.line)
-                        .args(format_args!(
-                            "exit: {}; span={:?}; parent={:?};",
-                            meta.name.unwrap_or(""),
-                            span.id,
-                            data.parent(),
-                        )).build(),
-                );
-            }
-        } else {
-            <Self as Subscriber>::exit(&self, span.id.clone())
-        }
-    }
+//     fn exit(&self, span: &SpanRef) {
+//         if let Some(data) = span.data {
+//             let meta = data.metadata();
+//             let log_meta = meta.as_log();
+//             let logger = log::logger();
+//             if logger.enabled(&log_meta) {
+//                 logger.log(
+//                     &log::Record::builder()
+//                         .metadata(log_meta)
+//                         .module_path(meta.module_path)
+//                         .file(meta.file)
+//                         .line(meta.line)
+//                         .args(format_args!(
+//                             "exit: {}; span={:?}; parent={:?};",
+//                             meta.name.unwrap_or(""),
+//                             span.id,
+//                             data.parent(),
+//                         )).build(),
+//                 );
+//             }
+//         } else {
+//             <Self as Subscriber>::exit(&self, span.id.clone())
+//         }
+//     }
 
-    fn close(&self, span: &SpanRef) {
-        if let Some(data) = span.data {
-            let meta = data.metadata();
-            let log_meta = meta.as_log();
-            let logger = log::logger();
-            if logger.enabled(&log_meta) {
-                logger.log(
-                    &log::Record::builder()
-                        .metadata(log_meta)
-                        .module_path(meta.module_path)
-                        .file(meta.file)
-                        .line(meta.line)
-                        .args(format_args!(
-                            "close: {}; span={:?}; parent={:?};",
-                            meta.name.unwrap_or(""),
-                            span.id,
-                            data.parent(),
-                        )).build(),
-                );
-            }
-        } else {
-            <Self as Subscriber>::close(&self, span.id.clone())
-        }
-    }
+//     fn close(&self, span: &SpanRef) {
+//         if let Some(data) = span.data {
+//             let meta = data.metadata();
+//             let log_meta = meta.as_log();
+//             let logger = log::logger();
+//             if logger.enabled(&log_meta) {
+//                 logger.log(
+//                     &log::Record::builder()
+//                         .metadata(log_meta)
+//                         .module_path(meta.module_path)
+//                         .file(meta.file)
+//                         .line(meta.line)
+//                         .args(format_args!(
+//                             "close: {}; span={:?}; parent={:?};",
+//                             meta.name.unwrap_or(""),
+//                             span.id,
+//                             data.parent(),
+//                         )).build(),
+//                 );
+//             }
+//         } else {
+//             <Self as Subscriber>::close(&self, span.id.clone())
+//         }
+//     }
 
-    fn filter(&self) -> &dyn tokio_trace_subscriber::Filter {
-        self
-    }
-}
+//     fn filter(&self) -> &dyn tokio_trace_subscriber::Filter {
+//         self
+//     }
+// }
 
-impl tokio_trace_subscriber::Filter for TraceLogger {
-    fn enabled(&self, metadata: &Meta) -> bool {
-        <Self as Subscriber>::enabled(&self, metadata)
-    }
+// impl tokio_trace_subscriber::Filter for TraceLogger {
+//     fn enabled(&self, metadata: &Meta) -> bool {
+//         <Self as Subscriber>::enabled(&self, metadata)
+//     }
 
-    fn should_invalidate_filter(&self, _metadata: &Meta) -> bool {
-        false
-    }
-}
+//     fn should_invalidate_filter(&self, _metadata: &Meta) -> bool {
+//         false
+//     }
+// }
 
-impl<'a, 'b: 'a, I: 'a, T: 'a> fmt::Debug for LogFields<'a, 'b, I, T>
+impl<'a, 'b: 'a, I> fmt::Debug for LogFields<'a, 'b, I>
 where
-    &'a I: IntoIterator<Item = (tokio_trace::field::Key<'b>, T)>,
-    T: fmt::Debug,
+    &'a I: IntoIterator<Item = (tokio_trace::field::Key<'b>, &'b dyn tokio_trace::field::Value)>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut fields = self.0.into_iter();
-        if let Some((field, value)) = fields.next() {
+        if let Some((ref key, val)) = fields.next() {
             // Format the first field without a leading space, in case it's the
             // only field.
-            write!(f, "{}={:?};", field, value)?;
-            for (field, value) in fields {
-                write!(f, " {}={:?};", field, value)?;
+            write!(f, "{:?}", LogField { key, val })?;
+            for (ref key, val) in fields {
+                write!(f, " {:?}", LogField { key, val })?;
             }
         }
 
+        Ok(())
+    }
+}
+
+struct LogField<'a> {
+    key: &'a field::Key<'a>,
+    val: &'a dyn field::Value,
+}
+impl<'a> fmt::Debug for LogField<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let name = self.key.name().unwrap_or("???");
+        write!(f, "{}=", name)?;
+        let mut f = RecordFmt::new(f);
+        self.val.record(&mut f).map_err(|_| fmt::Error)?;
+        let mut f = f.into_inner();
+        write!(f, ";")?;
+        Ok(())
+    }
+}
+
+
+struct RecordFmt<F> {
+    write: F,
+    comma_delimited: bool,
+    will_be_comma: bool,
+}
+
+impl<F> RecordFmt<F>
+where
+    F: fmt::Write
+{
+    fn new(write: F) -> Self {
+        Self {
+            write,
+            comma_delimited: false,
+            will_be_comma: false,
+        }
+    }
+
+    fn into_inner(self) -> F {
+        self.write
+    }
+
+    fn maybe_comma(&mut self)  -> fmt::Result {
+        if self.comma_delimited {
+            self.write.write_str(", ")?;
+        } else if self.will_be_comma {
+            self.comma_delimited = true;
+            self.will_be_comma = false;
+        }
+        Ok(())
+    }
+}
+
+impl<F> field::Recorder for RecordFmt<F>
+where
+    F: fmt::Write
+{
+    fn record_tuple(&mut self, tuple: (&dyn field::Value, &dyn field::Value)) -> field::RecordResult {
+        self.maybe_comma()?;
+        self.write.write_char('(')?;
+        tuple.0.record(self)?;
+        self.write.write_str(", ")?;
+        tuple.1.record(self)?;
+        self.write.write_char(')')?;
+        Ok(())
+    }
+    fn record_kv(&mut self, k: &dyn field::Value, v: &dyn field::Value) -> field::RecordResult {
+        self.maybe_comma()?;
+        k.record(self)?;
+        self.write.write_str(": ")?;
+        v.record(self)
+
+    }
+    fn record_fmt(&mut self, args: fmt::Arguments) -> field::RecordResult {
+        self.write.write_fmt(args)?;
+        Ok(())
+    }
+
+    fn open_map(&mut self) -> field::RecordResult {
+        self.maybe_comma()?;
+        self.will_be_comma = true;
+        self.write.write_char('{')?;
+        Ok(())
+    }
+    fn close_map(&mut self) -> field::RecordResult {
+        self.comma_delimited = false;
+        self.write.write_char('}')?;
+        Ok(())
+    }
+
+    fn open_list(&mut self) -> field::RecordResult {
+        self.maybe_comma()?;
+        self.will_be_comma = true;
+        self.write.write_char('[')?;
+        Ok(())
+    }
+    fn close_list(&mut self) -> field::RecordResult {
+        self.comma_delimited = false;
+        self.write.write_char(']')?;
+        Ok(())
+    }
+
+    fn open_struct(&mut self, name: &str) -> field::RecordResult {
+        self.maybe_comma()?;
+        self.will_be_comma = true;
+        self.write.write_fmt(format_args!("{} {{", name))?;
+        Ok(())
+    }
+
+    fn close_struct(&mut self) -> field::RecordResult {
+        self.comma_delimited = false;
+        self.write.write_char('}')?;
+        Ok(())
+    }
+
+    fn finish(self) -> field::RecordResult {
         Ok(())
     }
 }
