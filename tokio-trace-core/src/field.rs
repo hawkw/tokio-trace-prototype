@@ -92,20 +92,47 @@ pub trait Recorder {
     fn record_any(&mut self, value: &dyn Value) -> RecordResult;
 
     fn record_tuple(&mut self, tuple: (&dyn Value, &dyn Value)) -> RecordResult;
+    fn record_kv(&mut self, k: &dyn Value, v: &dyn Value) -> RecordResult;
 
-    fn record_map(
-        &mut self,
-        map: &mut dyn Iterator<Item = (&dyn Value, &dyn Value)>,
-    ) -> RecordResult;
+    fn open_map(&mut self) -> RecordResult;
+    fn close_map(&mut self) -> RecordResult;
 
-    fn record_list(&mut self, list: &mut dyn Iterator<Item = &dyn Value>) -> RecordResult;
+    fn open_list(&mut self) -> RecordResult;
+    fn close_list(&mut self) -> RecordResult;
 
-    fn record_struct(
-        &mut self,
-        name: &str,
-        strct: &mut dyn Iterator<Item = (&str, &dyn Value)>,
-    ) -> RecordResult;
+    fn open_struct(&mut self, name: &str) -> RecordResult;
+    fn close_struct(&mut self) -> RecordResult;
+
     fn finish(self) -> RecordResult;
+}
+
+impl Recorder {
+    pub fn record_map<'a, I>(&mut self, i: I) -> RecordResult
+    where I: IntoIterator<Item = (&'a dyn Value, &'a dyn Value)> {
+        self.open_map()?;
+        for (k, v) in i {
+            self.record_kv(k, v)?;
+        }
+        self.close_map()
+    }
+
+    pub fn record_list<'a, I>(&mut self, i: I) -> RecordResult
+    where I: IntoIterator<Item = &'a dyn Value> {
+        self.open_map()?;
+        for v in i {
+            v.record(self)?;
+        }
+        self.close_map()
+    }
+
+    pub fn record_struct<'a, I>(&mut self, name: &str, i: I) -> RecordResult
+    where I: IntoIterator<Item = (&'a str, &'a dyn Value)>  {
+        self.open_struct(name)?;
+        for (name, v) in i {
+            self.record_kv(&name, v)?;
+        }
+        self.close_struct()
+    }
 }
 
 /// A formattable field value of an erased type.
@@ -137,53 +164,32 @@ where
         write!(&mut self.0, "{:?}", value).map_err(Into::into)
     }
 
-    fn record_map(
-        &mut self,
-        map: &mut dyn Iterator<Item = (&dyn Value, &dyn Value)>,
-    ) -> RecordResult {
-        // TODO: this is...not great.
-        struct Debug<'a, A: 'a, B: ?Sized + 'a>(Cell<Option<&'a mut dyn Iterator<Item = (A, B)>>>);
-        impl<'a, A: fmt::Debug + 'a, B: fmt::Debug + 'a> fmt::Debug for Debug<'a, A, B> {
-            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                f.debug_map().entries(self.0.replace(None).expect("should not be formatted twice")).finish()
-            }
-        }
-        write!(self.0, "{:?}", Debug(Cell::new(Some(map)))).map_err(Into::into)
+    fn open_map(&mut self) -> RecordResult {
+        unimplemented!()
     }
 
-    fn record_list(&mut self, list: &mut dyn Iterator<Item = &dyn Value>) -> RecordResult {
-        struct Debug<'a, T: ?Sized + 'a>(Cell<Option<&'a mut dyn Iterator<Item = T>>>);
-        impl<'a, T: fmt::Debug + 'a> fmt::Debug for Debug<'a, T> {
-            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                f.debug_list().entries(self.0.replace(None).expect("should not be formatted twice")).finish()
-            }
-        }
-        write!(self.0, "{:?}", Debug(Cell::new(Some(list)))).map_err(Into::into)
+    fn close_map(&mut self) -> RecordResult {
+        unimplemented!()
     }
 
-    fn record_struct(
-        &mut self,
-        name: &str,
-        fields: &mut dyn Iterator<Item = (&str, &(dyn Value))>,
-    ) -> RecordResult {
-        struct Debug<'a, 'b, 'c: 'a, T: ?Sized + 'a> {
-            name: &'b str,
-            fields: Cell<Option<&'a mut dyn Iterator<Item = (&'c str, T)>>>,
-        }
-        impl<'a, 'b, 'c: 'a, T: fmt::Debug + 'a> fmt::Debug for Debug<'a, 'b, 'c, T> {
-            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                let mut debug = f.debug_struct(self.name.as_ref());
-                self.fields.replace(None).expect("should not be formatted twice")
-                    .fold(
-                        &mut debug,
-                        |debug, (name, value)| debug.field(name.as_ref(), &value),
-                    );
-                debug.finish()
-            }
-        }
-        let fields = Cell::new(Some(fields));
-        write!(self.0, "{:?}", Debug { name, fields
-        }).map_err(From::from)
+    fn open_list(&mut self) -> RecordResult {
+        unimplemented!()
+    }
+
+    fn close_list(&mut self) -> RecordResult {
+        unimplemented!()
+    }
+
+    fn open_struct(&mut self, name: &str) -> RecordResult {
+        unimplemented!()
+    }
+
+    fn close_struct(&mut self) -> RecordResult {
+        unimplemented!()
+    }
+
+    fn record_kv(&mut self, k: &dyn Value, v: &dyn Value) -> RecordResult {
+        unimplemented!()
     }
 
     fn finish(mut self) -> RecordResult {
@@ -192,9 +198,8 @@ where
 }
 
 impl<W: Write> DebugWriter<W> {
-    pub fn new_named(mut writer: W, field: &Key) -> Result<Self, io::Error> {
-        write!(&mut writer, "{}: ", field.name().unwrap_or("???"))?;
-        Ok(DebugWriter(writer))
+    pub fn new(writer: W) -> Self {
+        DebugWriter(writer)
     }
 }
 
@@ -207,7 +212,7 @@ impl<W: Write> DebugWriter<W> {
 /// field across all instances of a given span or event with the same metadata.
 /// Thus, when a subscriber observes a new span or event, it need only access a
 /// field by name _once_, and use the key for that name for all other accesses.
-#[derive(Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Key<'a> {
     i: usize,
     metadata: &'a Meta<'a>,
@@ -426,6 +431,12 @@ impl_values! {
 impl<'a> Value for &'a str {
     fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
         recorder.record_str(self)
+    }
+}
+
+impl<'a> Value for Key<'a> {
+    fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
+        recorder.record_str(self.name().unwrap_or("???"))
     }
 }
 
