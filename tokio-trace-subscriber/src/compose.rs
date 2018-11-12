@@ -1,7 +1,8 @@
 use tokio_trace::{
+    field,
     span,
     subscriber::{AddValueError, FollowsError, Subscriber},
-    Event, IntoValue, Meta,
+    Event, Meta,
 };
 use {filter::NoFilter, observe::NoObserver, Filter, Observe, RegisterSpan};
 
@@ -100,14 +101,14 @@ where
 
     fn new_span(&self, new_span: span::Attributes) -> span::Id {
         self.registry
-            .new_span(span::Data::from_attributes(new_span))
+            .new_span(new_span)
     }
 
     fn add_value(
         &self,
         span: &span::Id,
         name: &tokio_trace::field::Key,
-        value: &dyn IntoValue,
+        value: &dyn field::Value,
     ) -> Result<(), AddValueError> {
         self.registry.add_value(span, name, value)
     }

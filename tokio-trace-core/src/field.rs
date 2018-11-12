@@ -49,7 +49,7 @@
 //! span value for the entire lifetime of the span, it needs the ability to
 //! convert the value into a form in which it is owned by the _subscriber_,
 //! rather than the scope in which it was added to the span. For this reason,
-//! span values are passed as `&dyn IntoValue`. The `IntoValue` trait is an
+//! span values are passed as `&dyn field::Value`. The `IntoValue` trait is an
 //! extension of the `Value` trait that allows conversion into an `OwnedValue`,
 //! a type which represents an owned value allocated on the heap. Since some
 //! subscriber implementations may _not_ need to persist span field values

@@ -57,9 +57,9 @@ impl tokio_trace::Subscriber for EnabledSubscriber {
 }
 
 /// Simulates a subscriber that caches span data.
-struct AddData(Mutex<Option<span::Data>>);
+struct AddAttributes(Mutex<Option<span::Attributes>>);
 
-impl tokio_trace::Subscriber for AddData {
+impl tokio_trace::Subscriber for AddAttributes {
     fn new_span(&self, span: span::Attributes) -> span::Id {
         *self.0.lock().unwrap() = Some(span.into());
         span::Id::from_u64(0)
@@ -137,7 +137,7 @@ fn span_with_fields(b: &mut Bencher) {
 
 #[bench]
 fn span_with_fields_add_data(b: &mut Bencher) {
-    tokio_trace::Dispatch::to(AddData(Mutex::new(None))).as_default(|| {
+    tokio_trace::Dispatch::to(AddAttributes(Mutex::new(None))).as_default(|| {
         b.iter(|| span!("span", foo = &"foo", bar = &"bar", baz = &3, quuux = &0.99))
     });
 }

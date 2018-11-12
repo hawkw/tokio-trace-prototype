@@ -182,9 +182,9 @@
 //! implementation could be expected to make.
 //!
 //!
-//! # Accessing a Span's Data
+//! # Accessing a Span's Attributes
 //!
-//! The [`Data`] type represents a *non-entering* reference to a `Span`'s data
+//! The [`Attributes`] type represents a *non-entering* reference to a `Span`'s data
 //! --- a set of key-value pairs (known as _fields_), a creation timestamp,
 //! a reference to the span's parent in the trace tree, and metadata describing
 //! the source code location where the span was created. This data is provided
@@ -193,7 +193,7 @@
 //!
 //! [`Subscriber`]: ::Subscriber
 //! [`State`]: ::span::State
-//! [`Data`]: ::span::Data
+//! [`Attributes`]: ::span::Attributes
 //! [shared span]: ::span::Shared
 //! [`IntoShared`]: ::span::IntoShared
 pub use tokio_trace_core::span::{Attributes, Id, Span};
@@ -203,7 +203,7 @@ pub use tokio_trace_core::span::{mock, MockSpan};
 
 use std::{borrow::Borrow, fmt, iter, sync::Arc};
 use tokio_trace_core::span::Enter;
-use {field, subscriber, IntoValue, Meta};
+use {field, subscriber, Meta};
 
 /// Trait for converting a `Span` into a cloneable `Shared` span.
 pub trait IntoShared {
@@ -217,18 +217,12 @@ pub trait SpanExt: ::sealed::Sealed {
     fn add_value_for<Q: ?Sized>(
         &mut self,
         field: &Q,
-        value: &dyn IntoValue,
+        value: &dyn field::Value,
     ) -> Result<(), subscriber::AddValueError>
     where
         Q: field::AsKey;
 
     fn has_field_for<Q: ?Sized>(&self, field: &Q) -> bool
-    where
-        Q: field::AsKey;
-}
-
-pub trait DataExt: SpanExt {
-    fn field_for<Q: ?Sized + field::AsKey>(&self, field: &Q) -> Option<&field::OwnedValue>
     where
         Q: field::AsKey;
 }
@@ -254,24 +248,6 @@ impl IntoShared for Span {
 #[derive(Clone, Debug)]
 pub struct Shared {
     inner: Option<Arc<Enter>>,
-}
-
-/// Representation of the data associated with a span.
-///
-/// This has the potential to outlive the span itself if it exists after the
-/// span completes executing --- such as if it is still being processed by a
-/// subscriber.
-///
-/// This may *not* be used to enter the span.
-pub struct Data {
-    attributes: Attributes,
-
-    /// The values of the fields attached to this span.
-    ///
-    /// These may be `None` if a field was defined but the value has yet to be
-    /// attached. The name of the field at each index is defined by
-    /// `self.attributes.field_names[i]`.
-    field_values: Vec<Option<field::OwnedValue>>,
 }
 
 impl Shared {
@@ -332,7 +308,7 @@ impl Shared {
     pub fn add_value<Q: field::AsKey>(
         &self,
         field: &Q,
-        value: &dyn IntoValue,
+        value: &dyn field::Value,
     ) -> Result<(), subscriber::AddValueError> {
         if let Some(ref inner) = self.inner {
             let field = field
@@ -373,7 +349,7 @@ impl SpanExt for Span {
     fn add_value_for<Q: ?Sized>(
         &mut self,
         field: &Q,
-        value: &dyn IntoValue,
+        value: &dyn field::Value,
     ) -> Result<(), subscriber::AddValueError>
     where
         Q: field::AsKey,
@@ -394,163 +370,6 @@ impl SpanExt for Span {
         self.metadata()
             .and_then(|meta| field.as_key(meta))
             .is_some()
-    }
-}
-
-impl Data {
-    pub fn from_attributes(attributes: Attributes) -> Self {
-        Self {
-            attributes,
-            field_values: Vec::new(),
-        }
-    }
-
-    /// Returns the name of this span, or `None` if it is unnamed,
-    pub fn name(&self) -> Option<&'static str> {
-        self.attributes.name()
-    }
-
-    /// Returns the `Id` of the parent of this span, if one exists.
-    pub fn parent(&self) -> Option<&Id> {
-        self.attributes.parent()
-    }
-
-    /// Borrows this span's metadata.
-    pub fn metadata(&self) -> &'static Meta<'static> {
-        self.attributes.metadata()
-    }
-
-    /// Returns an iterator over the names of all the fields on this span.
-    pub fn field_keys(&self) -> impl Iterator<Item = field::Key<'static>> {
-        self.metadata().fields()
-    }
-
-    /// Returns a [`Key`](::field::Key) for the field with the given `name`, if
-    /// one exists,
-    pub fn key_for<Q>(&self, name: &Q) -> Option<field::Key<'static>>
-    where
-        Q: Borrow<str>,
-    {
-        self.attributes.key_for(name)
-    }
-
-    /// Returns true if a field named 'name' has been declared on this span,
-    /// even if the field does not currently have a value.
-    #[inline]
-    pub fn has_field<Q: ?Sized>(&self, field: &Q) -> bool
-    where
-        Q: field::AsKey,
-    {
-        if let Some(key) = field.as_key(self.metadata()) {
-            self.metadata().contains_key(&key)
-        } else {
-            false
-        }
-    }
-
-    /// Borrows the value of the field named `name`, if it exists. Otherwise,
-    /// returns `None`.
-    pub fn field_for<Q: ?Sized>(&self, field: &Q) -> Option<&field::OwnedValue>
-    where
-        Q: field::AsKey,
-    {
-        let key = field.as_key(self.metadata())?;
-        if !self.has_field(&key) {
-            return None;
-        }
-
-        let i = key.as_usize();
-        self.field_values.get(i)?.as_ref()
-    }
-
-    /// Returns an iterator over all the field names and values on this span.
-    pub fn fields<'a>(
-        &'a self,
-    ) -> impl Iterator<Item = (field::Key<'static>, &'a field::OwnedValue)> {
-        self.field_keys().filter_map(move |key| {
-            let val = self.field_values.get(key.as_usize())?.as_ref()?;
-            Some((key, val))
-        })
-    }
-
-    /// Edits the span data to add the given `value` to the field indexed by `key`.
-    ///
-    /// `name` must name a field already defined by this span's metadata, and
-    /// the field must not already have a value. If this is not the case, this
-    /// function returns an [`AddValueError`](::subscriber::AddValueError).
-    ///
-    /// **Note**: This function will allocate to grow the vector used internally
-    /// to store the span's field values. Otherwise, if this function is not used,
-    /// the `Data` type will not allocate. Thus, this function should only be
-    /// called by subscribers who wish to allocate to persist field values;
-    /// otherwise, it need not be used.
-    pub fn add_value<Q: ?Sized>(
-        &mut self,
-        field: &Q,
-        value: &dyn field::IntoValue,
-    ) -> Result<(), ::subscriber::AddValueError>
-    where
-        Q: field::AsKey,
-    {
-        let meta = self.metadata();
-        let key = field
-            .as_key(meta)
-            .ok_or(::subscriber::AddValueError::NoField)?;
-        if !self.has_field(&key) {
-            return Err(::subscriber::AddValueError::NoField);
-        }
-        if self.field_values.is_empty() {
-            // If we're adding the first field, go ahead and reserve capacity to
-            // add all the fields.
-            let count = meta.field_names.len();
-            self.field_values.reserve(count);
-            self.field_values
-                .extend(iter::repeat(()).map(|_| None).take(count));
-        }
-        let field = &mut self.field_values[key.as_usize()];
-        if field.is_some() {
-            Err(::subscriber::AddValueError::FieldAlreadyExists)
-        } else {
-            *field = Some(value.into_value());
-            Ok(())
-        }
-    }
-}
-
-impl<'a> IntoIterator for &'a Data {
-    type Item = (field::Key<'static>, &'a field::OwnedValue);
-    type IntoIter = Box<Iterator<Item = Self::Item> + 'a>; // TODO: unbox
-    fn into_iter(self) -> Self::IntoIter {
-        Box::new(self.fields())
-    }
-}
-
-impl fmt::Debug for Data {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        struct DebugFields<'a>(&'a Data);
-        impl<'a> fmt::Debug for DebugFields<'a> {
-            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                f.debug_set()
-                    .entries(
-                        self.0
-                            .into_iter()
-                            .map(|(k, v)| (k.name().unwrap_or("???"), v)),
-                    ).finish()
-            }
-        }
-
-        f.debug_struct("Data")
-            .field("name", &self.name())
-            .field("parent", &self.parent())
-            .field("fields", &DebugFields(self))
-            .field("metadata", &self.metadata())
-            .finish()
-    }
-}
-
-impl From<Attributes> for Data {
-    fn from(attributes: Attributes) -> Data {
-        Data::from_attributes(attributes)
     }
 }
 

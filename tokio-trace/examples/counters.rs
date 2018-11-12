@@ -45,7 +45,7 @@ impl Subscriber for CounterSubscriber {
         &self,
         _span: &span::Id,
         key: &field::Key,
-        value: &dyn IntoValue,
+        value: &dyn field::Value,
     ) -> Result<(), subscriber::AddValueError> {
         let registry = self.counters.0.read().unwrap();
         if let Some((counter, value)) = key.name().and_then(|name| {

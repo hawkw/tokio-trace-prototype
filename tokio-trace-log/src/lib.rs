@@ -204,7 +204,7 @@ impl Subscriber for TraceLogger {
         &self,
         _span: &span::Id,
         _name: &field::Key,
-        _value: &dyn IntoValue,
+        _value: &dyn field::Value,
     ) -> Result<(), subscriber::AddValueError> {
         // XXX eventually this should Do Something...
         Ok(())

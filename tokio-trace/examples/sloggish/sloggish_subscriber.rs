@@ -16,7 +16,7 @@ use self::ansi_term::{Color, Style};
 use super::tokio_trace::{
     self,
     subscriber::{self, Subscriber},
-    Level, SpanData, SpanId,
+    Level, SpanAttributes, SpanId,
 };
 
 use std::{
@@ -34,7 +34,7 @@ pub struct SloggishSubscriber {
     indent_amount: usize,
     stderr: io::Stderr,
     stack: Mutex<Vec<SpanId>>,
-    spans: Mutex<HashMap<SpanId, SpanData>>,
+    spans: Mutex<HashMap<SpanId, SpanAttributes>>,
     ids: AtomicUsize,
 }
 
@@ -172,7 +172,7 @@ impl Subscriber for SloggishSubscriber {
         let mut stack = self.stack.lock().unwrap();
         let spans = self.spans.lock().unwrap();
         let data = spans.get(&span);
-        let parent = data.and_then(SpanData::parent);
+        let parent = data.and_then(SpanAttributes::parent);
         if stack.iter().any(|id| id == &span) {
             // We are already in this span, do nothing.
             return;
