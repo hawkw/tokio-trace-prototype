@@ -125,14 +125,14 @@ macro_rules! span {
 macro_rules! event {
     (target: $target:expr, $lvl:expr, { $($k:ident = $val:expr),* }, $($arg:tt)+ ) => ({
         {
-            use $crate::{callsite, SpanAttributes, SpanId, Subscriber, Event, field::AsValue};
+            use $crate::{callsite, SpanAttributes, SpanId, Subscriber, Event, field::Value};
             use $crate::callsite::Callsite;
             let callsite = callsite! { event:
                 $lvl,
                 target:
                 $target, $( $k ),*
             };
-            let field_values: &[ &dyn AsValue ] = &[ $( &$val ),* ];
+            let field_values: &[ &dyn Value ] = &[ $( &$val ),* ];
             Event::observe(
                 callsite,
                 &field_values[..],
