@@ -424,7 +424,7 @@ impl Value {
     /// assert!(owned_value.downcast_ref::<Foo>().is_some());
     /// # }
     /// ```
-    pub fn display<T>(t: T) -> DisplayValue<T>
+    pub fn display<'a, T>(t: T) -> DisplayValue<T>
     where
         T: fmt::Display,
     {
@@ -647,7 +647,7 @@ mod tests {
     #[test]
     fn display_value_formats_with_display() {
         let foo = Foo { bar: "foo" };
-        let display_foo = &display(&foo.clone());
+        let display_foo = Value::display(foo.clone());
 
         assert_eq!(format!("{:?}", foo), "Foo { bar: \"foo\" }".to_owned());
         assert_eq!(format!("{:?}", display_foo), format!("{}", foo));
@@ -656,7 +656,7 @@ mod tests {
     #[test]
     fn display_value_is_value() {
         let foo = Foo { bar: "foo" };
-        let display_foo = display(&foo.clone());
+        let display_foo = Value::display(foo.clone());
 
         let value: &dyn Value = &display_foo;
         assert_eq!(format!("{:?}", value), format!("{}", foo));
@@ -665,7 +665,7 @@ mod tests {
     #[test]
     fn display_value_downcasts_to_original_type() {
         let foo = Foo { bar: "foo" };
-        let display_foo = &display(&foo);
+        let display_foo = Value::display(foo);
         let value: &dyn Value = &display_foo;
 
         assert!(value.downcast_ref::<Foo>().is_some());
