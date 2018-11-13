@@ -214,7 +214,7 @@ pub trait IntoShared {
 }
 
 pub trait SpanExt: ::sealed::Sealed {
-    fn record_for<Q: ?Sized>(
+    fn record_field<Q: ?Sized>(
         &mut self,
         field: &Q,
         value: &dyn field::Value,
@@ -346,7 +346,7 @@ impl Shared {
 impl ::sealed::Sealed for Span {}
 
 impl SpanExt for Span {
-    fn record_for<Q: ?Sized>(
+    fn record_field<Q: ?Sized>(
         &mut self,
         field: &Q,
         value: &dyn field::Value,
