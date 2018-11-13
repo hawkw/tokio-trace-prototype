@@ -46,7 +46,7 @@
 use ::{ span, Dispatch, Meta};
 use std::fmt;
 
-pub trait Value: ::sealed::Sealed {
+pub trait Value: ::sealed::Sealed + Send {
     fn record(&self, key: &Key, recorder: &mut dyn Record) -> Result<(), ::subscriber::RecordError>;
 }
 
@@ -233,7 +233,10 @@ impl<'a> AsRef<str> for Key<'a> {
 
 impl<T: fmt::Display> ::sealed::Sealed for DisplayValue<T> {}
 
-impl<T: fmt::Display> Value for DisplayValue<T> {
+impl<T> Value for DisplayValue<T>
+where
+    T: fmt::Display + Send,
+{
     fn record(&self, key: &Key, recorder: &mut dyn Record) -> Result<(), ::subscriber::RecordError> {
         recorder.record_fmt(key, format_args!("{}", self.0))
     }
@@ -243,7 +246,10 @@ impl<T: fmt::Display> Value for DisplayValue<T> {
 
 impl<T: fmt::Debug> ::sealed::Sealed for DebugValue<T> {}
 
-impl<T: fmt::Debug> Value for DebugValue<T> {
+impl<T: fmt::Debug> Value for DebugValue<T>
+where
+    T: fmt::Debug + Send,
+{
     fn record(&self, key: &Key, recorder: &mut dyn Record) -> Result<(), ::subscriber::RecordError> {
         recorder.record_fmt(key, format_args!("{:?}", self.0))
     }
@@ -283,12 +289,12 @@ impl Value for u64 {
 
 impl<'a, V> ::sealed::Sealed for &'a V
 where
-    V: Value + ::sealed::Sealed,
+    V: Value + ::sealed::Sealed + Send + Sync,
 {}
 
 impl<'a, V> Value for &'a V
 where
-    V: Value + ::sealed::Sealed,
+    V: Value + ::sealed::Sealed + Send + Sync,
 {
     fn record(&self, key: &Key, recorder: &mut dyn Record) -> Result<(), ::subscriber::RecordError> {
         (*self).record(key, recorder)
