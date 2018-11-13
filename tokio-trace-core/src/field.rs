@@ -70,7 +70,7 @@ pub trait Record {
     fn record_bool(
         &mut self,
         field: &Key,
-        value: i64,
+        value: bool,
     ) -> Result<(), ::subscriber::RecordError> {
         self.record_fmt(field, format_args!("{}", value))
     }
@@ -261,7 +261,7 @@ impl ::sealed::Sealed for bool {}
 
 impl Value for bool {
     fn record(&self, key: &Key, recorder: &mut dyn Record) -> Result<(), ::subscriber::RecordError> {
-        recorder.record_bool(key, self)
+        recorder.record_bool(key, *self)
     }
 }
 
@@ -269,7 +269,7 @@ impl ::sealed::Sealed for i64 {}
 
 impl Value for i64 {
     fn record(&self, key: &Key, recorder: &mut dyn Record) -> Result<(), ::subscriber::RecordError> {
-        recorder.record_i64(key, self)
+        recorder.record_i64(key, *self)
     }
 }
 
@@ -277,7 +277,7 @@ impl ::sealed::Sealed for u64 {}
 
 impl Value for u64 {
     fn record(&self, key: &Key, recorder: &mut dyn Record) -> Result<(), ::subscriber::RecordError> {
-        recorder.record_u64(key, self)
+        recorder.record_u64(key, *self)
     }
 }
 
@@ -291,6 +291,6 @@ where
     V: Value + ::sealed::Sealed,
 {
     fn record(&self, key: &Key, recorder: &mut dyn Record) -> Result<(), ::subscriber::RecordError> {
-        recorder.record_u64(key, *self)
+        (*self).record(key, recorder)
     }
 }

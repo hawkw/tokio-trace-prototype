@@ -223,7 +223,7 @@ impl Span {
     /// `name` must name a field already defined by this span's metadata, and
     /// the field must not already have a value. If this is not the case, this
     /// function returns an [`RecordError`](::subscriber::RecordError).
-    pub fn record<T: field::Value>(&self, field: &Key, value: &T) -> Result<(), RecordError> {
+    pub fn record(&self, field: &Key, value: &dyn field::Value) -> Result<(), RecordError> {
         if let Some(ref inner) = self.inner {
             inner.record(field, value)
         } else {
@@ -426,12 +426,12 @@ impl Enter {
     /// `name` must name a field already defined by this span's metadata, and
     /// the field must not already have a value. If this is not the case, this
     /// function returns an [`RecordError`](::subscriber::RecordError).
-    pub fn record<T: field::Value>(&self, field: &Key, value: &T) -> Result<(), RecordError> {
+    pub fn record(&self, field: &Key, value: &dyn field::Value) -> Result<(), RecordError> {
         if !self.meta.contains_key(field) {
             return Err(RecordError::NoField);
         }
 
-        match value.record(&field, self.subscriber.span_recorder(&self.id)) {
+        match self.subscriber.record(&self.id, field, value) {
             Ok(()) => Ok(()),
             Err(RecordError::NoSpan) => panic!("span should still exist!"),
             Err(e) => Err(e),

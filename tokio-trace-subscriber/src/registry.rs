@@ -1,7 +1,7 @@
 use tokio_trace::{
     field,
     span::{Attributes, Id},
-    subscriber::{AddValueError, FollowsError},
+    subscriber::{RecordError, FollowsError},
 };
 
 use std::{
@@ -40,12 +40,12 @@ pub trait RegisterSpan {
     /// [span ID]: ../span/struct.Id.html
     fn new_span(&self, new_span: Attributes) -> Id;
 
-    fn add_value(
+    fn record(
         &self,
         span: &Id,
         name: &field::Key,
         value: &dyn field::Value,
-    ) -> Result<(), AddValueError>;
+    ) -> Result<(), RecordError>;
 
     /// Adds an indication that `span` follows from the span with the id
     /// `follows`.
@@ -142,12 +142,12 @@ impl RegisterSpan for IncreasingCounter {
         id
     }
 
-    fn add_value(
+    fn record(
         &self,
         _span: &Id,
         _name: &field::Key,
         _value: &dyn field::Value,
-    ) -> Result<(), AddValueError> {
+    ) -> Result<(), RecordError> {
         unimplemented!("TODO: figure out")
     }
 

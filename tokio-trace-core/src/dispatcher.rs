@@ -97,8 +97,8 @@ impl Subscriber for Dispatch {
     }
 
     #[inline]
-    fn span_recorder(&self, span: &span::Id) -> &mut dyn field::Record {
-        self.subscriber.span_recorder(span)
+    fn record(&self, span: &span::Id, key: &field::Key, value: &dyn field::Value) -> Result<(), ::subscriber::RecordError> {
+        self.subscriber.record(span, key, value)
     }
 
     #[inline]
@@ -137,29 +137,13 @@ impl Subscriber for Dispatch {
 }
 
 struct NoSubscriber;
-
-
-
 impl Subscriber for NoSubscriber {
     fn new_span(&self, _span: span::Attributes) -> span::Id {
         span::Id::from_u64(0)
     }
 
-    fn span_recorder(
-        &self,
-        _span: &span::Id,
-    ) -> &mut dyn field::Record {
-        struct NoRecorder;
-        impl field::Record for NoRecorder {
-            fn record_fmt(
-                &mut self,
-                _field: &field::Key,
-                _value: ::std::fmt::Arguments,
-            ) -> Result<(), ::subscriber::RecordError> {
-                Ok(())
-            }
-        }
-        &mut NoRecorder
+    fn record(&self, span: &span::Id, key: &field::Key, value: &dyn field::Value) -> Result<(), ::subscriber::RecordError> {
+        Ok(())
     }
 
     fn add_follows_from(

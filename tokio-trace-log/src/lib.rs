@@ -196,7 +196,7 @@ impl LineBuilder {
         }
     }
 
-    fn add_field(&mut self, key: &field::Key, val: &dyn field::Value) -> field::RecordResult {
+    fn record(&mut self, key: &field::Key, val: &dyn field::Value) -> fmt::Result {
         use std::fmt::Write;
         write!(&mut self.line, " {:?}", LogField { key, val })?;
         Ok(())
@@ -239,17 +239,17 @@ impl Subscriber for TraceLogger {
         id
     }
 
-    fn add_value(
+    fn record(
         &self,
         span: &span::Id,
         key: &field::Key,
         val: &dyn field::Value,
-    ) -> Result<(), subscriber::AddValueError> {
+    ) -> Result<(), subscriber::RecordError> {
         if let Some(span) = self.in_progress.lock().unwrap().get_mut(span) {
-            span.add_field(key, val)?;
+            span.record(key, val)?;
             Ok(())
         } else {
-            Err(subscriber::AddValueError::NoSpan)
+            Err(subscriber::RecordError::NoSpan)
         }
     }
 
@@ -441,13 +441,9 @@ struct LogField<'a> {
 }
 impl<'a> fmt::Debug for LogField<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let name = self.key.name().unwrap_or("???");
-        write!(f, "{}=", name)?;
-        {
-            let mut recorder = field::DebugRecorder::new_fmt(f);
-            self.val.record(&mut recorder).map_err(|_| fmt::Error)?;
-        }
-        write!(f, ";")?;
+        let mut recorder = field::DebugRecorder::new_fmt(f);
+        self.val.record(self.key, &mut recorder).map_err(|_| fmt::Error)?;
+        write!(recorder.into_inner(), ";")?;
         Ok(())
     }
 }

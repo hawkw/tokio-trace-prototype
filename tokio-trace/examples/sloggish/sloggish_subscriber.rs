@@ -65,7 +65,7 @@ impl Span {
         }
     }
 
-    fn add_field(
+    fn record(
         &mut self,
         key: &tokio_trace::field::Key,
         value: &dyn tokio_trace::field::Value,
@@ -148,17 +148,17 @@ impl Subscriber for SloggishSubscriber {
         id
     }
 
-    fn add_value(
+    fn record(
         &self,
         span: &tokio_trace::SpanId,
         name: &tokio_trace::field::Key,
         value: &dyn tokio_trace::field::Value,
-    ) -> Result<(), subscriber::AddValueError> {
+    ) -> Result<(), subscriber::RecordError> {
         let mut spans = self.spans.lock().expect("mutex poisoned!");
         let span = spans
             .get_mut(span)
-            .ok_or(subscriber::AddValueError::NoSpan)?;
-        span.add_field(name, value)?;
+            .ok_or(subscriber::RecordError::NoSpan)?;
+        span.record(name, value)?;
         Ok(())
     }
 

@@ -214,11 +214,11 @@ pub trait IntoShared {
 }
 
 pub trait SpanExt: ::sealed::Sealed {
-    fn add_value_for<Q: ?Sized>(
+    fn record_for<Q: ?Sized>(
         &mut self,
         field: &Q,
         value: &dyn field::Value,
-    ) -> Result<(), subscriber::AddValueError>
+    ) -> Result<(), subscriber::RecordError>
     where
         Q: field::AsKey;
 
@@ -304,17 +304,17 @@ impl Shared {
     ///
     /// `name` must name a field already defined by this span's metadata, and
     /// the field must not already have a value. If this is not the case, this
-    /// function returns an [`AddValueError`](::subscriber::AddValueError).
-    pub fn add_value<Q: field::AsKey>(
+    /// function returns an [`RecordError`](::subscriber::RecordError).
+    pub fn record<Q: field::AsKey>(
         &self,
         field: &Q,
         value: &dyn field::Value,
-    ) -> Result<(), subscriber::AddValueError> {
+    ) -> Result<(), subscriber::RecordError> {
         if let Some(ref inner) = self.inner {
             let field = field
                 .as_key(inner.metadata())
-                .ok_or(subscriber::AddValueError::NoField)?;
-            inner.add_value(&field, value)
+                .ok_or(subscriber::RecordError::NoField)?;
+            inner.record(&field, value)
         } else {
             Ok(())
         }
@@ -346,19 +346,19 @@ impl Shared {
 impl ::sealed::Sealed for Span {}
 
 impl SpanExt for Span {
-    fn add_value_for<Q: ?Sized>(
+    fn record_for<Q: ?Sized>(
         &mut self,
         field: &Q,
         value: &dyn field::Value,
-    ) -> Result<(), subscriber::AddValueError>
+    ) -> Result<(), subscriber::RecordError>
     where
         Q: field::AsKey,
     {
         if let Some(meta) = self.metadata() {
             let key = field
                 .as_key(meta)
-                .ok_or(subscriber::AddValueError::NoField)?;
-            self.add_value(&key, value)
+                .ok_or(subscriber::RecordError::NoField)?;
+            self.record(&key, value)
         } else {
             Ok(())
         }

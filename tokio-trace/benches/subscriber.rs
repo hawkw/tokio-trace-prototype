@@ -15,12 +15,12 @@ impl tokio_trace::Subscriber for EnabledSubscriber {
         let _ = span;
         span::Id::from_u64(0)
     }
-    fn add_value(
+    fn record(
         &self,
         span: &span::Id,
         field: &field::Key,
         value: &dyn field::IntoValue,
-    ) -> Result<(), tokio_trace::subscriber::AddValueError> {
+    ) -> Result<(), tokio_trace::subscriber::RecordError> {
         let _ = (span, field, value);
         Ok(())
     }
@@ -65,15 +65,15 @@ impl tokio_trace::Subscriber for AddAttributes {
         span::Id::from_u64(0)
     }
 
-    fn add_value(
+    fn record(
         &self,
         span: &span::Id,
         field: &field::Key,
         value: &dyn field::IntoValue,
-    ) -> Result<(), tokio_trace::subscriber::AddValueError> {
+    ) -> Result<(), tokio_trace::subscriber::RecordError> {
         let _ = span;
         if let Some(data) = self.0.lock().unwrap().as_mut() {
-            data.add_value(field, value);
+            data.record(field, value);
         }
         Ok(())
     }

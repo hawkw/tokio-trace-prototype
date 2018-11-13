@@ -107,16 +107,16 @@ macro_rules! span {
                 $(
                     let key = keys.next()
                         .expect(concat!("metadata should define a key for '", stringify!($k), "'"));
-                    span!(@ add_value: span, $k, &key, $($val)*);
+                    span!(@ record: span, $k, &key, $($val)*);
                 )*
             })
         }
     };
-    (@ add_value: $span:expr, $k:expr, $i:expr, $val:expr) => (
-        $span.add_value($i, $val)
+    (@ record: $span:expr, $k:expr, $i:expr, $val:expr) => (
+        $span.record($i, $val)
             .expect(concat!("adding value for field '", stringify!($k), "' failed"));
     );
-    (@ add_value: $span:expr, $k:expr, $i:expr,) => (
+    (@ record: $span:expr, $k:expr, $i:expr,) => (
         // skip
     );
 }

@@ -116,8 +116,7 @@ pub trait Subscriber {
     /// [`Span`]: ::span::Span
     fn new_span(&self, span: span::Attributes) -> span::Id;
 
-    /// Return a [recorder](::field::Record) for the span with the given ID.
-    fn span_recorder(&self, span: &span::Id) -> &mut dyn field::Record;
+    fn record(&self, span: &span::Id, key: &field::Key, value: &dyn field::Value) -> Result<(), RecordError>;
 
     /// Adds an indication that `span` follows from the span with the id
     /// `follows`.
@@ -394,27 +393,28 @@ mod test_support {
         }
     }
 
+    impl<'a, F> field::Record for &'a Running<F>
+    where
+        F: Fn(&Meta) -> bool,
+        F: 'a,
+    {
+        fn record_fmt(
+            &mut self,
+            _field: &field::Key,
+            _value: ::std::fmt::Arguments,
+        ) -> Result<(), ::subscriber::RecordError> {
+            // TODO: it would be nice to be able to expect field values...
+            Ok(())
+        }
+    }
+
     impl<F: Fn(&Meta) -> bool> Subscriber for Running<F> {
         fn enabled(&self, meta: &Meta) -> bool {
             (self.filter)(meta)
         }
 
-        fn span_recorder(
-            &self,
-            _span: &span::Id,
-        ) -> &mut dyn field::Record {
-            // TODO: it should be possible to expect values...
-            struct NoRecorder;
-            impl field::Record for NoRecorder {
-                fn record_fmt(
-                    &mut self,
-                    _field: &field::Key,
-                    _value: ::std::fmt::Arguments,
-                ) -> Result<(), ::subscriber::RecordError> {
-                    Ok(())
-                }
-            }
-            &mut NoRecorder
+        fn record(&self, span: &span::Id, key: &field::Key, value: &dyn field::Value) -> Result<(), ::subscriber::RecordError> {
+            Ok(())
         }
 
         fn add_follows_from(
