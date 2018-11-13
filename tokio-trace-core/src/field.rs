@@ -276,14 +276,6 @@ pub type RecordResult = Result<(), Error>;
 pub trait Value: fmt::Debug + Send + Sync {
     /// Records the value with the given `Recorder`.
     fn record(&self, &mut dyn Recorder) -> RecordResult;
-
-    #[doc(hidden)]
-    fn type_id(&self) -> TypeId
-    where
-        Self: 'static,
-    {
-        TypeId::of::<Self>()
-    }
 }
 
 /// An error that occurred while recording a field.
@@ -354,35 +346,6 @@ impl Value {
     /// );
     /// # }
     /// ```
-    ///
-    /// ```
-    /// # extern crate tokio_trace_core as tokio_trace;
-    /// # use std::fmt;
-    /// # fn main() {
-    /// #
-    /// # #[derive(Clone, Debug)]
-    /// # struct Foo;
-    /// #
-    /// # impl fmt::Display for Foo {
-    /// #   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    /// #       f.pad("Hello, I'm Foo")
-    /// #   }
-    /// # }
-    /// # impl Value for Foo {
-    /// #   fn record(&self, recorder: &mut dyn tokio_trace::field::Recorder)
-    /// #       -> tokio_trace::field::RecordResult
-    /// #   {
-    /// #       recorder.record_str("foo")
-    /// #   }
-    /// # }
-    /// use tokio_trace::field::Value;
-    /// let foo = Value::display(Foo);
-    ///
-    /// assert_eq!("Hello, I'm Foo".to_owned(), format!("{:?}", foo));
-    ///
-    /// assert!(Value::downcast_ref::<Foo>(&foo).is_some());
-    /// # }
-    /// ```
     pub fn display<'a, T>(t: T) -> DisplayValue<T>
     where
         T: fmt::Display,
@@ -408,51 +371,11 @@ impl Value {
     }
 }
 
-// Copied from `std::any::Any`.
-impl Value + 'static {
-    /// Returns true if the boxed type is the same as `T`
-    #[inline]
-    pub fn is<T: Value + 'static>(&self) -> bool
-    where
-        Self: 'static,
-    {
-        // Get TypeId of the type this function is instantiated with
-        let t = TypeId::of::<T>();
-
-        // Get TypeId of the type in the trait object
-        let boxed = self.type_id();
-
-        // Compare both TypeIds on equality
-        t == boxed
-    }
-
-    /// Returns some reference to the boxed value if it is of type `T`, or
-    /// `None` if it isn't.
-    pub fn downcast_ref<T: Value + 'static>(&self) -> Option<&T>
-    where
-        Self: 'static,
-    {
-        if self.is::<T>() {
-            unsafe { Some(&*(self as *const Value as *const T)) }
-        } else {
-            None
-        }
-    }
-}
-
 // ===== impl DisplayValue =====
 
 impl<T: fmt::Display + Send + Sync> Value for DisplayValue<T> {
     fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
         recorder.record_fmt(format_args!("{}", self.0))
-    }
-
-    #[doc(hidden)]
-    fn type_id(&self) -> TypeId
-    where
-        Self: 'static,
-    {
-        TypeId::of::<T>()
     }
 }
 
@@ -467,14 +390,6 @@ impl<T: fmt::Display> fmt::Debug for DisplayValue<T> {
 impl<T: fmt::Debug + Send + Sync> Value for DebugValue<T> {
     fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
         recorder.record_fmt(format_args!("{:?}", self.0))
-    }
-
-    #[doc(hidden)]
-    fn type_id(&self) -> TypeId
-    where
-        Self: 'static,
-    {
-        TypeId::of::<T>()
     }
 }
 
@@ -761,14 +676,5 @@ mod tests {
 
         let value: &dyn Value = &display_foo;
         assert_eq!(format!("{:?}", value), format!("{}", foo));
-    }
-
-    #[test]
-    fn display_value_downcasts_to_original_type() {
-        let foo = Foo { bar: "foo" };
-        let display_foo = Value::display(foo);
-        let value: &dyn Value = &display_foo;
-
-        assert!(value.downcast_ref::<Foo>().is_some());
     }
 }
