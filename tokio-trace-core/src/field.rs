@@ -56,55 +56,153 @@ use std::{
 
 pub type RecordResult = Result<(), Error>;
 
+/// A visitor which records `Value`s.
 pub trait Recorder {
     // fn named<'b: 'a>(&'b mut self, name: &'b str) -> &'b dyn Recorder<'b>;
+    /// Record an unsigned integer value.
+    ///
+    /// This defaults to calling `self.record_any()`; implementations wishing to
+    /// provide behaviour specific to unsigned integers may override the default
+    /// implementation.
     fn record_uint(&mut self, value: u64) -> RecordResult {
         self.record_any(&value)
     }
 
+    /// Record a signed integer value.
+    ///
+    /// This defaults to calling `self.record_any()`; implementations wishing to
+    /// provide behaviour specific to signed integers may override the default
+    /// implementation.
     fn record_int(&mut self, value: i64) -> RecordResult {
         self.record_any(&value)
     }
 
+    /// Record a floating-point value.
+    ///
+    /// This defaults to calling `self.record_any()`; implementations wishing to
+    /// provide behaviour specific to floating-point values may override the
+    /// default implementation.
     fn record_float(&mut self, value: f64) -> RecordResult {
         self.record_any(&value)
     }
 
+    /// Record a string value.
+    ///
+    /// This defaults to calling `self.record_any()`; implementations wishing to
+    /// provide behaviour specific to strings may override the default
+    /// implementation.
     fn record_str(&mut self, value: &str) -> RecordResult {
         self.record_any(&value)
     }
 
+    /// Record an unsigned 8-bit value.
+    ///
+    /// This defaults to calling `self.record_any()`; implementations wishing to
+    /// provide behaviour specific to byte values may override the default
+    /// implementation.
     fn record_byte(&mut self, value: u8) -> RecordResult {
         self.record_any(&value)
     }
 
+    /// Record a boolean value.
+    ///
+    /// This defaults to calling `self.record_any()`; implementations wishing to
+    /// provide behaviour specific to booleans may override the default
+    /// implementation.
     fn record_bool(&mut self, value: bool) -> RecordResult {
         self.record_any(&value)
     }
 
+    /// Record an arbitrarily-typed value.
+    ///
+    /// As the `Value` trait requires `fmt::Debug`, the value may be formatted
+    /// with its `Debug` implementation; by default, this function calls
+    /// `self.record_fmt` to do so.
     fn record_any(&mut self, value: &dyn Value) -> RecordResult {
         self.record_fmt(format_args!("{:?}", value))
     }
 
+    /// Record a key-value association.
+    ///
+    /// The key and the value are both known to implement `Value`.
     fn record_kv(&mut self, k: &dyn Value, v: &dyn Value) -> RecordResult;
+
+    /// Record an arbitrary set of pre-compiled format arguments.
     fn record_fmt(&mut self, args: fmt::Arguments) -> RecordResult;
 
+    /// Begin recording a key-value map.
+    ///
+    /// After this function has returned `Ok(())`, the `Recorder` may expect
+    /// that all subsequent calls will be to `record_kv` (representing the
+    /// key-value pairs in the map) until `close_map` is called.
+    ///
+    /// The recorder should perform any internal state transitions necessary to
+    /// record a map.
     fn open_map(&mut self) -> RecordResult;
+
+    /// Finish recording a map.
+    ///
+    /// When this is called, the recorder should expect calls to arbitrary
+    /// `record` methods.
     fn close_map(&mut self) -> RecordResult;
 
+    /// Begin recording an ordered list of values.
+    ///
+    /// When this function has returned `Ok(())` any subsequent calls to
+    /// `record` represent the elements of the list, until `close_list` is
+    /// called.
+    ///
+    /// The recorder should perform any internal state transitions necessary to
+    /// record a list (for example, begin serializing comma-delimited values).
     fn open_list(&mut self) -> RecordResult;
+
+    /// Finish recording a list.
     fn close_list(&mut self) -> RecordResult;
 
+    /// Begin recording a `struct`.
+    ///
+    /// The `name` argument is a string containing the the type name of the struct.
+    ///
+    /// After this function has returned `Ok(())`, the `Recorder` may expect
+    /// that all subsequent calls will be to `record_kv` (representing the
+    /// field names and values of the struct) until `close_struct` is called.
+    ///
+    /// The recorder should perform any internal state transitions necessary to
+    /// record a struct.
     fn open_struct(&mut self, name: &str) -> RecordResult;
+
+    /// Finish recording a `struct`.
     fn close_struct(&mut self) -> RecordResult;
 
+    /// Begin recording a tuple.
+    ///
+    ///  When this function has returned `Ok(())` any subsequent calls to
+    /// `record` represent the elements of the tuple, until `close_tuple` is
+    /// called.
+    ///
+    /// The recorder should perform any internal state transitions necessary to
+    /// record a tuple.
     fn open_tuple(&mut self) -> RecordResult;
+
+    /// Finish recording a `struct`.
     fn close_tuple(&mut self) -> RecordResult;
 
+    /// Complete recording to this recorder.
+    ///
+    /// At this point, the recorder should perform any necessary clean-up, such
+    /// as flushing IO.
     fn finish(self) -> RecordResult;
 }
 
 impl<'r> Recorder + 'r {
+    /// Record a map of key-value data.
+    ///
+    /// This function manages calling `open_map`, recording the key-value
+    /// data in the given iterator, and closing the map.
+    ///
+    /// This is the suggested way for `Value` implementations to record maps,
+    /// rather than calling those functions directly, unless different behaviour
+    /// is needed.
     pub fn record_map<'a, I, K, V>(&mut self, i: I) -> RecordResult
     where
         I: IntoIterator<Item = (&'a K, &'a V)>,
@@ -118,6 +216,14 @@ impl<'r> Recorder + 'r {
         self.close_map()
     }
 
+    /// Record an ordered list of `Value`s.
+    ///
+    /// This function manages calling `open_list`, recording the list elements
+    /// in the given iterator, and closing the list.
+    ///
+    /// This is the suggested way for `Value` implementations to record lists,
+    /// rather than calling those functions directly, unless different behaviour
+    /// is needed.
     pub fn record_list<'a, I, V>(&mut self, i: I) -> RecordResult
     where
         I: IntoIterator<Item = &'a V>,
@@ -130,18 +236,35 @@ impl<'r> Recorder + 'r {
         self.close_list()
     }
 
-    pub fn record_struct<'a, I, V>(&mut self, name: &str, i: I) -> RecordResult
+    /// Record a `struct` list of `Value`s, given the struct's `name` and an
+    /// iterator over its `fields`.
+    ///
+    /// This function manages calling `open_struct`, recording the struct's
+    /// fields, and closing the struct.
+    ///
+    /// This is the suggested way for `Value` implementations to record structs,
+    /// rather than calling those functions directly, unless different behaviour
+    /// is needed.
+    pub fn record_struct<'a, I, V>(&mut self, name: &str, fields: I) -> RecordResult
     where
         I: IntoIterator<Item = (&'a str, &'a V)>,
         V: Value + 'a,
     {
         self.open_struct(name)?;
-        for (name, v) in i {
+        for (name, v) in fields {
             self.record_kv(&name, v)?;
         }
         self.close_struct()
     }
 
+    /// Record a tuple.
+    ///
+    /// This function manages calling `open_tuple`, recording the tuple's
+    /// fields, and closing the tuple.
+    ///
+    /// This is the suggested way for `Value` implementations to record tuples,
+    /// rather than calling those functions directly, unless different behaviour
+    /// is needed.
     pub fn record_tuple<'a, I, V>(&mut self, i: I) -> RecordResult
     where
         I: IntoIterator<Item = &'a V>,
@@ -156,7 +279,11 @@ impl<'r> Recorder + 'r {
 
 }
 
-/// A formattable field value of an erased type.
+/// A structured field value of an erased type.
+///
+/// Implementors of `Value` may call the appropriate typed recording methods on
+/// the `Recorder` passed to `Record` in order to indicate how their data
+/// should be recorded.
 pub trait Value: fmt::Debug + Send + Sync {
     /// Records the value with the given `Recorder`.
     fn record(&self, &mut dyn Recorder) -> RecordResult;
@@ -170,6 +297,7 @@ pub trait Value: fmt::Debug + Send + Sync {
     }
 }
 
+/// An error that occurred while recording a field.
 #[derive(Debug)]
 pub struct Error {
     // TODO: Should this carry a boxed error, or should it just discard the
@@ -587,6 +715,7 @@ impl From<io::Error> for Error {
 }
 
 impl Error {
+    /// Returns a new `Error` wrapping the given inner error.
     pub fn new<E>(inner: E) -> Self
     where
         E: error::Error + 'static,
