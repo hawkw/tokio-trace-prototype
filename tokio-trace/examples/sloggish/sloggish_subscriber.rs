@@ -69,9 +69,9 @@ impl Span {
         &mut self,
         key: &tokio_trace::field::Key,
         value: &dyn tokio_trace::field::Value,
-    ) -> field::RecordResult {
+    ) -> Result<(), subscriber::RecordError> {
         let mut s = String::new();
-        value.record(&mut tokio_trace::field::DebugRecorder::new_fmt(&mut s))?;
+        value.record(key, &mut tokio_trace::field::DebugRecorder::new(&mut s))?;
         // TODO: shouldn't have to alloc the key...
         self.kvs.push((key.name().unwrap_or("???").to_owned(), s));
         Ok(())
@@ -173,11 +173,11 @@ impl Subscriber for SloggishSubscriber {
 
     #[inline]
     fn observe_event<'a>(&self, event: &'a tokio_trace::Event<'a>) {
-        struct Display<'a>(&'a dyn field::Value);
+        struct Display<'a> { key: field::Key<'a>, value: &'a dyn field::Value };
         impl<'a> fmt::Display for Display<'a> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                self.0
-                    .record(&mut field::DebugRecorder::new_fmt(f))
+                self.value
+                    .record(&self.key, &mut field::DebugRecorder::new(f))
                     .map_err(|_| fmt::Error)
             }
         }
@@ -203,7 +203,10 @@ impl Subscriber for SloggishSubscriber {
         ).unwrap();
         self.print_kvs(
             &mut stderr,
-            event.fields().map(|(k, v)| (k, Display(v))),
+            event.fields().map(|(key, value)| {
+                let display = Display { key, value };
+                (display.key.clone(), display)
+            }),
             ", ",
         ).unwrap();
         write!(&mut stderr, "\n").unwrap();
