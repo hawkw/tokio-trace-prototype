@@ -116,9 +116,11 @@ pub trait Recorder {
 }
 
 impl<'r> Recorder + 'r {
-    pub fn record_map<'a, I>(&mut self, i: I) -> RecordResult
+    pub fn record_map<'a, I, K, V>(&mut self, i: I) -> RecordResult
     where
-        I: IntoIterator<Item = (&'a dyn Value, &'a dyn Value)>,
+        I: IntoIterator<Item = (&'a K, &'a V)>,
+        K: Value + 'a,
+        V: Value + 'a,
     {
         self.open_map()?;
         for (k, v) in i {
@@ -127,20 +129,22 @@ impl<'r> Recorder + 'r {
         self.close_map()
     }
 
-    pub fn record_list<'a, I>(&mut self, i: I) -> RecordResult
+    pub fn record_list<'a, I, V>(&mut self, i: I) -> RecordResult
     where
-        I: IntoIterator<Item = &'a dyn Value>,
+        I: IntoIterator<Item = &'a V>,
+        V: Value + 'a,
     {
-        self.open_map()?;
+        self.open_list()?;
         for v in i {
             v.record(self)?;
         }
-        self.close_map()
+        self.close_list()
     }
 
-    pub fn record_struct<'a, I>(&mut self, name: &str, i: I) -> RecordResult
+    pub fn record_struct<'a, I, V>(&mut self, name: &str, i: I) -> RecordResult
     where
-        I: IntoIterator<Item = (&'a str, &'a dyn Value)>,
+        I: IntoIterator<Item = (&'a str, &'a V)>,
+        V: Value + 'a,
     {
         self.open_struct(name)?;
         for (name, v) in i {
@@ -148,6 +152,19 @@ impl<'r> Recorder + 'r {
         }
         self.close_struct()
     }
+
+    pub fn record_tuple<'a, I, V>(&mut self, i: I) -> RecordResult
+    where
+        I: IntoIterator<Item = &'a V>,
+        V: Value + 'a,
+    {
+        self.open_tuple()?;
+        for v in i {
+            v.record(self)?;
+        }
+        self.close_tuple()
+    }
+
 }
 
 /// A formattable field value of an erased type.
