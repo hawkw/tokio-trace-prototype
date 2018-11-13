@@ -71,7 +71,7 @@ impl Span {
         value: &dyn tokio_trace::field::Value,
     ) -> field::RecordResult {
         let mut s = String::new();
-        value.record(&mut tokio_trace::field::DebugWriter::new_fmt(&mut s))?;
+        value.record(&mut tokio_trace::field::DebugRecorder::new_fmt(&mut s))?;
         // TODO: shouldn't have to alloc the key...
         self.kvs.push((key.name().unwrap_or("???").to_owned(), s));
         Ok(())
@@ -177,7 +177,7 @@ impl Subscriber for SloggishSubscriber {
         impl<'a> fmt::Display for Display<'a> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 self.0
-                    .record(&mut field::DebugWriter::new_fmt(f))
+                    .record(&mut field::DebugRecorder::new_fmt(f))
                     .map_err(|_| fmt::Error)
             }
         }

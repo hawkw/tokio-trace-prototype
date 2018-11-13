@@ -17,7 +17,7 @@ pub trait AsKey {
     fn as_key<'a>(&self, metadata: &'a Meta<'a>) -> Option<Key<'a>>;
 }
 
-pub struct DebugWriter<W> {
+pub struct DebugRecorder<W> {
     write: W,
     comma_delimited: usize,
     add_comma: bool,
@@ -46,15 +46,15 @@ impl AsKey for str {
     }
 }
 
-// ===== impl DebugWriter =====
+// ===== impl DebugRecorder =====
 
-impl<W> DebugWriter<W> {
+impl<W> DebugRecorder<W> {
     pub fn into_inner(self) -> W {
         self.write
     }
 }
 
-impl<'a> DebugWriter<&'a mut fmt::Write> {
+impl<'a> DebugRecorder<&'a mut fmt::Write> {
     pub fn new_fmt<W: fmt::Write>(write: &'a mut W) -> Self {
         Self {
             write,
@@ -87,7 +87,7 @@ impl<'a> DebugWriter<&'a mut fmt::Write> {
     }
 }
 
-impl<'a> DebugWriter<&'a mut io::Write> {
+impl<'a> DebugRecorder<&'a mut io::Write> {
     pub fn new_io<W: io::Write>(write: &'a mut W) -> Self {
         Self {
             write,
@@ -120,7 +120,7 @@ impl<'a> DebugWriter<&'a mut io::Write> {
     }
 }
 
-impl<'a> Record for DebugWriter<&'a mut dyn io::Write> {
+impl<'a> Record for DebugRecorder<&'a mut dyn io::Write> {
     fn record_fmt(&mut self, args: fmt::Arguments) -> RecordResult {
         self.io_maybe_comma()?;
         self.write.write_fmt(args)?;
@@ -173,7 +173,7 @@ impl<'a> Record for DebugWriter<&'a mut dyn io::Write> {
     }
 }
 
-impl<'a> Record for DebugWriter<&'a mut dyn fmt::Write> {
+impl<'a> Record for DebugRecorder<&'a mut dyn fmt::Write> {
     fn record_fmt(&mut self, args: fmt::Arguments) -> RecordResult {
         self.fmt_maybe_comma()?;
         self.write.write_fmt(args)?;

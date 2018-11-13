@@ -444,7 +444,7 @@ impl<'a> fmt::Debug for LogField<'a> {
         let name = self.key.name().unwrap_or("???");
         write!(f, "{}=", name)?;
         {
-            let mut recorder = field::DebugWriter::new_fmt(f);
+            let mut recorder = field::DebugRecorder::new_fmt(f);
             self.val.record(&mut recorder).map_err(|_| fmt::Error)?;
         }
         write!(f, ";")?;
