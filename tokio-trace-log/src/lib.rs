@@ -402,15 +402,15 @@ impl Subscriber for TraceLogger {
 //     }
 // }
 
-// impl tokio_trace_subscriber::Filter for TraceLogger {
-//     fn enabled(&self, metadata: &Meta) -> bool {
-//         <Self as Subscriber>::enabled(&self, metadata)
-//     }
+impl tokio_trace_subscriber::Filter for TraceLogger {
+    fn enabled(&self, metadata: &Meta) -> bool {
+        <Self as Subscriber>::enabled(&self, metadata)
+    }
 
-//     fn should_invalidate_filter(&self, _metadata: &Meta) -> bool {
-//         false
-//     }
-// }
+    fn should_invalidate_filter(&self, _metadata: &Meta) -> bool {
+        false
+    }
+}
 
 impl<'a, 'b: 'a, I> fmt::Debug for LogFields<'a, 'b, I>
 where

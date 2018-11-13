@@ -4,7 +4,7 @@ extern crate tokio_trace;
 use tokio_trace::{
     field, span,
     subscriber::{self, Subscriber},
-    Event, IntoValue, Level, Meta, Value,
+    Event, Level, Meta,
 };
 
 use std::{
@@ -50,7 +50,8 @@ impl Subscriber for CounterSubscriber {
         let registry = self.counters.0.read().unwrap();
         if let Some((counter, value)) = key.name().and_then(|name| {
             let counter = registry.get(name)?;
-            let &val = value.into_value().downcast_ref::<usize>()?;
+            let &val =
+            unimplemented!("TODO: rework this example with visitor API");//value.downcast_ref::<usize>()?;
             Some((counter, val))
         }) {
             counter.fetch_add(value, Ordering::Release);
@@ -109,7 +110,7 @@ fn main() {
             foo += 1;
             event!(
                 Level::Info,
-                { yak_shaved = &true },
+                { yak_shaved = true },
                 "hi from inside my span"
             );
             span!("my other span", foo_count = &foo, baz_count = &5usize).enter(|| {})

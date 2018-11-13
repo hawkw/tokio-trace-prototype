@@ -378,7 +378,7 @@ impl Value {
     /// # Examples
     /// ```
     /// # extern crate tokio_trace_core as tokio_trace;
-    /// use tokio_trace::field;
+    /// use tokio_trace::field::{self, Value, RecordResult};
     /// # use std::fmt;
     /// # fn main() {
     ///
@@ -391,13 +391,19 @@ impl Value {
     ///     }
     /// }
     ///
+    /// impl Value for Foo {
+    ///     fn record(&self, recorder: &mut dyn field::Recorder) -> RecordResult {
+    ///         recorder.record_str("foo")
+    ///     }
+    /// }
+    ///
     /// let foo = Foo;
     /// assert_eq!("Foo".to_owned(), format!("{:?}", foo));
     ///
-    /// let display_foo = field::display(foo.clone());
+    /// let display_foo = Value::display(foo.clone());
     /// assert_eq!(
     ///     format!("{}", foo),
-    ///     format!("{:?}", field::borrowed(&display_foo)),
+    ///     format!("{:?}", &display_foo),
     /// );
     /// # }
     /// ```
@@ -415,13 +421,19 @@ impl Value {
     /// #       f.pad("Hello, I'm Foo")
     /// #   }
     /// # }
-    /// use tokio_trace::field::{self, Value, IntoValue};
-    /// let foo = field::display(Foo);
+    /// # impl Value for Foo {
+    /// #   fn record(&self, recorder: &mut dyn tokio_trace::field::Recorder)
+    /// #       -> tokio_trace::field::RecordResult
+    /// #   {
+    /// #       recorder.record_str("foo")
+    /// #   }
+    /// # }
+    /// use tokio_trace::field::Value;
+    /// let foo = Value::display(Foo);
     ///
-    /// let owned_value = foo.into_value();
-    /// assert_eq!("Hello, I'm Foo".to_owned(), format!("{:?}", owned_value));
+    /// assert_eq!("Hello, I'm Foo".to_owned(), format!("{:?}", foo));
     ///
-    /// assert!(owned_value.downcast_ref::<Foo>().is_some());
+    /// assert!(Value::downcast_ref::<Foo>(&foo).is_some());
     /// # }
     /// ```
     pub fn display<'a, T>(t: T) -> DisplayValue<T>
@@ -445,7 +457,7 @@ impl Value {
 impl Value + 'static {
     /// Returns true if the boxed type is the same as `T`
     #[inline]
-    fn is<T: Value + 'static>(&self) -> bool
+    pub fn is<T: Value + 'static>(&self) -> bool
     where
         Self: 'static,
     {
@@ -461,7 +473,7 @@ impl Value + 'static {
 
     /// Returns some reference to the boxed value if it is of type `T`, or
     /// `None` if it isn't.
-    fn downcast_ref<T: Value + 'static>(&self) -> Option<&T>
+    pub fn downcast_ref<T: Value + 'static>(&self) -> Option<&T>
     where
         Self: 'static,
     {
