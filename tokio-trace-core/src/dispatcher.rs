@@ -97,53 +97,8 @@ impl Subscriber for Dispatch {
     }
 
     #[inline]
-    fn record_i64(
-        &self,
-        span: &span::Id,
-        field: &field::Key,
-        value: i64,
-    ) -> Result<(), ::subscriber::RecordError> {
-        self.subscriber.record_i64(span, field, value)
-    }
-
-    #[inline]
-    fn record_u64(
-        &self,
-        span: &span::Id,
-        field: &field::Key,
-        value: u64,
-    ) -> Result<(), RecordError> {
-        self.subscriber.record_u64(span, field, value)
-    }
-
-    #[inline]
-    fn record_bool(
-        &self,
-        span: &span::Id,
-        field: &field::Key,
-        value: bool,
-    ) -> Result<(), RecordError> {
-        self.subscriber.record_bool(span, field, value)
-    }
-
-    #[inline]
-    fn record_str(
-        &self,
-        span: &span::Id,
-        field: &field::Key,
-        value: &str,
-    ) -> Result<(), RecordError> {
-        self.subscriber.record_str(span, field, value)
-    }
-
-    #[inline]
-    fn record_fmt(
-        &self,
-        span: &span::Id,
-        field: &field::Key,
-        value: fmt::Arguments,
-    ) -> Result<(), RecordError> {
-        self.subscriber.record_fmt(span, field, value)
+    fn span_recorder(&self, span: &span::Id) -> &mut dyn field::Record {
+        self.subscriber.span_recorder(span)
     }
 
     #[inline]
@@ -183,18 +138,28 @@ impl Subscriber for Dispatch {
 
 struct NoSubscriber;
 
+
+
 impl Subscriber for NoSubscriber {
     fn new_span(&self, _span: span::Attributes) -> span::Id {
         span::Id::from_u64(0)
     }
 
-    fn record_fmt(
+    fn span_recorder(
         &self,
         _span: &span::Id,
-        _name: &field::Key,
-        _value: fmt::Arguments,
-    ) -> Result<(), subscriber::RecordError> {
-        Ok(())
+    ) -> &mut dyn field::Record {
+        struct NoRecorder;
+        impl field::Record for NoRecorder {
+            fn record_fmt(
+                &mut self,
+                _field: &field::Key,
+                _value: ::std::fmt::Arguments,
+            ) -> Result<(), ::subscriber::RecordError> {
+                Ok(())
+            }
+        }
+        &mut NoRecorder
     }
 
     fn add_follows_from(

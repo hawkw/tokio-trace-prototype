@@ -386,12 +386,6 @@ impl<'a> Event<'a> {
             Some((key, val))
         })
     }
-
-    /// Returns a struct that can be used to format all the fields on this
-    /// `Event` with `fmt::Debug`.
-    pub fn debug_fields<'b: 'a>(&'b self) -> DebugFields<'b, 'b, Self> {
-        DebugFields(self)
-    }
 }
 
 impl<'a> IntoIterator for &'a Event<'a> {
@@ -399,25 +393,6 @@ impl<'a> IntoIterator for &'a Event<'a> {
     type IntoIter = Box<Iterator<Item = (field::Key<'a>, &'a dyn Value)> + 'a>; // TODO: unbox
     fn into_iter(self) -> Self::IntoIter {
         Box::new(self.fields())
-    }
-}
-
-/// Formats the key-value fields of a `Span` or `Event` with `fmt::Debug`.
-pub struct DebugFields<'a, 'b: 'a, I: 'a>(&'a I)
-where
-    &'a I: IntoIterator<Item = (field::Key<'b>, &'b dyn Value)>;
-
-impl<'a, 'b: 'a, I: 'a> fmt::Debug for DebugFields<'a, 'b, I>
-where
-    &'a I: IntoIterator<Item = (field::Key<'b>, &'b dyn Value)>,
-{
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.0
-            .into_iter()
-            .fold(&mut f.debug_struct(""), |s, (key, value)| {
-                let name = key.name().unwrap_or("???");
-                s.field(name, &value)
-            }).finish()
     }
 }
 

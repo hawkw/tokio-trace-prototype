@@ -431,7 +431,7 @@ impl Enter {
             return Err(RecordError::NoField);
         }
 
-        match value.record(&self.id, &field, &self.subscriber) {
+        match value.record(&field, self.subscriber.span_recorder(&self.id)) {
             Ok(()) => Ok(()),
             Err(RecordError::NoSpan) => panic!("span should still exist!"),
             Err(e) => Err(e),

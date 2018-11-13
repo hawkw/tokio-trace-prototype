@@ -47,7 +47,54 @@ use ::{ span, Dispatch, Meta};
 use std::fmt;
 
 pub trait Value: ::sealed::Sealed {
-    fn record(&self, span: &span::Id, key: &Key, subscriber: &Dispatch) -> Result<(), ::subscriber::RecordError>;
+    fn record(&self, key: &Key, recorder: &mut dyn Record) -> Result<(), ::subscriber::RecordError>;
+}
+
+pub trait Record {
+    fn record_i64(
+        &mut self,
+        field: &Key,
+        value: i64,
+    ) -> Result<(), ::subscriber::RecordError> {
+        self.record_fmt(field, format_args!("{}", value))
+    }
+
+    fn record_u64(
+        &mut self,
+        field: &Key,
+        value: u64,
+    ) -> Result<(), ::subscriber::RecordError> {
+        self.record_fmt(field, format_args!("{}", value))
+    }
+
+    fn record_bool(
+        &mut self,
+        field: &Key,
+        value: i64,
+    ) -> Result<(), ::subscriber::RecordError> {
+        self.record_fmt(field, format_args!("{}", value))
+    }
+
+    fn record_str(
+        &mut self,
+        field: &Key,
+        value: &str,
+    ) -> Result<(), ::subscriber::RecordError> {
+        self.record_fmt(field, format_args!("{}", value))
+    }
+
+    /// Adds a new field to an existing span observed by this `Subscriber`.
+    ///
+    /// This is expected to return an error under the following conditions:
+    /// - The span ID does not correspond to a span which currently exists.
+    /// - The span does not have a field with the given name.
+    /// - The span has a field with the given name, but the value has already
+    ///   been set.
+    fn record_fmt(
+        &mut self,
+        field: &Key,
+        value: fmt::Arguments,
+    ) -> Result<(), ::subscriber::RecordError>;
 }
 
 /// An opaque key allowing _O_(1) access to a field in a `Span` or `Event`'s
@@ -127,28 +174,6 @@ impl Value {
     }
 }
 
-// ===== impl DisplayValue =====
-
-impl<T: fmt::Display> ::sealed::Sealed for DisplayValue<T> {}
-
-impl<T: fmt::Display> Value for DisplayValue<T> {
-    fn record(&self, span: &span::Id, key: &Key, dispatch: &Dispatch) -> Result<(), ::subscriber::RecordError> {
-        dispatch.record_fmt(span, key, format_args!("{}", self.0))
-    }
-}
-
-
-// ===== impl DebugValue =====
-
-impl<T: fmt::Debug> ::sealed::Sealed for DebugValue<T> {}
-
-impl<T: fmt::Debug> Value for DebugValue<T> {
-    fn record(&self, span: &span::Id, key: &Key, dispatch: &Dispatch) -> Result<(), ::subscriber::RecordError> {
-        dispatch.record_fmt(span, key, format_args!("{:?}", self.0))
-    }
-}
-
-
 // ===== impl Field =====
 
 impl<'a> Key<'a> {
@@ -204,34 +229,68 @@ impl<'a> AsRef<str> for Key<'a> {
     }
 }
 
+// ===== impl DisplayValue =====
+
+impl<T: fmt::Display> ::sealed::Sealed for DisplayValue<T> {}
+
+impl<T: fmt::Display> Value for DisplayValue<T> {
+    fn record(&self, key: &Key, recorder: &mut dyn Record) -> Result<(), ::subscriber::RecordError> {
+        recorder.record_fmt(key, format_args!("{}", self.0))
+    }
+}
+
+// ===== impl Value =====
+
+impl<T: fmt::Debug> ::sealed::Sealed for DebugValue<T> {}
+
+impl<T: fmt::Debug> Value for DebugValue<T> {
+    fn record(&self, key: &Key, recorder: &mut dyn Record) -> Result<(), ::subscriber::RecordError> {
+        recorder.record_fmt(key, format_args!("{:?}", self.0))
+    }
+}
+
 impl ::sealed::Sealed for str {}
 
 impl Value for str {
-    fn record(&self, span: &span::Id, key: &Key, dispatch: &Dispatch) -> Result<(), ::subscriber::RecordError> {
-        dispatch.record_str(span, key, self)
+    fn record(&self, key: &Key, recorder: &mut dyn Record) -> Result<(), ::subscriber::RecordError> {
+        recorder.record_str(key, self)
     }
 }
 
 impl ::sealed::Sealed for bool {}
 
 impl Value for bool {
-    fn record(&self, span: &span::Id, key: &Key, dispatch: &Dispatch) -> Result<(), ::subscriber::RecordError> {
-        dispatch.record_bool(span, key, self)
+    fn record(&self, key: &Key, recorder: &mut dyn Record) -> Result<(), ::subscriber::RecordError> {
+        recorder.record_bool(key, self)
     }
 }
 
 impl ::sealed::Sealed for i64 {}
 
 impl Value for i64 {
-    fn record(&self, span: &span::Id, key: &Key, dispatch: &Dispatch) -> Result<(), ::subscriber::RecordError> {
-        dispatch.record_i64(span, key, self)
+    fn record(&self, key: &Key, recorder: &mut dyn Record) -> Result<(), ::subscriber::RecordError> {
+        recorder.record_i64(key, self)
     }
 }
 
 impl ::sealed::Sealed for u64 {}
 
 impl Value for u64 {
-    fn record(&self, span: &span::Id, key: &Key, dispatch: &Dispatch) -> Result<(), ::subscriber::RecordError> {
-        dispatch.record_u64(span, key, self)
+    fn record(&self, key: &Key, recorder: &mut dyn Record) -> Result<(), ::subscriber::RecordError> {
+        recorder.record_u64(key, self)
+    }
+}
+
+impl<'a, V> ::sealed::Sealed for &'a V
+where
+    V: Value + ::sealed::Sealed,
+{}
+
+impl<'a, V> Value for &'a V
+where
+    V: Value + ::sealed::Sealed,
+{
+    fn record(&self, key: &Key, recorder: &mut dyn Record) -> Result<(), ::subscriber::RecordError> {
+        recorder.record_u64(key, *self)
     }
 }

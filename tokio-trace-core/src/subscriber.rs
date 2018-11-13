@@ -116,55 +116,8 @@ pub trait Subscriber {
     /// [`Span`]: ::span::Span
     fn new_span(&self, span: span::Attributes) -> span::Id;
 
-    fn record_i64(
-        &self,
-        span: &span::Id,
-        field: &field::Key,
-        value: i64,
-    ) -> Result<(), RecordError> {
-        self.record_fmt(span, field, format_args!("{}", value))
-    }
-
-    fn record_u64(
-        &self,
-        span: &span::Id,
-        field: &field::Key,
-        value: u64,
-    ) -> Result<(), RecordError> {
-        self.record_fmt(span, field, format_args!("{}", value))
-    }
-
-    fn record_bool(
-        &self,
-        span: &span::Id,
-        field: &field::Key,
-        value: bool,
-    ) -> Result<(), RecordError> {
-        self.record_fmt(span, field, format_args!("{}", value))
-    }
-
-    fn record_str(
-        &self,
-        span: &span::Id,
-        field: &field::Key,
-        value: &str,
-    ) -> Result<(), RecordError> {
-        self.record_fmt(span, field, format_args!("{}", value))
-    }
-
-    /// Adds a new field to an existing span observed by this `Subscriber`.
-    ///
-    /// This is expected to return an error under the following conditions:
-    /// - The span ID does not correspond to a span which currently exists.
-    /// - The span does not have a field with the given name.
-    /// - The span has a field with the given name, but the value has already
-    ///   been set.
-    fn record_fmt(
-        &self,
-        span: &span::Id,
-        field: &field::Key,
-        value: fmt::Arguments,
-    ) -> Result<(), RecordError>;
+    /// Return a [recorder](::field::Record) for the span with the given ID.
+    fn span_recorder(&self, span: &span::Id) -> &mut dyn field::Record;
 
     /// Adds an indication that `span` follows from the span with the id
     /// `follows`.
@@ -446,14 +399,22 @@ mod test_support {
             (self.filter)(meta)
         }
 
-        fn record(
+        fn span_recorder(
             &self,
             _span: &span::Id,
-            _name: &Key,
-            _value: &dyn Value,
-        ) -> Result<(), RecordError> {
+        ) -> &mut dyn field::Record {
             // TODO: it should be possible to expect values...
-            Ok(())
+            struct NoRecorder;
+            impl field::Record for NoRecorder {
+                fn record_fmt(
+                    &mut self,
+                    _field: &field::Key,
+                    _value: ::std::fmt::Arguments,
+                ) -> Result<(), ::subscriber::RecordError> {
+                    Ok(())
+                }
+            }
+            &mut NoRecorder
         }
 
         fn add_follows_from(
