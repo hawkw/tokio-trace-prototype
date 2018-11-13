@@ -224,7 +224,7 @@ enum InterestKind {
 /// Errors which may prevent a value from being successfully added to a span.
 // TODO: before releasing core 0.1 this needs to be made private, to avoid
 // future breaking changes.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub enum AddValueError {
     /// The span with the given ID does not exist.
     NoSpan,
@@ -232,6 +232,8 @@ pub enum AddValueError {
     NoField,
     /// The named field already has a value.
     FieldAlreadyExists,
+    /// An error occurred recording the field.
+    Record(field::Error),
 }
 
 /// Errors which may prevent a prior span from being added to a span.
@@ -294,6 +296,15 @@ impl Interest {
     /// Returns an `usize` representing this `Interest`.
     pub fn as_usize(&self) -> usize {
         self.0 as usize
+    }
+}
+
+// ===== impl AddValueError =====
+// TODO: impl Error, etc
+
+impl From<field::Error> for AddValueError {
+    fn from(e: field::Error) -> Self {
+        AddValueError::Record(e)
     }
 }
 

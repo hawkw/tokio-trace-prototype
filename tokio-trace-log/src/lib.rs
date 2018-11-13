@@ -246,8 +246,7 @@ impl Subscriber for TraceLogger {
         val: &dyn field::Value,
     ) -> Result<(), subscriber::AddValueError> {
         if let Some(span) = self.in_progress.lock().unwrap().get_mut(span) {
-            // TODO: this needs to return the error instead.
-            span.add_field(key, val).unwrap();
+            span.add_field(key, val)?;
             Ok(())
         } else {
             Err(subscriber::AddValueError::NoSpan)

@@ -158,8 +158,7 @@ impl Subscriber for SloggishSubscriber {
         let span = spans
             .get_mut(span)
             .ok_or(subscriber::AddValueError::NoSpan)?;
-        // TODO: need error variant for this...
-        span.add_field(name, value).unwrap();
+        span.add_field(name, value)?;
         Ok(())
     }
 
