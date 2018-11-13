@@ -113,7 +113,7 @@ pub use self::{
     dispatcher::Dispatch,
     field::{Key, Value},
     span::{Attributes as SpanAttributes, Id as SpanId, Span},
-    subscriber::{Subscriber, Interest},
+    subscriber::{Interest, Subscriber},
 };
 
 /// `Event`s represent single points in time where something occurred during the
@@ -376,9 +376,7 @@ impl<'a> Event<'a> {
         if !self.has_field(key) {
             return None;
         }
-        self.field_values
-            .get(key.as_usize())
-            .map(|&v| v)
+        self.field_values.get(key.as_usize()).map(|&v| v)
     }
 
     /// Returns an iterator over all the field names and values on this event.

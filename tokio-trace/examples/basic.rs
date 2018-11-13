@@ -15,11 +15,7 @@ fn main() {
 
         span!("my_great_span", foo = &4, baz = &5).enter(|| {
             Span::current().close();
-            event!(
-                Level::Info,
-                { yak_shaved = true },
-                "hi from inside my span"
-            );
+            event!(Level::Info, { yak_shaved = true }, "hi from inside my span");
         });
     });
 }

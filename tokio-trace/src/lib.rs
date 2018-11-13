@@ -153,7 +153,7 @@ pub mod subscriber;
 
 pub use self::{
     dispatcher::Dispatch,
-    field::{Value},
+    field::Value,
     span::{Attributes as SpanAttributes, Id as SpanId, Span},
     subscriber::Subscriber,
     tokio_trace_core::{

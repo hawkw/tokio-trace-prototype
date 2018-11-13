@@ -14,8 +14,7 @@ extern crate ansi_term;
 extern crate humantime;
 use self::ansi_term::{Color, Style};
 use super::tokio_trace::{
-    self,
-    field,
+    self, field,
     subscriber::{self, Subscriber},
     Level, SpanAttributes, SpanId,
 };
@@ -66,7 +65,11 @@ impl Span {
         }
     }
 
-    fn add_field(&mut self, key: &tokio_trace::field::Key, value: &dyn tokio_trace::field::Value) -> field::RecordResult {
+    fn add_field(
+        &mut self,
+        key: &tokio_trace::field::Key,
+        value: &dyn tokio_trace::field::Value,
+    ) -> field::RecordResult {
         let mut s = String::new();
         value.record(&mut tokio_trace::field::DebugWriter::new_fmt(&mut s))?;
         // TODO: shouldn't have to alloc the key...
@@ -86,7 +89,12 @@ impl SloggishSubscriber {
         }
     }
 
-    fn print_kvs<'a, I, K, V>(&self, writer: &mut impl Write, kvs: I, leading: &str) -> io::Result<()>
+    fn print_kvs<'a, I, K, V>(
+        &self,
+        writer: &mut impl Write,
+        kvs: I,
+        leading: &str,
+    ) -> io::Result<()>
     where
         I: IntoIterator<Item = (K, V)>,
         K: AsRef<str> + 'a,
@@ -103,12 +111,7 @@ impl SloggishSubscriber {
             )?;
         }
         for (k, v) in kvs {
-            write!(
-                writer,
-                ", {}: {}",
-                Style::new().bold().paint(k.as_ref()),
-                v
-            )?;
+            write!(writer, ", {}: {}", Style::new().bold().paint(k.as_ref()), v)?;
         }
         Ok(())
     }
@@ -138,7 +141,10 @@ impl Subscriber for SloggishSubscriber {
     fn new_span(&self, span: tokio_trace::span::Attributes) -> tokio_trace::span::Id {
         let next = self.ids.fetch_add(1, Ordering::SeqCst) as u64;
         let id = tokio_trace::span::Id::from_u64(next);
-        self.spans.lock().unwrap().insert(id.clone(), Span::new(span));
+        self.spans
+            .lock()
+            .unwrap()
+            .insert(id.clone(), Span::new(span));
         id
     }
 
@@ -171,7 +177,9 @@ impl Subscriber for SloggishSubscriber {
         struct Display<'a>(&'a dyn field::Value);
         impl<'a> fmt::Display for Display<'a> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                self.0.record(&mut field::DebugWriter::new_fmt(f)).map_err(|_| fmt::Error)
+                self.0
+                    .record(&mut field::DebugWriter::new_fmt(f))
+                    .map_err(|_| fmt::Error)
             }
         }
         let mut stderr = self.stderr.lock();
@@ -194,7 +202,11 @@ impl Subscriber for SloggishSubscriber {
             "{}",
             Style::new().bold().paint(format!("{}", event.message))
         ).unwrap();
-        self.print_kvs(&mut stderr, event.fields().map(|(k, v)| (k, Display(v))), ", ").unwrap();
+        self.print_kvs(
+            &mut stderr,
+            event.fields().map(|(k, v)| (k, Display(v))),
+            ", ",
+        ).unwrap();
         write!(&mut stderr, "\n").unwrap();
     }
 
@@ -223,7 +235,8 @@ impl Subscriber for SloggishSubscriber {
             self.print_indent(&mut stderr, indent).unwrap();
             stack.push(span);
             if let Some(data) = data {
-                self.print_kvs(&mut stderr, data.kvs.iter().map(|(k, v)| (k, v)), "").unwrap();
+                self.print_kvs(&mut stderr, data.kvs.iter().map(|(k, v)| (k, v)), "")
+                    .unwrap();
             }
             write!(&mut stderr, "\n").unwrap();
         }

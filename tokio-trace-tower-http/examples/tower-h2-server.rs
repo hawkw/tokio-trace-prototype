@@ -18,7 +18,7 @@ use futures::*;
 use http::Request;
 use tokio::net::TcpListener;
 use tokio::runtime::Runtime;
-use tokio_trace::{Level, field::Value};
+use tokio_trace::{field::Value, Level};
 use tokio_trace_futures::Instrument;
 use tower_h2::{Body, RecvBody, Server};
 use tower_service::{NewService, Service};
@@ -113,7 +113,11 @@ fn main() {
         let addr = "[::1]:8888".parse().unwrap();
         let bind = TcpListener::bind(&addr).expect("bind");
 
-        span!("serve", local_ip = &Value::debug(addr.ip()), local_port = &addr.port()).enter(move || {
+        span!(
+            "serve",
+            local_ip = &Value::debug(addr.ip()),
+            local_port = &addr.port()
+        ).enter(move || {
             let new_svc = tokio_trace_tower_http::InstrumentedNewService::new(NewSvc);
             let h2 = Server::new(new_svc, Default::default(), reactor.clone());
 
@@ -121,7 +125,11 @@ fn main() {
                 .incoming()
                 .fold((h2, reactor), |(h2, reactor), sock| {
                     let addr = sock.peer_addr().expect("can't get addr");
-                    span!("conn", remote_ip = &Value::debug(addr.ip()), remote_port = &addr.port()).enter(|| {
+                    span!(
+                        "conn",
+                        remote_ip = &Value::debug(addr.ip()),
+                        remote_port = &addr.port()
+                    ).enter(|| {
                         if let Err(e) = sock.set_nodelay(true) {
                             return Err(e);
                         }

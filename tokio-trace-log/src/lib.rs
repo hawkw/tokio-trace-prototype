@@ -27,7 +27,8 @@ use std::{
     collections::HashMap,
     fmt, io,
     sync::{
-        Mutex, atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT}
+        atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT},
+        Mutex,
     },
 };
 use tokio_trace::{
@@ -217,7 +218,7 @@ impl LineBuilder {
                         meta.name.unwrap_or(""),
                         self.attrs.parent(),
                         self.line,
-                    )).build()
+                    )).build(),
             );
         }
     }
@@ -231,7 +232,10 @@ impl Subscriber for TraceLogger {
     fn new_span(&self, new_span: span::Attributes) -> span::Id {
         static NEXT_ID: AtomicUsize = ATOMIC_USIZE_INIT;
         let id = span::Id::from_u64(NEXT_ID.fetch_add(1, Ordering::SeqCst) as u64);
-        self.in_progress.lock().unwrap().insert(id.clone(), LineBuilder::new(new_span));
+        self.in_progress
+            .lock()
+            .unwrap()
+            .insert(id.clone(), LineBuilder::new(new_span));
         id
     }
 
@@ -410,7 +414,12 @@ impl Subscriber for TraceLogger {
 
 impl<'a, 'b: 'a, I> fmt::Debug for LogFields<'a, 'b, I>
 where
-    &'a I: IntoIterator<Item = (tokio_trace::field::Key<'b>, &'b dyn tokio_trace::field::Value)>,
+    &'a I: IntoIterator<
+        Item = (
+            tokio_trace::field::Key<'b>,
+            &'b dyn tokio_trace::field::Value,
+        ),
+    >,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut fields = self.0.into_iter();

@@ -117,7 +117,9 @@ pub trait Recorder {
 
 impl Recorder {
     pub fn record_map<'a, I>(&mut self, i: I) -> RecordResult
-    where I: IntoIterator<Item = (&'a dyn Value, &'a dyn Value)> {
+    where
+        I: IntoIterator<Item = (&'a dyn Value, &'a dyn Value)>,
+    {
         self.open_map()?;
         for (k, v) in i {
             self.record_kv(k, v)?;
@@ -126,7 +128,9 @@ impl Recorder {
     }
 
     pub fn record_list<'a, I>(&mut self, i: I) -> RecordResult
-    where I: IntoIterator<Item = &'a dyn Value> {
+    where
+        I: IntoIterator<Item = &'a dyn Value>,
+    {
         self.open_map()?;
         for v in i {
             v.record(self)?;
@@ -135,7 +139,9 @@ impl Recorder {
     }
 
     pub fn record_struct<'a, I>(&mut self, name: &str, i: I) -> RecordResult
-    where I: IntoIterator<Item = (&'a str, &'a dyn Value)>  {
+    where
+        I: IntoIterator<Item = (&'a str, &'a dyn Value)>,
+    {
         self.open_struct(name)?;
         for (name, v) in i {
             self.record_kv(&name, v)?;
@@ -234,7 +240,6 @@ impl<'a> DebugWriter<&'a mut io::Write> {
         self.comma_delimited.saturating_sub(1);
         Ok(())
     }
-
 }
 
 impl<'a> Recorder for DebugWriter<&'a mut dyn io::Write> {
@@ -290,9 +295,7 @@ impl<'a> Recorder for DebugWriter<&'a mut dyn io::Write> {
     }
 }
 
-
 impl<'a> Recorder for DebugWriter<&'a mut dyn fmt::Write> {
-
     fn record_fmt(&mut self, args: fmt::Arguments) -> RecordResult {
         self.fmt_maybe_comma()?;
         self.write.write_fmt(args)?;
@@ -646,14 +649,8 @@ mod tests {
         let foo = Foo { bar: "foo" };
         let display_foo = display(foo.clone());
 
-        assert_eq!(
-            format!("{:?}", foo),
-            "Foo { bar: \"foo\" }".to_owned()
-        );
-        assert_eq!(
-            format!("{:?}", display_foo),
-            format!("{}", foo)
-        );
+        assert_eq!(format!("{:?}", foo), "Foo { bar: \"foo\" }".to_owned());
+        assert_eq!(format!("{:?}", display_foo), format!("{}", foo));
     }
 
     #[test]

@@ -18,7 +18,7 @@ use std::str;
 mod sloggish;
 use self::sloggish::SloggishSubscriber;
 
-use tokio_trace::{Level, field::Value};
+use tokio_trace::{field::Value, Level};
 use tokio_trace_futures::{Instrument, Instrumented};
 
 type BoxFut = Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send>;
@@ -105,7 +105,11 @@ fn echo(req: Request<Body>) -> Instrumented<BoxFut> {
             _ => {
                 *response.status_mut() = StatusCode::NOT_FOUND;
                 (
-                    span!("response", body = &Value::debug(()), status = &Value::debug(&StatusCode::NOT_FOUND)),
+                    span!(
+                        "response",
+                        body = &Value::debug(()),
+                        status = &Value::debug(&StatusCode::NOT_FOUND)
+                    ),
                     Box::new(future::ok(response)),
                 )
             }
@@ -126,7 +130,10 @@ fn main() {
                 .expect("bind")
                 .incoming()
                 .fold(Http::new(), move |http, sock| {
-                    let span = span!("connection", remote = &Value::debug(&sock.peer_addr().unwrap()));
+                    let span = span!(
+                        "connection",
+                        remote = &Value::debug(&sock.peer_addr().unwrap())
+                    );
                     hyper::rt::spawn(
                         http.serve_connection(sock, service_fn(echo))
                             .map_err(|e| {
