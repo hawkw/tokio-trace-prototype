@@ -97,13 +97,53 @@ impl Subscriber for Dispatch {
     }
 
     #[inline]
-    fn add_value(
+    fn add_value_i64(
         &self,
         span: &span::Id,
-        name: &field::Key,
-        value: &dyn field::Value,
-    ) -> Result<(), subscriber::AddValueError> {
-        self.subscriber.add_value(span, name, value)
+        field: &field::Key,
+        value: i64,
+    ) -> Result<(), ::subscriber::AddValueError> {
+        self.subscriber.add_value_i64(span, field, value)
+    }
+
+    #[inline]
+    fn add_value_u64(
+        &self,
+        span: &span::Id,
+        field: &field::Key,
+        value: u64,
+    ) -> Result<(), AddValueError> {
+        self.subscriber.add_value_u64(span, field, value)
+    }
+
+    #[inline]
+    fn add_value_bool(
+        &self,
+        span: &span::Id,
+        field: &field::Key,
+        value: bool,
+    ) -> Result<(), AddValueError> {
+        self.subscriber.add_value_bool(span, field, value)
+    }
+
+    #[inline]
+    fn add_value_str(
+        &self,
+        span: &span::Id,
+        field: &field::Key,
+        value: &str,
+    ) -> Result<(), AddValueError> {
+        self.subscriber.add_value_str(span, field, value)
+    }
+
+    #[inline]
+    fn add_value_fmt(
+        &self,
+        span: &span::Id,
+        field: &field::Key,
+        value: fmt::Arguments,
+    ) -> Result<(), AddValueError> {
+        self.subscriber.add_value_fmt(span, field, value)
     }
 
     #[inline]
@@ -148,11 +188,11 @@ impl Subscriber for NoSubscriber {
         span::Id::from_u64(0)
     }
 
-    fn add_value(
+    fn add_value_fmt(
         &self,
         _span: &span::Id,
         _name: &field::Key,
-        _value: &dyn field::Value,
+        _value: fmt::Arguments,
     ) -> Result<(), subscriber::AddValueError> {
         Ok(())
     }

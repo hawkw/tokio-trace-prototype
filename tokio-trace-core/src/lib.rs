@@ -462,3 +462,7 @@ impl MetaKind {
     /// The `MetaKind` for `Event` metadata.
     pub const EVENT: Self = MetaKind(KindInner::Event);
 }
+
+mod sealed {
+    pub trait Sealed {}
+}

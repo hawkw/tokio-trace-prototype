@@ -1,6 +1,8 @@
 //! Subscribers collect and record trace data.
 use {field, span, Event, Meta, SpanId};
 
+use std::fmt;
+
 /// Trait representing the functions required to collect trace data.
 ///
 /// Crates that provide implementations of methods for collecting or recording
@@ -114,6 +116,42 @@ pub trait Subscriber {
     /// [`Span`]: ::span::Span
     fn new_span(&self, span: span::Attributes) -> span::Id;
 
+    fn add_value_i64(
+        &self,
+        span: &span::Id,
+        field: &field::Key,
+        value: i64,
+    ) -> Result<(), AddValueError> {
+        self.add_value_fmt(span, field, format_args!("{}", value))
+    }
+
+    fn add_value_u64(
+        &self,
+        span: &span::Id,
+        field: &field::Key,
+        value: u64,
+    ) -> Result<(), AddValueError> {
+        self.add_value_fmt(span, field, format_args!("{}", value))
+    }
+
+    fn add_value_bool(
+        &self,
+        span: &span::Id,
+        field: &field::Key,
+        value: bool,
+    ) -> Result<(), AddValueError> {
+        self.add_value_fmt(span, field, format_args!("{}", value))
+    }
+
+    fn add_value_str(
+        &self,
+        span: &span::Id,
+        field: &field::Key,
+        value: &str,
+    ) -> Result<(), AddValueError> {
+        self.add_value_fmt(span, field, format_args!("{}", value))
+    }
+
     /// Adds a new field to an existing span observed by this `Subscriber`.
     ///
     /// This is expected to return an error under the following conditions:
@@ -121,11 +159,11 @@ pub trait Subscriber {
     /// - The span does not have a field with the given name.
     /// - The span has a field with the given name, but the value has already
     ///   been set.
-    fn add_value(
+    fn add_value_fmt(
         &self,
         span: &span::Id,
         field: &field::Key,
-        value: &dyn field::Value,
+        value: fmt::Arguments,
     ) -> Result<(), AddValueError>;
 
     /// Adds an indication that `span` follows from the span with the id
@@ -233,7 +271,7 @@ pub enum AddValueError {
     /// The named field already has a value.
     FieldAlreadyExists,
     /// An error occurred recording the field.
-    Record(field::Error),
+    Record,
 }
 
 /// Errors which may prevent a prior span from being added to a span.
@@ -302,9 +340,9 @@ impl Interest {
 // ===== impl AddValueError =====
 // TODO: impl Error, etc
 
-impl From<field::Error> for AddValueError {
-    fn from(e: field::Error) -> Self {
-        AddValueError::Record(e)
+impl From<fmt::Error> for AddValueError {
+    fn from(e: fmt::Error) -> Self {
+        AddValueError::Record
     }
 }
 

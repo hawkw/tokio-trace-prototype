@@ -223,7 +223,7 @@ impl Span {
     /// `name` must name a field already defined by this span's metadata, and
     /// the field must not already have a value. If this is not the case, this
     /// function returns an [`AddValueError`](::subscriber::AddValueError).
-    pub fn add_value(&self, field: &Key, value: &dyn field::Value) -> Result<(), AddValueError> {
+    pub fn add_value<T: field::Value>(&self, field: &Key, value: &T) -> Result<(), AddValueError> {
         if let Some(ref inner) = self.inner {
             inner.add_value(field, value)
         } else {
@@ -426,12 +426,12 @@ impl Enter {
     /// `name` must name a field already defined by this span's metadata, and
     /// the field must not already have a value. If this is not the case, this
     /// function returns an [`AddValueError`](::subscriber::AddValueError).
-    pub fn add_value(&self, field: &Key, value: &dyn field::Value) -> Result<(), AddValueError> {
+    pub fn add_value<T: field::Value>(&self, field: &Key, value: &T) -> Result<(), AddValueError> {
         if !self.meta.contains_key(field) {
             return Err(AddValueError::NoField);
         }
 
-        match self.subscriber.add_value(&self.id, &field, value) {
+        match value.add_value(&self.id, &field, &self.subscriber) {
             Ok(()) => Ok(()),
             Err(AddValueError::NoSpan) => panic!("span should still exist!"),
             Err(e) => Err(e),
