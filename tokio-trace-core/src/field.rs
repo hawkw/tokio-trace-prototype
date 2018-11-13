@@ -115,7 +115,7 @@ pub trait Recorder {
     fn finish(self) -> RecordResult;
 }
 
-impl Recorder {
+impl<'r> Recorder + 'r {
     pub fn record_map<'a, I>(&mut self, i: I) -> RecordResult
     where
         I: IntoIterator<Item = (&'a dyn Value, &'a dyn Value)>,
@@ -647,7 +647,7 @@ mod tests {
     #[test]
     fn display_value_formats_with_display() {
         let foo = Foo { bar: "foo" };
-        let display_foo = display(foo.clone());
+        let display_foo = &display(&foo.clone());
 
         assert_eq!(format!("{:?}", foo), "Foo { bar: \"foo\" }".to_owned());
         assert_eq!(format!("{:?}", display_foo), format!("{}", foo));
@@ -656,7 +656,7 @@ mod tests {
     #[test]
     fn display_value_is_value() {
         let foo = Foo { bar: "foo" };
-        let display_foo = display(foo.clone());
+        let display_foo = display(&foo.clone());
 
         let value: &dyn Value = &display_foo;
         assert_eq!(format!("{:?}", value), format!("{}", foo));
@@ -665,7 +665,7 @@ mod tests {
     #[test]
     fn display_value_downcasts_to_original_type() {
         let foo = Foo { bar: "foo" };
-        let display_foo = display(foo);
+        let display_foo = &display(&foo);
         let value: &dyn Value = &display_foo;
 
         assert!(value.downcast_ref::<Foo>().is_some());
