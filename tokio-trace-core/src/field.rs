@@ -46,7 +46,6 @@
 use super::Meta;
 use std::{
     any::TypeId,
-    cell::Cell,
     collections,
     error,
     fmt,
@@ -54,11 +53,8 @@ use std::{
     io,
 };
 
-pub type RecordResult = Result<(), Error>;
-
 /// A visitor which records `Value`s.
 pub trait Recorder {
-    // fn named<'b: 'a>(&'b mut self, name: &'b str) -> &'b dyn Recorder<'b>;
     /// Record an unsigned integer value.
     ///
     /// This defaults to calling `self.record_any()`; implementations wishing to
@@ -276,8 +272,10 @@ impl<'r> Recorder + 'r {
         }
         self.close_tuple()
     }
-
 }
+
+/// Result type returned by recording field values with a `Recorder`.
+pub type RecordResult = Result<(), Error>;
 
 /// A structured field value of an erased type.
 ///
@@ -682,7 +680,7 @@ where
     T: Value + 'a,
 {
     fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
-        self.record(recorder)
+        (*self).record(recorder)
     }
 }
 

@@ -167,7 +167,7 @@ impl<'a> Recorder for DebugWriter<&'a mut dyn io::Write> {
         Ok(())
     }
 
-    fn finish(mut self) -> RecordResult {
+    fn finish(self) -> RecordResult {
         self.write.flush()?;
         Ok(())
     }
@@ -220,7 +220,7 @@ impl<'a> Recorder for DebugWriter<&'a mut dyn fmt::Write> {
         Ok(())
     }
 
-    fn finish(mut self) -> RecordResult {
+    fn finish(self) -> RecordResult {
         Ok(())
     }
 }

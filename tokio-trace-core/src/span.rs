@@ -4,14 +4,13 @@ use std::{
     cell::RefCell,
     cmp, fmt,
     hash::{Hash, Hasher},
-    iter,
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 use {
     callsite::Callsite,
     field::{self, Key},
     subscriber::{AddValueError, FollowsError, Interest, Subscriber},
-    DebugFields, Dispatch, Meta, StaticMeta,
+    Dispatch, Meta, StaticMeta,
 };
 
 thread_local! {

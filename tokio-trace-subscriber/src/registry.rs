@@ -144,9 +144,9 @@ impl RegisterSpan for IncreasingCounter {
 
     fn add_value(
         &self,
-        span: &Id,
-        name: &field::Key,
-        value: &dyn field::Value,
+        _span: &Id,
+        _name: &field::Key,
+        _value: &dyn field::Value,
     ) -> Result<(), AddValueError> {
         unimplemented!("TODO: figure out")
     }

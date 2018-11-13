@@ -36,7 +36,7 @@ use tokio_trace::{
     subscriber::{self, Subscriber},
     Event, Meta,
 };
-use tokio_trace_subscriber::SpanRef;
+
 /// Format a log record as a trace event in the current span.
 pub fn format_trace(record: &log::Record) -> io::Result<()> {
     struct LogCallsite<'a>(tokio_trace::Meta<'a>);
