@@ -234,10 +234,9 @@ impl<'r> Recorder + 'r {
     /// This is the suggested way for `Value` implementations to record structs,
     /// rather than calling those functions directly, unless different behaviour
     /// is needed.
-    pub fn record_struct<'a, I, V>(&mut self, name: &str, fields: I) -> RecordResult
+    pub fn record_struct<'a, I>(&mut self, name: &str, fields: I) -> RecordResult
     where
-        I: IntoIterator<Item = (&'a str, &'a V)>,
-        V: Value + 'a,
+        I: IntoIterator<Item = (&'a str, &'a dyn Value)>,
     {
         self.open_struct(name)?;
         for (name, v) in fields {
@@ -254,10 +253,9 @@ impl<'r> Recorder + 'r {
     /// This is the suggested way for `Value` implementations to record tuples,
     /// rather than calling those functions directly, unless different behaviour
     /// is needed.
-    pub fn record_tuple<'a, I, V>(&mut self, i: I) -> RecordResult
+    pub fn record_tuple<'a, I>(&mut self, i: I) -> RecordResult
     where
-        I: IntoIterator<Item = &'a V>,
-        V: Value + 'a,
+        I: IntoIterator<Item = &'a dyn Value>,
     {
         self.open_tuple()?;
         for v in i {
@@ -399,6 +397,14 @@ impl Value {
         T: fmt::Debug,
     {
         DebugValue(t)
+    }
+
+    /// Erases the type of a value, returning a `Value` trait object.
+    pub fn erased<'a, T>(t: &'a T) -> &'a dyn Value
+    where
+        T: Value + 'a,
+    {
+        t
     }
 }
 
@@ -616,7 +622,7 @@ where
     T: Value + Hash + Eq,
 {
     fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
-        recorder.record_tuple(self.iter())
+        recorder.record_tuple(self.iter().map(Value::erased))
     }
 }
 
@@ -635,7 +641,7 @@ where
     T: Value + Eq,
 {
     fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
-        recorder.record_tuple(self.iter())
+        recorder.record_tuple(self.iter().map(Value::erased))
     }
 }
 
@@ -735,7 +741,7 @@ mod tests {
     impl Value for Foo {
         fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
             let mut fields = ::std::iter::once::<(&str, &dyn Value)>(("bar", &self.bar));
-            recorder.record_struct(&"Foo", &mut fields)
+            recorder.record_struct("Foo", &mut fields)
         }
     }
 
