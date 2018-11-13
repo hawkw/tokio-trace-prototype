@@ -9,7 +9,7 @@ use std::{
 use {
     callsite::Callsite,
     field::{self, Key},
-    subscriber::{AddValueError, FollowsError, Interest, Subscriber},
+    subscriber::{RecordError, FollowsError, Interest, Subscriber},
     Dispatch, Meta, StaticMeta,
 };
 
@@ -131,7 +131,7 @@ impl Span {
     /// [`Callsite`]: ::callsite::Callsite
     /// [`Subscriber`]: ::subscriber::Subscriber
     /// [current span]: ::span::Span::current
-    /// [field values]: ::span::Span::add_value
+    /// [field values]: ::span::Span::record
     /// [`follows_from` annotations]: ::span::Span::follows_from
     #[inline]
     pub fn new<F>(callsite: &'static dyn Callsite, if_enabled: F) -> Span
@@ -222,10 +222,10 @@ impl Span {
     ///
     /// `name` must name a field already defined by this span's metadata, and
     /// the field must not already have a value. If this is not the case, this
-    /// function returns an [`AddValueError`](::subscriber::AddValueError).
-    pub fn add_value<T: field::Value>(&self, field: &Key, value: &T) -> Result<(), AddValueError> {
+    /// function returns an [`RecordError`](::subscriber::RecordError).
+    pub fn record<T: field::Value>(&self, field: &Key, value: &T) -> Result<(), RecordError> {
         if let Some(ref inner) = self.inner {
-            inner.add_value(field, value)
+            inner.record(field, value)
         } else {
             Ok(())
         }
@@ -425,15 +425,15 @@ impl Enter {
     ///
     /// `name` must name a field already defined by this span's metadata, and
     /// the field must not already have a value. If this is not the case, this
-    /// function returns an [`AddValueError`](::subscriber::AddValueError).
-    pub fn add_value<T: field::Value>(&self, field: &Key, value: &T) -> Result<(), AddValueError> {
+    /// function returns an [`RecordError`](::subscriber::RecordError).
+    pub fn record<T: field::Value>(&self, field: &Key, value: &T) -> Result<(), RecordError> {
         if !self.meta.contains_key(field) {
-            return Err(AddValueError::NoField);
+            return Err(RecordError::NoField);
         }
 
-        match value.add_value(&self.id, &field, &self.subscriber) {
+        match value.record(&self.id, &field, &self.subscriber) {
             Ok(()) => Ok(()),
-            Err(AddValueError::NoSpan) => panic!("span should still exist!"),
+            Err(RecordError::NoSpan) => panic!("span should still exist!"),
             Err(e) => Err(e),
         }
     }

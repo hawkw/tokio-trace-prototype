@@ -116,40 +116,40 @@ pub trait Subscriber {
     /// [`Span`]: ::span::Span
     fn new_span(&self, span: span::Attributes) -> span::Id;
 
-    fn add_value_i64(
+    fn record_i64(
         &self,
         span: &span::Id,
         field: &field::Key,
         value: i64,
-    ) -> Result<(), AddValueError> {
-        self.add_value_fmt(span, field, format_args!("{}", value))
+    ) -> Result<(), RecordError> {
+        self.record_fmt(span, field, format_args!("{}", value))
     }
 
-    fn add_value_u64(
+    fn record_u64(
         &self,
         span: &span::Id,
         field: &field::Key,
         value: u64,
-    ) -> Result<(), AddValueError> {
-        self.add_value_fmt(span, field, format_args!("{}", value))
+    ) -> Result<(), RecordError> {
+        self.record_fmt(span, field, format_args!("{}", value))
     }
 
-    fn add_value_bool(
+    fn record_bool(
         &self,
         span: &span::Id,
         field: &field::Key,
         value: bool,
-    ) -> Result<(), AddValueError> {
-        self.add_value_fmt(span, field, format_args!("{}", value))
+    ) -> Result<(), RecordError> {
+        self.record_fmt(span, field, format_args!("{}", value))
     }
 
-    fn add_value_str(
+    fn record_str(
         &self,
         span: &span::Id,
         field: &field::Key,
         value: &str,
-    ) -> Result<(), AddValueError> {
-        self.add_value_fmt(span, field, format_args!("{}", value))
+    ) -> Result<(), RecordError> {
+        self.record_fmt(span, field, format_args!("{}", value))
     }
 
     /// Adds a new field to an existing span observed by this `Subscriber`.
@@ -159,12 +159,12 @@ pub trait Subscriber {
     /// - The span does not have a field with the given name.
     /// - The span has a field with the given name, but the value has already
     ///   been set.
-    fn add_value_fmt(
+    fn record_fmt(
         &self,
         span: &span::Id,
         field: &field::Key,
         value: fmt::Arguments,
-    ) -> Result<(), AddValueError>;
+    ) -> Result<(), RecordError>;
 
     /// Adds an indication that `span` follows from the span with the id
     /// `follows`.
@@ -263,7 +263,7 @@ enum InterestKind {
 // TODO: before releasing core 0.1 this needs to be made private, to avoid
 // future breaking changes.
 #[derive(Debug)]
-pub enum AddValueError {
+pub enum RecordError {
     /// The span with the given ID does not exist.
     NoSpan,
     /// The span exists, but does not have the specified field.
@@ -281,7 +281,7 @@ pub enum AddValueError {
 pub enum FollowsError {
     /// The span with the given ID does not exist.
     /// TODO: can this error type be generalized between `FollowsError` and
-    /// `AddValueError`?
+    /// `RecordError`?
     NoSpan(SpanId),
     /// The span that this span follows from does not exist (it has no ID).
     NoPreceedingId,
@@ -337,12 +337,12 @@ impl Interest {
     }
 }
 
-// ===== impl AddValueError =====
+// ===== impl RecordError =====
 // TODO: impl Error, etc
 
-impl From<fmt::Error> for AddValueError {
+impl From<fmt::Error> for RecordError {
     fn from(e: fmt::Error) -> Self {
-        AddValueError::Record
+        RecordError::Record
     }
 }
 
@@ -446,12 +446,12 @@ mod test_support {
             (self.filter)(meta)
         }
 
-        fn add_value(
+        fn record(
             &self,
             _span: &span::Id,
             _name: &Key,
             _value: &dyn Value,
-        ) -> Result<(), AddValueError> {
+        ) -> Result<(), RecordError> {
             // TODO: it should be possible to expect values...
             Ok(())
         }

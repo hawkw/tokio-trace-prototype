@@ -41,13 +41,13 @@
 //! span _during_ the `Span`'s execution. Thus, rather than receiving all the
 //! field values when the span is initially created, subscribers are instead
 //! notified of each field as it is added to the span, via the
-//! `Subscriber::add_value` method. That method is called with the span's ID,
+//! `Subscriber::record` method. That method is called with the span's ID,
 //! the name of the field whose value is being added, and the value to add.
 use ::{ span, Dispatch, Meta};
 use std::fmt;
 
 pub trait Value: ::sealed::Sealed {
-    fn add_value(&self, span: &span::Id, key: &Key, subscriber: &Dispatch) -> Result<(), ::subscriber::AddValueError>;
+    fn record(&self, span: &span::Id, key: &Key, subscriber: &Dispatch) -> Result<(), ::subscriber::RecordError>;
 }
 
 /// An opaque key allowing _O_(1) access to a field in a `Span` or `Event`'s
@@ -132,8 +132,8 @@ impl Value {
 impl<T: fmt::Display> ::sealed::Sealed for DisplayValue<T> {}
 
 impl<T: fmt::Display> Value for DisplayValue<T> {
-    fn add_value(&self, span: &span::Id, key: &Key, dispatch: &Dispatch) -> Result<(), ::subscriber::AddValueError> {
-        dispatch.add_value_fmt(span, key, format_args!("{}", self.0))
+    fn record(&self, span: &span::Id, key: &Key, dispatch: &Dispatch) -> Result<(), ::subscriber::RecordError> {
+        dispatch.record_fmt(span, key, format_args!("{}", self.0))
     }
 }
 
@@ -143,8 +143,8 @@ impl<T: fmt::Display> Value for DisplayValue<T> {
 impl<T: fmt::Debug> ::sealed::Sealed for DebugValue<T> {}
 
 impl<T: fmt::Debug> Value for DebugValue<T> {
-    fn add_value(&self, span: &span::Id, key: &Key, dispatch: &Dispatch) -> Result<(), ::subscriber::AddValueError> {
-        dispatch.add_value_fmt(span, key, format_args!("{:?}", self.0))
+    fn record(&self, span: &span::Id, key: &Key, dispatch: &Dispatch) -> Result<(), ::subscriber::RecordError> {
+        dispatch.record_fmt(span, key, format_args!("{:?}", self.0))
     }
 }
 
@@ -207,31 +207,31 @@ impl<'a> AsRef<str> for Key<'a> {
 impl ::sealed::Sealed for str {}
 
 impl Value for str {
-    fn add_value(&self, span: &span::Id, key: &Key, dispatch: &Dispatch) -> Result<(), ::subscriber::AddValueError> {
-        dispatch.add_value_str(span, key, self)
+    fn record(&self, span: &span::Id, key: &Key, dispatch: &Dispatch) -> Result<(), ::subscriber::RecordError> {
+        dispatch.record_str(span, key, self)
     }
 }
 
 impl ::sealed::Sealed for bool {}
 
 impl Value for bool {
-    fn add_value(&self, span: &span::Id, key: &Key, dispatch: &Dispatch) -> Result<(), ::subscriber::AddValueError> {
-        dispatch.add_value_bool(span, key, self)
+    fn record(&self, span: &span::Id, key: &Key, dispatch: &Dispatch) -> Result<(), ::subscriber::RecordError> {
+        dispatch.record_bool(span, key, self)
     }
 }
 
 impl ::sealed::Sealed for i64 {}
 
 impl Value for i64 {
-    fn add_value(&self, span: &span::Id, key: &Key, dispatch: &Dispatch) -> Result<(), ::subscriber::AddValueError> {
-        dispatch.add_value_i64(span, key, self)
+    fn record(&self, span: &span::Id, key: &Key, dispatch: &Dispatch) -> Result<(), ::subscriber::RecordError> {
+        dispatch.record_i64(span, key, self)
     }
 }
 
 impl ::sealed::Sealed for u64 {}
 
 impl Value for u64 {
-    fn add_value(&self, span: &span::Id, key: &Key, dispatch: &Dispatch) -> Result<(), ::subscriber::AddValueError> {
-        dispatch.add_value_u64(span, key, self)
+    fn record(&self, span: &span::Id, key: &Key, dispatch: &Dispatch) -> Result<(), ::subscriber::RecordError> {
+        dispatch.record_u64(span, key, self)
     }
 }

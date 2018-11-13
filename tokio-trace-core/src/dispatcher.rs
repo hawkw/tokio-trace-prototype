@@ -97,53 +97,53 @@ impl Subscriber for Dispatch {
     }
 
     #[inline]
-    fn add_value_i64(
+    fn record_i64(
         &self,
         span: &span::Id,
         field: &field::Key,
         value: i64,
-    ) -> Result<(), ::subscriber::AddValueError> {
-        self.subscriber.add_value_i64(span, field, value)
+    ) -> Result<(), ::subscriber::RecordError> {
+        self.subscriber.record_i64(span, field, value)
     }
 
     #[inline]
-    fn add_value_u64(
+    fn record_u64(
         &self,
         span: &span::Id,
         field: &field::Key,
         value: u64,
-    ) -> Result<(), AddValueError> {
-        self.subscriber.add_value_u64(span, field, value)
+    ) -> Result<(), RecordError> {
+        self.subscriber.record_u64(span, field, value)
     }
 
     #[inline]
-    fn add_value_bool(
+    fn record_bool(
         &self,
         span: &span::Id,
         field: &field::Key,
         value: bool,
-    ) -> Result<(), AddValueError> {
-        self.subscriber.add_value_bool(span, field, value)
+    ) -> Result<(), RecordError> {
+        self.subscriber.record_bool(span, field, value)
     }
 
     #[inline]
-    fn add_value_str(
+    fn record_str(
         &self,
         span: &span::Id,
         field: &field::Key,
         value: &str,
-    ) -> Result<(), AddValueError> {
-        self.subscriber.add_value_str(span, field, value)
+    ) -> Result<(), RecordError> {
+        self.subscriber.record_str(span, field, value)
     }
 
     #[inline]
-    fn add_value_fmt(
+    fn record_fmt(
         &self,
         span: &span::Id,
         field: &field::Key,
         value: fmt::Arguments,
-    ) -> Result<(), AddValueError> {
-        self.subscriber.add_value_fmt(span, field, value)
+    ) -> Result<(), RecordError> {
+        self.subscriber.record_fmt(span, field, value)
     }
 
     #[inline]
@@ -188,12 +188,12 @@ impl Subscriber for NoSubscriber {
         span::Id::from_u64(0)
     }
 
-    fn add_value_fmt(
+    fn record_fmt(
         &self,
         _span: &span::Id,
         _name: &field::Key,
         _value: fmt::Arguments,
-    ) -> Result<(), subscriber::AddValueError> {
+    ) -> Result<(), subscriber::RecordError> {
         Ok(())
     }
 
