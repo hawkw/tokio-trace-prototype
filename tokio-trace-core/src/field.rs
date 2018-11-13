@@ -60,8 +60,10 @@ use super::Meta;
 use std::{
     any::TypeId,
     cell::Cell,
+    collections,
     error,
     fmt,
+    hash::Hash,
     io::{self, Write},
 };
 
@@ -655,6 +657,100 @@ impl<'a> Value for &'a str {
 impl<'a> Value for Key<'a> {
     fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
         recorder.record_str(self.name().unwrap_or("???"))
+    }
+}
+
+impl<T> Value for [T]
+where
+    T: Value,
+{
+    fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
+        recorder.record_list(self.iter())
+    }
+}
+
+impl<T> Value for Vec<T>
+where
+    T: Value,
+{
+    fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
+        self.as_slice().record(recorder)
+    }
+}
+
+impl<K, V> Value for collections::HashMap<K, V>
+where
+    K: Value + Hash + Eq,
+    V: Value,
+{
+    fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
+        recorder.record_map(self.iter())
+    }
+}
+
+impl<T> Value for collections::HashSet<T>
+where
+    T: Value + Hash + Eq,
+{
+    fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
+        recorder.record_tuple(self.iter())
+    }
+}
+
+impl<K, V> Value for collections::BTreeMap<K, V>
+where
+    K: Value + Eq,
+    V: Value,
+{
+    fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
+        recorder.record_map(self.iter())
+    }
+}
+
+impl<T> Value for collections::BTreeSet<T>
+where
+    T: Value + Eq,
+{
+    fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
+        recorder.record_tuple(self.iter())
+    }
+}
+
+impl<T> Value for collections::LinkedList<T>
+where
+    T: Value,
+{
+    fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
+        recorder.record_list(self.iter())
+    }
+}
+
+impl<T> Value for collections::VecDeque<T>
+where
+    T: Value,
+{
+    fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
+        recorder.record_list(self.iter())
+    }
+}
+
+impl<T> Value for collections::BinaryHeap<T>
+where
+    T: Value + Ord,
+{
+    fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
+        // NOTE: the values will *not* be visited in order --- is that something
+        // we want to guarantee?
+        recorder.record_list(self.iter())
+    }
+}
+
+impl<'a, T> Value for &'a T
+where
+    T: Value + 'a,
+{
+    fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
+        self.record(recorder)
     }
 }
 
