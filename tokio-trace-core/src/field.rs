@@ -8,8 +8,8 @@
 //!
 //! Rather than restricting `Value`s to a set of Rust primitives, `tokio-trace`
 //! allows values to be of any type. This means that arbitrary user-defined
-//! types may be attached to spans or events, provided they meet certain
-//! requirements.
+//! types may be attached to spans or events, provided they implement the
+//! `Value` trait or can be formatted with `fmt::Display` or `fmt::Debug`.
 //!
 //! Typically, we might accept arbitrarily-typed values by making the
 //! `Subscriber` APIs that accept them generic. However, as the `Dispatch` type
@@ -17,10 +17,14 @@
 //! object-safe --- it cannot have trait methods that accept a generic
 //! parameter. Thus, we erase the value's original type.
 //!
-//! However, a `Value` which is valid for the `'static` lifetime may also be
-//! _downcast_ back to a concrete type, similarly to `std::error::Error` and
-//! `std::any::Any`. If the erased type of the value is known, downcasting
-//! allows it to be used as an instance of that type.
+//! An object-safe API, [`Recorder`](Recorder), is provided for consuming
+//! `Value`s. A `Recorder` may implement a set of functions that record various
+//! Rust primitive types, allowing user-defined behaviours to be implemented for
+//! numbers, boolean values, strings, collections, and so on. `Value`s are
+//! required to implement the `record` function, which is passed a mutable
+//! reference to a `Recorder` trait object. The `Value` may choose which of the
+//! `Recorder`'s `record` methods for various types it wishes to call, allowing
+//! it to present typed data to the `Recorder`.
 //!
 //! # `Value`s and `Subscriber`s
 //!
@@ -30,32 +34,15 @@
 //! When a field is attached to an `Event`, the `Subscriber::observe_event`
 //! method is passed an `Event` struct which provides an iterator
 //! (`Event::fields`) to iterate over the event's fields, providing references
-//! to the values as `BorrowedValue`s. Since an `Event` represents a _moment_ in
-//! time, it   does not expect to outlive the scope that created it. Thus, the
-//! values attached to an `Event` are _borrowed_ from the scope where the
-//! `Event` originated.
+//! to the values as `Value` trait objects.
 //!
-//! `Span`s, on the other hand, are somewhat more complex. A `Span` may outlive
-//! scope in which it was created, and as `Span`s are not instantaneous, the
-//! values of their fields may be discovered and added to the span _during_ the
-//! `Span`'s execution. Thus, rather than receiving all the field values when
-//! the span is initially created, subscribers are instead notified of each
-//! field as it is added to the span, via the `Subscriber::add_value` method.
-//! That method is called with the span's ID, the name of the field whose value
-//! is being added, and the value to add.
-//!
-//! Since spans may have arbitrarily long lifetimes, passing the subscriber a
-//! `&dyn AsValue` isn't sufficient. Instead, if a subscriber wishes to persist a
-//! span value for the entire lifetime of the span, it needs the ability to
-//! convert the value into a form in which it is owned by the _subscriber_,
-//! rather than the scope in which it was added to the span. For this reason,
-//! span values are passed as `&dyn field::Value`. The `IntoValue` trait is an
-//! extension of the `Value` trait that allows conversion into an `OwnedValue`,
-//! a type which represents an owned value allocated on the heap. Since some
-//! subscriber implementations may _not_ need to persist span field values
-//! indefinitely, they are not heap-allocated by default, to avoid unnecessary
-//! allocations, but the `IntoValue` trait presents `Subscriber`s with the
-//! _option_ to box values should they need to do so.
+//! `Span`s, on the other hand, are somewhat more complex. As `Span`s are not
+//! instantaneous, the values of their fields may be discovered and added to the
+//! span _during_ the `Span`'s execution. Thus, rather than receiving all the
+//! field values when the span is initially created, subscribers are instead
+//! notified of each field as it is added to the span, via the
+//! `Subscriber::add_value` method. That method is called with the span's ID,
+//! the name of the field whose value is being added, and the value to add.
 use super::Meta;
 use std::{
     any::TypeId,
