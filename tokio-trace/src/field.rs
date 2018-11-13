@@ -17,38 +17,42 @@ pub trait AsKey {
     fn as_key<'a>(&self, metadata: &'a Meta<'a>) -> Option<Key<'a>>;
 }
 
-pub struct DebugRecorder<W> {
-    write: W,
+pub struct DebugRecorder<'a, W: 'a> {
+    write: &'a mut W,
+    with_key: bool,
 }
 
 
 // ===== impl DebugRecorder =====
 
-impl<W> DebugRecorder<W> {
-    pub fn into_inner(self) -> W {
+impl<'a, W: 'a> DebugRecorder<'a, W> {
+    pub fn into_inner(self) -> &'a mut W {
         self.write
     }
 }
 
-impl<'a> DebugRecorder<&'a mut fmt::Write> {
-    pub fn new_fmt<W: fmt::Write>(write: &'a mut W) -> Self {
+impl<'a, W: fmt::Write + 'a > DebugRecorder<'a, W> {
+    pub fn new(write: &'a mut W) -> Self {
         Self {
             write,
+            with_key: false,
+        }
+    }
+
+    pub fn new_with_key(write: &'a mut W) -> Self {
+        Self {
+            write,
+            with_key: true,
         }
     }
 }
 
-impl<'a> DebugRecorder<&'a mut io::Write> {
-    pub fn new_io<W: io::Write>(write: &'a mut W) -> Self {
-        Self {
-            write,
-        }
-    }
-}
 
-impl<'a> Record for DebugRecorder<&'a mut dyn fmt::Write> {
+impl<'a, W: fmt::Write + 'a> Record for DebugRecorder<'a, W> {
     fn record_fmt(&mut self, key: &Key, args: fmt::Arguments) -> Result<(), ::subscriber::RecordError> {
-        self.write.write_fmt(format_args!("{}=", key.name().unwrap_or("???")))?;
+        if self.with_key {
+            self.write.write_fmt(format_args!("{}=", key.name().unwrap_or("???")))?;
+        }
         self.write.write_fmt(args)?;
         Ok(())
     }

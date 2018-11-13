@@ -113,7 +113,7 @@ macro_rules! span {
         }
     };
     (@ record: $span:expr, $k:expr, $i:expr, $val:expr) => (
-        $span.record($i, $val)
+        $span.record($i, &$val)
             .expect(concat!("adding value for field '", stringify!($k), "' failed"));
     );
     (@ record: $span:expr, $k:expr, $i:expr,) => (

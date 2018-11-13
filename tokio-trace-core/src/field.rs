@@ -249,9 +249,9 @@ impl<T: fmt::Debug> Value for DebugValue<T> {
     }
 }
 
-impl ::sealed::Sealed for str {}
+impl<'a> ::sealed::Sealed for &'a str {}
 
-impl Value for str {
+impl<'a> Value for &'a str {
     fn record(&self, key: &Key, recorder: &mut dyn Record) -> Result<(), ::subscriber::RecordError> {
         recorder.record_str(key, self)
     }

@@ -441,7 +441,7 @@ struct LogField<'a> {
 }
 impl<'a> fmt::Debug for LogField<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut recorder = field::DebugRecorder::new_fmt(f);
+        let mut recorder = field::DebugRecorder::new_with_key(f);
         self.val.record(self.key, &mut recorder).map_err(|_| fmt::Error)?;
         write!(recorder.into_inner(), ";")?;
         Ok(())
