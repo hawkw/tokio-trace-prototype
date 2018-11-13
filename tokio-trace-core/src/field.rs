@@ -44,14 +44,7 @@
 //! `Subscriber::add_value` method. That method is called with the span's ID,
 //! the name of the field whose value is being added, and the value to add.
 use super::Meta;
-use std::{
-    any::TypeId,
-    collections,
-    error,
-    fmt,
-    hash::Hash,
-    io,
-};
+use std::{any::TypeId, collections, error, fmt, hash::Hash, io};
 
 /// A visitor which records `Value`s.
 pub trait Recorder {
@@ -719,7 +712,7 @@ impl Error {
         E: error::Error + 'static,
     {
         Self {
-            inner: Box::new(inner)
+            inner: Box::new(inner),
         }
     }
 }

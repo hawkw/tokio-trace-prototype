@@ -50,8 +50,7 @@ impl Subscriber for CounterSubscriber {
         let registry = self.counters.0.read().unwrap();
         if let Some((counter, value)) = key.name().and_then(|name| {
             let counter = registry.get(name)?;
-            let &val =
-            unimplemented!("TODO: rework this example with visitor API");//value.downcast_ref::<usize>()?;
+            let &val = unimplemented!("TODO: rework this example with visitor API"); //value.downcast_ref::<usize>()?;
             Some((counter, val))
         }) {
             counter.fetch_add(value, Ordering::Release);
@@ -108,11 +107,7 @@ fn main() {
         let mut foo: usize = 2;
         span!("my_great_span", foo_count = &foo).enter(|| {
             foo += 1;
-            event!(
-                Level::Info,
-                { yak_shaved = true },
-                "hi from inside my span"
-            );
+            event!(Level::Info, { yak_shaved = true }, "hi from inside my span");
             span!("my other span", foo_count = &foo, baz_count = &5usize).enter(|| {})
         });
     });

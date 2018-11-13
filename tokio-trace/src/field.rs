@@ -1,6 +1,6 @@
+use std::{fmt, io};
 pub use tokio_trace_core::field::*;
 use Meta;
-use std::{io, fmt};
 
 /// Trait implemented to allow a type to be used as a field key.
 ///
