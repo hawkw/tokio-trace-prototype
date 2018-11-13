@@ -120,7 +120,7 @@ impl<'a> DebugWriter<&'a mut io::Write> {
     }
 }
 
-impl<'a> Recorder for DebugWriter<&'a mut dyn io::Write> {
+impl<'a> Record for DebugWriter<&'a mut dyn io::Write> {
     fn record_fmt(&mut self, args: fmt::Arguments) -> RecordResult {
         self.io_maybe_comma()?;
         self.write.write_fmt(args)?;
@@ -173,7 +173,7 @@ impl<'a> Recorder for DebugWriter<&'a mut dyn io::Write> {
     }
 }
 
-impl<'a> Recorder for DebugWriter<&'a mut dyn fmt::Write> {
+impl<'a> Record for DebugWriter<&'a mut dyn fmt::Write> {
     fn record_fmt(&mut self, args: fmt::Arguments) -> RecordResult {
         self.fmt_maybe_comma()?;
         self.write.write_fmt(args)?;

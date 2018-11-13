@@ -17,14 +17,14 @@
 //! object-safe --- it cannot have trait methods that accept a generic
 //! parameter. Thus, we erase the value's original type.
 //!
-//! An object-safe API, [`Recorder`](Recorder), is provided for consuming
-//! `Value`s. A `Recorder` may implement a set of functions that record various
+//! An object-safe API, [`Record`](Record), is provided for consuming
+//! `Value`s. A `Record` may implement a set of functions that record various
 //! Rust primitive types, allowing user-defined behaviours to be implemented for
 //! numbers, boolean values, strings, collections, and so on. `Value`s are
 //! required to implement the `record` function, which is passed a mutable
-//! reference to a `Recorder` trait object. The `Value` may choose which of the
-//! `Recorder`'s `record` methods for various types it wishes to call, allowing
-//! it to present typed data to the `Recorder`.
+//! reference to a `Record` trait object. The `Value` may choose which of the
+//! `Record`'s `record` methods for various types it wishes to call, allowing
+//! it to present typed data to the `Record`.
 //!
 //! # `Value`s and `Subscriber`s
 //!
@@ -47,7 +47,7 @@ use super::Meta;
 use std::{any::TypeId, collections, error, fmt, hash::Hash, io};
 
 /// A visitor which records `Value`s.
-pub trait Recorder {
+pub trait Record {
     /// Record an unsigned integer value.
     ///
     /// This defaults to calling `self.record_any()`; implementations wishing to
@@ -121,7 +121,7 @@ pub trait Recorder {
 
     /// Begin recording a key-value map.
     ///
-    /// After this function has returned `Ok(())`, the `Recorder` may expect
+    /// After this function has returned `Ok(())`, the `Record` may expect
     /// that all subsequent calls will be to `record_kv` (representing the
     /// key-value pairs in the map) until `close_map` is called.
     ///
@@ -152,7 +152,7 @@ pub trait Recorder {
     ///
     /// The `name` argument is a string containing the the type name of the struct.
     ///
-    /// After this function has returned `Ok(())`, the `Recorder` may expect
+    /// After this function has returned `Ok(())`, the `Record` may expect
     /// that all subsequent calls will be to `record_kv` (representing the
     /// field names and values of the struct) until `close_struct` is called.
     ///
@@ -183,7 +183,7 @@ pub trait Recorder {
     fn finish(self) -> RecordResult;
 }
 
-impl<'r> Recorder + 'r {
+impl<'r> Record + 'r {
     /// Record a map of key-value data.
     ///
     /// This function manages calling `open_map`, recording the key-value
@@ -265,17 +265,17 @@ impl<'r> Recorder + 'r {
     }
 }
 
-/// Result type returned by recording field values with a `Recorder`.
+/// Result type returned by recording field values with a `Record`.
 pub type RecordResult = Result<(), Error>;
 
 /// A structured field value of an erased type.
 ///
 /// Implementors of `Value` may call the appropriate typed recording methods on
-/// the `Recorder` passed to `Record` in order to indicate how their data
+/// the `Record` passed to `Record` in order to indicate how their data
 /// should be recorded.
 pub trait Value: fmt::Debug + Send + Sync {
-    /// Records the value with the given `Recorder`.
-    fn record(&self, &mut dyn Recorder) -> RecordResult;
+    /// Records the value with the given `Record`.
+    fn record(&self, &mut dyn Record) -> RecordResult;
 }
 
 /// An error that occurred while recording a field.
@@ -331,7 +331,7 @@ impl Value {
     /// }
     ///
     /// impl Value for Foo {
-    ///     fn record(&self, recorder: &mut dyn field::Recorder) -> RecordResult {
+    ///     fn record(&self, recorder: &mut dyn field::Record) -> RecordResult {
     ///         recorder.record_str("foo")
     ///     }
     /// }
@@ -374,7 +374,7 @@ impl Value {
 // ===== impl DisplayValue =====
 
 impl<T: fmt::Display + Send + Sync> Value for DisplayValue<T> {
-    fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
+    fn record(&self, recorder: &mut dyn Record) -> RecordResult {
         recorder.record_fmt(format_args!("{}", self.0))
     }
 }
@@ -388,7 +388,7 @@ impl<T: fmt::Display> fmt::Debug for DisplayValue<T> {
 // ===== impl DebugValue =====
 
 impl<T: fmt::Debug + Send + Sync> Value for DebugValue<T> {
-    fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
+    fn record(&self, recorder: &mut dyn Record) -> RecordResult {
         recorder.record_fmt(format_args!("{:?}", self.0))
     }
 }
@@ -465,7 +465,7 @@ macro_rules! impl_value {
     ( $record:ident( $( $value_ty:ty ),+ ) ) => {
         $(
             impl Value for $value_ty {
-                fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
+                fn record(&self, recorder: &mut dyn Record) -> RecordResult {
                     recorder.$record(*self)
                 }
             }
@@ -474,7 +474,7 @@ macro_rules! impl_value {
     ( $record:ident( $( $value_ty:ty ),+ as $as_ty:ty) ) => {
         $(
             impl Value for $value_ty {
-                fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
+                fn record(&self, recorder: &mut dyn Record) -> RecordResult {
                     recorder.$record(*self as $as_ty)
                 }
             }
@@ -493,13 +493,13 @@ impl_values! {
 }
 
 impl<'a> Value for &'a str {
-    fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
+    fn record(&self, recorder: &mut dyn Record) -> RecordResult {
         recorder.record_str(self)
     }
 }
 
 impl<'a> Value for Key<'a> {
-    fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
+    fn record(&self, recorder: &mut dyn Record) -> RecordResult {
         recorder.record_str(self.name().unwrap_or("???"))
     }
 }
@@ -508,7 +508,7 @@ impl<T> Value for [T]
 where
     T: Value,
 {
-    fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
+    fn record(&self, recorder: &mut dyn Record) -> RecordResult {
         recorder.record_list(self.iter())
     }
 }
@@ -517,7 +517,7 @@ impl<T> Value for Vec<T>
 where
     T: Value,
 {
-    fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
+    fn record(&self, recorder: &mut dyn Record) -> RecordResult {
         self.as_slice().record(recorder)
     }
 }
@@ -527,7 +527,7 @@ where
     K: Value + Hash + Eq,
     V: Value,
 {
-    fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
+    fn record(&self, recorder: &mut dyn Record) -> RecordResult {
         recorder.record_map(self.iter())
     }
 }
@@ -536,7 +536,7 @@ impl<T> Value for collections::HashSet<T>
 where
     T: Value + Hash + Eq,
 {
-    fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
+    fn record(&self, recorder: &mut dyn Record) -> RecordResult {
         recorder.record_tuple(self.iter().map(Value::erased))
     }
 }
@@ -546,7 +546,7 @@ where
     K: Value + Eq,
     V: Value,
 {
-    fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
+    fn record(&self, recorder: &mut dyn Record) -> RecordResult {
         recorder.record_map(self.iter())
     }
 }
@@ -555,7 +555,7 @@ impl<T> Value for collections::BTreeSet<T>
 where
     T: Value + Eq,
 {
-    fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
+    fn record(&self, recorder: &mut dyn Record) -> RecordResult {
         recorder.record_tuple(self.iter().map(Value::erased))
     }
 }
@@ -564,7 +564,7 @@ impl<T> Value for collections::LinkedList<T>
 where
     T: Value,
 {
-    fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
+    fn record(&self, recorder: &mut dyn Record) -> RecordResult {
         recorder.record_list(self.iter())
     }
 }
@@ -573,7 +573,7 @@ impl<T> Value for collections::VecDeque<T>
 where
     T: Value,
 {
-    fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
+    fn record(&self, recorder: &mut dyn Record) -> RecordResult {
         recorder.record_list(self.iter())
     }
 }
@@ -582,7 +582,7 @@ impl<T> Value for collections::BinaryHeap<T>
 where
     T: Value + Ord,
 {
-    fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
+    fn record(&self, recorder: &mut dyn Record) -> RecordResult {
         // NOTE: the values will *not* be visited in order --- is that something
         // we want to guarantee?
         recorder.record_list(self.iter())
@@ -593,7 +593,7 @@ impl<'a, T> Value for &'a T
 where
     T: Value + 'a,
 {
-    fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
+    fn record(&self, recorder: &mut dyn Record) -> RecordResult {
         (*self).record(recorder)
     }
 }
@@ -654,7 +654,7 @@ mod tests {
     }
 
     impl Value for Foo {
-        fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
+        fn record(&self, recorder: &mut dyn Record) -> RecordResult {
             let mut fields = ::std::iter::once::<(&str, &dyn Value)>(("bar", &self.bar));
             recorder.record_struct("Foo", &mut fields)
         }
