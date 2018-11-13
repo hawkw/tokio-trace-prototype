@@ -15,6 +15,7 @@ extern crate humantime;
 use self::ansi_term::{Color, Style};
 use super::tokio_trace::{
     self,
+    field,
     subscriber::{self, Subscriber},
     Level, SpanAttributes, SpanId,
 };
@@ -34,8 +35,13 @@ pub struct SloggishSubscriber {
     indent_amount: usize,
     stderr: io::Stderr,
     stack: Mutex<Vec<SpanId>>,
-    spans: Mutex<HashMap<SpanId, SpanAttributes>>,
+    spans: Mutex<HashMap<SpanId, Span>>,
     ids: AtomicUsize,
+}
+
+struct Span {
+    attrs: SpanAttributes,
+    kvs: Vec<(String, String)>,
 }
 
 struct ColorLevel(Level);
@@ -52,6 +58,23 @@ impl fmt::Display for ColorLevel {
     }
 }
 
+impl Span {
+    fn new(attrs: SpanAttributes) -> Self {
+        Self {
+            attrs,
+            kvs: Vec::new(),
+        }
+    }
+
+    fn add_field(&mut self, key: &tokio_trace::field::Key, value: &dyn tokio_trace::field::Value) -> field::RecordResult {
+        let mut s = String::new();
+        value.record(&mut tokio_trace::field::DebugWriter::new_fmt(&mut s))?;
+        // TODO: shouldn't have to alloc the key...
+        self.kvs.push((key.name().unwrap_or("???").to_owned(), s));
+        Ok(())
+    }
+}
+
 impl SloggishSubscriber {
     pub fn new(indent_amount: usize) -> Self {
         Self {
@@ -63,16 +86,17 @@ impl SloggishSubscriber {
         }
     }
 
-    fn print_kvs<'a, I, T>(&self, writer: &mut impl Write, kvs: I, leading: &str) -> io::Result<()>
+    fn print_kvs<'a, I, K, V>(&self, writer: &mut impl Write, kvs: I, leading: &str) -> io::Result<()>
     where
-        I: IntoIterator<Item = (tokio_trace::field::Key<'a>, T)>,
-        T: fmt::Debug,
+        I: IntoIterator<Item = (K, V)>,
+        K: AsRef<str> + 'a,
+        V: fmt::Display + 'a,
     {
         let mut kvs = kvs.into_iter();
         if let Some((k, v)) = kvs.next() {
             write!(
                 writer,
-                "{}{}: {:?}",
+                "{}{}: {}",
                 leading,
                 Style::new().bold().paint(k.as_ref()),
                 v
@@ -81,7 +105,7 @@ impl SloggishSubscriber {
         for (k, v) in kvs {
             write!(
                 writer,
-                ", {}: {:?}",
+                ", {}: {}",
                 Style::new().bold().paint(k.as_ref()),
                 v
             )?;
@@ -114,7 +138,7 @@ impl Subscriber for SloggishSubscriber {
     fn new_span(&self, span: tokio_trace::span::Attributes) -> tokio_trace::span::Id {
         let next = self.ids.fetch_add(1, Ordering::SeqCst) as u64;
         let id = tokio_trace::span::Id::from_u64(next);
-        self.spans.lock().unwrap().insert(id.clone(), span.into());
+        self.spans.lock().unwrap().insert(id.clone(), Span::new(span));
         id
     }
 
@@ -122,13 +146,15 @@ impl Subscriber for SloggishSubscriber {
         &self,
         span: &tokio_trace::SpanId,
         name: &tokio_trace::field::Key,
-        value: &dyn tokio_trace::IntoValue,
+        value: &dyn tokio_trace::field::Value,
     ) -> Result<(), subscriber::AddValueError> {
         let mut spans = self.spans.lock().expect("mutex poisoned!");
         let span = spans
             .get_mut(span)
             .ok_or(subscriber::AddValueError::NoSpan)?;
-        span.add_value(name, value)
+        // TODO: need error variant for this...
+        span.add_field(name, value).unwrap();
+        Ok(())
     }
 
     fn add_follows_from(
@@ -142,6 +168,12 @@ impl Subscriber for SloggishSubscriber {
 
     #[inline]
     fn observe_event<'a>(&self, event: &'a tokio_trace::Event<'a>) {
+        struct Display<'a>(&'a dyn field::Value);
+        impl<'a> fmt::Display for Display<'a> {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                self.0.record(&mut field::DebugWriter::new_fmt(f)).map_err(|_| fmt::Error)
+            }
+        }
         let mut stderr = self.stderr.lock();
 
         let stack = self.stack.lock().unwrap();
@@ -162,7 +194,7 @@ impl Subscriber for SloggishSubscriber {
             "{}",
             Style::new().bold().paint(format!("{}", event.message))
         ).unwrap();
-        self.print_kvs(&mut stderr, event.fields(), ", ").unwrap();
+        self.print_kvs(&mut stderr, event.fields().map(|(k, v)| (k, Display(v))), ", ").unwrap();
         write!(&mut stderr, "\n").unwrap();
     }
 
@@ -172,7 +204,7 @@ impl Subscriber for SloggishSubscriber {
         let mut stack = self.stack.lock().unwrap();
         let spans = self.spans.lock().unwrap();
         let data = spans.get(&span);
-        let parent = data.and_then(SpanAttributes::parent);
+        let parent = data.and_then(|span| span.attrs.parent());
         if stack.iter().any(|id| id == &span) {
             // We are already in this span, do nothing.
             return;
@@ -191,7 +223,7 @@ impl Subscriber for SloggishSubscriber {
             self.print_indent(&mut stderr, indent).unwrap();
             stack.push(span);
             if let Some(data) = data {
-                self.print_kvs(&mut stderr, data.fields(), "").unwrap();
+                self.print_kvs(&mut stderr, data.kvs.iter().map(|(k, v)| (k, v)), "").unwrap();
             }
             write!(&mut stderr, "\n").unwrap();
         }
