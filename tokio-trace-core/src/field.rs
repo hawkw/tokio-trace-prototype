@@ -60,12 +60,12 @@ use super::Meta;
 use std::{
     any::TypeId,
     cell::Cell,
-    error::Error,
+    error,
     fmt,
     io::{self, Write},
 };
 
-pub type RecordResult = Result<(), Box<dyn Error>>;
+pub type RecordResult = Result<(), Error>;
 
 pub trait Recorder {
     // fn named<'b: 'a>(&'b mut self, name: &'b str) -> &'b dyn Recorder<'b>;
@@ -162,6 +162,13 @@ pub trait Value: fmt::Debug + Send + Sync {
     {
         TypeId::of::<Self>()
     }
+}
+
+#[derive(Debug)]
+pub struct Error {
+    // TODO: Should this carry a boxed error, or should it just discard the
+    // cause and be opaque?
+    inner: Box<dyn error::Error>,
 }
 
 pub struct DebugWriter<W> {
@@ -631,6 +638,45 @@ impl<'a> Value for &'a str {
 impl<'a> Value for Key<'a> {
     fn record(&self, recorder: &mut dyn Recorder) -> RecordResult {
         recorder.record_str(self.name().unwrap_or("???"))
+    }
+}
+
+// ===== impl Error =====
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(&self.inner, f)
+    }
+}
+
+impl error::Error for Error {
+    fn cause(&self) -> Option<&dyn error::Error> {
+        self.inner.cause()
+    }
+}
+
+impl From<fmt::Error> for Error {
+    fn from(inner: fmt::Error) -> Self {
+        // TODO: since `fmt::Error` is empty, it would be nice if we didn't
+        // have to box this.
+        Self::new(inner)
+    }
+}
+
+impl From<io::Error> for Error {
+    fn from(inner: io::Error) -> Self {
+        Self::new(inner)
+    }
+}
+
+impl Error {
+    pub fn new<E>(inner: E) -> Self
+    where
+        E: error::Error + 'static,
+    {
+        Self {
+            inner: Box::new(inner)
+        }
     }
 }
 
