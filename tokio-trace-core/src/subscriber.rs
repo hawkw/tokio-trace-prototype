@@ -116,6 +116,13 @@ pub trait Subscriber {
     /// [`Span`]: ::span::Span
     fn new_span(&self, span: span::Attributes) -> span::Id;
 
+    /// Adds a new field to an existing span observed by this `Subscriber`.
+    ///
+    /// This is expected to return an error under the following conditions:
+    /// - The span ID does not correspond to a span which currently exists.
+    /// - The span does not have a field with the given name.
+    /// - The span has a field with the given name, but the value has already
+    ///   been set.
     fn record(&self, span: &span::Id, key: &field::Key, value: &dyn field::Value) -> Result<(), RecordError>;
 
     /// Adds an indication that `span` follows from the span with the id

@@ -4,27 +4,19 @@
 //! as _fields_. These fields consist of a mapping from a `&'static str` to a
 //! piece of data, known as a `Value`.
 //!
-//! # Value Type Erasure
+//! # Values and Recorders
 //!
-//! Rather than restricting `Value`s to a set of Rust primitives, `tokio-trace`
-//! allows values to be of any type. This means that arbitrary user-defined
-//! types may be attached to spans or events, provided they implement the
-//! `Value` trait or can be formatted with `fmt::Display` or `fmt::Debug`.
+//! `tokio_trace` represents values as either one of a set of Rust primitives
+//! (`i64`, `u64`, `bool`, and `&str`) or using a `fmt::Display` or `fmt::Debug`
+//! implementation. The `Record` trait represents a type that can consume these
+//! values.
 //!
-//! Typically, we might accept arbitrarily-typed values by making the
-//! `Subscriber` APIs that accept them generic. However, as the `Dispatch` type
-//! holds a subscriber as a boxed trait object, the `Subscriber` trait must be
-//! object-safe --- it cannot have trait methods that accept a generic
-//! parameter. Thus, we erase the value's original type.
-//!
-//! An object-safe API, [`Record`](Record), is provided for consuming
-//! `Value`s. A `Record` may implement a set of functions that record various
-//! Rust primitive types, allowing user-defined behaviours to be implemented for
-//! numbers, boolean values, strings, collections, and so on. `Value`s are
-//! required to implement the `record` function, which is passed a mutable
-//! reference to a `Record` trait object. The `Value` may choose which of the
-//! `Record`'s `record` methods for various types it wishes to call, allowing
-//! it to present typed data to the `Record`.
+//! By default, `Record` implements the trait functions for recording primitives
+//! by calling its `record_fmt` function, so that only the `record_fmt` function
+//! must be implemented. However, implementors of `Record` that wish to consume
+//! these primitives as their types may override the `record` methods for any
+//! types they care about. For example, we might record integers by incrementing
+//! counters for their field names, rather than printing them.
 //!
 //! # `Value`s and `Subscriber`s
 //!
@@ -41,16 +33,27 @@
 //! span _during_ the `Span`'s execution. Thus, rather than receiving all the
 //! field values when the span is initially created, subscribers are instead
 //! notified of each field as it is added to the span, via the
-//! `Subscriber::record` method. That method is called with the span's ID,
-//! the name of the field whose value is being added, and the value to add.
-use ::{ span, Dispatch, Meta};
+//! `Subscriber::record` method. That method is called with the span's ID, the
+//! name of the field whose value is being added, and the value to add.
+use ::Meta;
 use std::fmt;
 
+/// A field value of an erased type.
+///
+/// Implementors of `Value` may call the appropriate typed recording methods on
+/// the `Record` passed to `Record` in order to indicate how their data
+/// should be recorded.
 pub trait Value: ::sealed::Sealed + Send {
+     /// Records this value with the given `Record`.
     fn record(&self, key: &Key, recorder: &mut dyn Record) -> Result<(), ::subscriber::RecordError>;
 }
 
 pub trait Record {
+    /// Record a signed 64-bit integer value.
+    ///
+    /// This defaults to calling `self.record_fmt()`; implementations wishing to
+    /// provide behaviour specific to signed integers may override the default
+    /// implementation.
     fn record_i64(
         &mut self,
         field: &Key,
@@ -59,6 +62,11 @@ pub trait Record {
         self.record_fmt(field, format_args!("{}", value))
     }
 
+    /// Record an umsigned 64-bit integer value.
+    ///
+    /// This defaults to calling `self.record_fmt()`; implementations wishing to
+    /// provide behaviour specific to unsigned integers may override the default
+    /// implementation.
     fn record_u64(
         &mut self,
         field: &Key,
@@ -67,6 +75,11 @@ pub trait Record {
         self.record_fmt(field, format_args!("{}", value))
     }
 
+    /// Record a boolean value.
+    ///
+    /// This defaults to calling `self.record_fmt()`; implementations wishing to
+    /// provide behaviour specific to booleans may override the default
+    /// implementation.
     fn record_bool(
         &mut self,
         field: &Key,
@@ -75,6 +88,11 @@ pub trait Record {
         self.record_fmt(field, format_args!("{}", value))
     }
 
+    /// Record a string value.
+    ///
+    /// This defaults to calling `self.record_str()`; implementations wishing to
+    /// provide behaviour specific to strings may override the default
+    /// implementation.
     fn record_str(
         &mut self,
         field: &Key,
@@ -83,13 +101,7 @@ pub trait Record {
         self.record_fmt(field, format_args!("{}", value))
     }
 
-    /// Adds a new field to an existing span observed by this `Subscriber`.
-    ///
-    /// This is expected to return an error under the following conditions:
-    /// - The span ID does not correspond to a span which currently exists.
-    /// - The span does not have a field with the given name.
-    /// - The span has a field with the given name, but the value has already
-    ///   been set.
+     /// Record a set of pre-compiled format arguments.
     fn record_fmt(
         &mut self,
         field: &Key,
@@ -122,41 +134,8 @@ pub struct DebugValue<T: fmt::Debug>(T);
 // ===== impl Value =====
 
 impl Value {
-    /// Wraps a type implementing `fmt::Display` so that its `Display`
-    /// implementation will be used when formatting it as a `Value`.
-    ///
-    /// # Examples
-    /// ```
-    /// # extern crate tokio_trace_core as tokio_trace;
-    /// use tokio_trace::field::{self, Value, RecordResult};
-    /// # use std::fmt;
-    /// # fn main() {
-    ///
-    /// #[derive(Clone, Debug)]
-    /// struct Foo;
-    ///
-    /// impl fmt::Display for Foo {
-    ///     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    ///         f.pad("Hello, I'm Foo")
-    ///     }
-    /// }
-    ///
-    /// impl Value for Foo {
-    ///     fn record(&self, recorder: &mut dyn field::Record) -> RecordResult {
-    ///         recorder.record_str("foo")
-    ///     }
-    /// }
-    ///
-    /// let foo = Foo;
-    /// assert_eq!("Foo".to_owned(), format!("{:?}", foo));
-    ///
-    /// let display_foo = Value::display(foo.clone());
-    /// assert_eq!(
-    ///     format!("{}", foo),
-    ///     format!("{:?}", &display_foo),
-    /// );
-    /// # }
-    /// ```
+    /// Wraps a type implementing `fmt::Display` as a `Value` that can be
+    /// serialized using its `Display` implementation.
     pub fn display<'a, T>(t: T) -> DisplayValue<T>
     where
         T: fmt::Display,
