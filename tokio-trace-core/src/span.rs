@@ -428,12 +428,12 @@ impl Enter {
     /// function returns an [`RecordError`](::subscriber::RecordError).
     pub fn record(&self, field: &Key, value: &dyn field::Value) -> Result<(), RecordError> {
         if !self.meta.contains_key(field) {
-            return Err(RecordError::NoField);
+            return Err(RecordError::no_field());
         }
 
         match self.subscriber.record(&self.id, field, value) {
             Ok(()) => Ok(()),
-            Err(RecordError::NoSpan) => panic!("span should still exist!"),
+            Err(ref e) if e.is_no_span() => panic!("span should still exist!"),
             Err(e) => Err(e),
         }
     }

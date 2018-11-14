@@ -1,7 +1,7 @@
 //! Subscribers collect and record trace data.
 use {field, span, Event, Meta, SpanId};
 
-use std::fmt;
+use std::{error::Error, fmt};
 
 /// Trait representing the functions required to collect trace data.
 ///
@@ -224,16 +224,19 @@ enum InterestKind {
 }
 
 /// Errors which may prevent a value from being successfully added to a span.
-// TODO: before releasing core 0.1 this needs to be made private, to avoid
-// future breaking changes.
 #[derive(Debug)]
-pub enum RecordError {
+pub struct RecordError {
+    kind: RecordErrorKind,
+}
+
+#[derive(Debug, Eq, PartialEq)]
+enum RecordErrorKind {
     /// The span with the given ID does not exist.
-    NoSpan,
+    NoSpan(SpanId),
     /// The span exists, but does not have the specified field.
     NoField,
     /// The named field already has a value.
-    FieldAlreadyExists,
+    AlreadyExists,
     /// An error occurred recording the field.
     Record,
 }
@@ -302,11 +305,90 @@ impl Interest {
 }
 
 // ===== impl RecordError =====
-// TODO: impl Error, etc
+
+impl RecordError {
+    /// Returns an error indicating that no span exists for the given `id`.
+    pub fn no_span(id: SpanId) -> Self {
+        Self {
+            kind: RecordErrorKind::NoSpan(id),
+        }
+    }
+
+    /// Returns an error indicating that the span exists, but does not have the
+    /// specified field.
+    pub fn no_field() -> Self {
+        Self {
+            kind: RecordErrorKind::NoField,
+        }
+    }
+
+    /// Return an error indicating that the named field already has a value.
+    pub fn already_exists() -> Self {
+        Self {
+            kind: RecordErrorKind::AlreadyExists,
+        }
+    }
+
+    /// Returns an error indicating that an error occurred recording the field.
+    pub fn record() -> Self {
+        Self {
+            kind: RecordErrorKind::Record,
+        }
+    }
+
+    /// Returns `true` if this error was due to no span existing for the
+    /// specified field.
+    pub fn is_no_span(&self) -> bool {
+        match self.kind {
+            RecordErrorKind::NoSpan(_) => true,
+            _ => false,
+        }
+    }
+
+    /// Returns `true` if this error was due to no field existing with the
+    /// specified name.
+    pub fn is_no_field(&self) -> bool {
+        match self.kind {
+            RecordErrorKind::NoField => true,
+            _ => false,
+        }
+    }
+
+    /// Returns `true` if this error was due to the named field already
+    /// existing.
+    pub fn is_already_exists(&self) -> bool {
+        match self.kind {
+            RecordErrorKind::AlreadyExists => true,
+            _ => false,
+        }
+    }
+
+    /// Returns `true` if this error was due to an error occurring while
+    /// recording the field.
+    pub fn is_record(&self) -> bool {
+        match self.kind {
+            RecordErrorKind::Record => true,
+            _ => false,
+        }
+    }
+}
+
+impl fmt::Display for RecordError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self.kind {
+            RecordErrorKind::NoSpan(ref id) => write!(f, "no span exists with id {:?}", id),
+            RecordErrorKind::NoField => f.pad("no such field exists"),
+            RecordErrorKind::AlreadyExists => f.pad("field already has a value"),
+            RecordErrorKind::Record => f.pad("an error occurred recording the field"),
+        }
+    }
+}
+
+impl Error for RecordError {}
 
 impl From<fmt::Error> for RecordError {
     fn from(_e: fmt::Error) -> Self {
-        RecordError::Record
+        RecordError::record()
     }
 }
 
