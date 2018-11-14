@@ -1,4 +1,4 @@
-use std::{fmt, io};
+use std::fmt;
 pub use tokio_trace_core::field::*;
 use Meta;
 

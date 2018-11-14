@@ -315,7 +315,7 @@ mod test_support {
     use super::*;
     use span::{self, MockSpan};
     use {
-        field::{Key, Value},
+        field,
         Event, Meta, SpanAttributes, SpanId,
     };
 
