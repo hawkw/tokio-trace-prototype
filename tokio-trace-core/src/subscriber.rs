@@ -438,7 +438,6 @@ impl fmt::Display for FollowsError {
     }
 }
 
-
 #[cfg(any(test, feature = "test-support"))]
 pub use self::test_support::*;
 
