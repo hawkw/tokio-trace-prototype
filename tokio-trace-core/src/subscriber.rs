@@ -300,7 +300,7 @@ impl Interest {
 // TODO: impl Error, etc
 
 impl From<fmt::Error> for RecordError {
-    fn from(e: fmt::Error) -> Self {
+    fn from(_e: fmt::Error) -> Self {
         RecordError::Record
     }
 }
@@ -420,7 +420,7 @@ mod test_support {
             (self.filter)(meta)
         }
 
-        fn record(&self, span: &span::Id, key: &field::Key, value: &dyn field::Value) -> Result<(), ::subscriber::RecordError> {
+        fn record(&self, _span: &span::Id, _key: &field::Key, _value: &dyn field::Value) -> Result<(), ::subscriber::RecordError> {
             Ok(())
         }
 

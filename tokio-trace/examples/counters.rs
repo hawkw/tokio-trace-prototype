@@ -91,7 +91,7 @@ impl Subscriber for CounterSubscriber {
         interest
     }
 
-    fn new_span(&self, new_span: span::Attributes) -> span::Id {
+    fn new_span(&self, _new_span: span::Attributes) -> span::Id {
         let id = self.ids.fetch_add(1, Ordering::SeqCst);
         span::Id::from_u64(id as u64)
     }
@@ -105,7 +105,7 @@ impl Subscriber for CounterSubscriber {
         Ok(())
     }
 
-    fn record(&self, span: &span::Id, key: &field::Key, value: &dyn field::Value) -> Result<(), ::subscriber::RecordError> {
+    fn record(&self, _span: &span::Id, key: &field::Key, value: &dyn field::Value) -> Result<(), ::subscriber::RecordError> {
         value.record(key, &mut &self.counters)
     }
 
