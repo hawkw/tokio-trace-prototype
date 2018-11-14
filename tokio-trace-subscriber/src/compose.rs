@@ -1,6 +1,6 @@
 use tokio_trace::{
     field, span,
-    subscriber::{RecordError, FollowsError, Subscriber},
+    subscriber::{FollowsError, RecordError, Subscriber},
     Event, Meta,
 };
 use {filter::NoFilter, observe::NoObserver, Filter, Observe, RegisterSpan};

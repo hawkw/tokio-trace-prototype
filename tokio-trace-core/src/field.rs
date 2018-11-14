@@ -35,8 +35,8 @@
 //! notified of each field as it is added to the span, via the
 //! `Subscriber::record` method. That method is called with the span's ID, the
 //! name of the field whose value is being added, and the value to add.
-use ::Meta;
 use std::fmt;
+use Meta;
 
 /// A field value of an erased type.
 ///
@@ -44,8 +44,9 @@ use std::fmt;
 /// the `Record` passed to `Record` in order to indicate how their data
 /// should be recorded.
 pub trait Value: ::sealed::Sealed + Send {
-     /// Records this value with the given `Record`.
-    fn record(&self, key: &Key, recorder: &mut dyn Record) -> Result<(), ::subscriber::RecordError>;
+    /// Records this value with the given `Record`.
+    fn record(&self, key: &Key, recorder: &mut dyn Record)
+        -> Result<(), ::subscriber::RecordError>;
 }
 
 pub trait Record {
@@ -54,11 +55,7 @@ pub trait Record {
     /// This defaults to calling `self.record_fmt()`; implementations wishing to
     /// provide behaviour specific to signed integers may override the default
     /// implementation.
-    fn record_i64(
-        &mut self,
-        field: &Key,
-        value: i64,
-    ) -> Result<(), ::subscriber::RecordError> {
+    fn record_i64(&mut self, field: &Key, value: i64) -> Result<(), ::subscriber::RecordError> {
         self.record_fmt(field, format_args!("{}", value))
     }
 
@@ -67,11 +64,7 @@ pub trait Record {
     /// This defaults to calling `self.record_fmt()`; implementations wishing to
     /// provide behaviour specific to unsigned integers may override the default
     /// implementation.
-    fn record_u64(
-        &mut self,
-        field: &Key,
-        value: u64,
-    ) -> Result<(), ::subscriber::RecordError> {
+    fn record_u64(&mut self, field: &Key, value: u64) -> Result<(), ::subscriber::RecordError> {
         self.record_fmt(field, format_args!("{}", value))
     }
 
@@ -80,11 +73,7 @@ pub trait Record {
     /// This defaults to calling `self.record_fmt()`; implementations wishing to
     /// provide behaviour specific to booleans may override the default
     /// implementation.
-    fn record_bool(
-        &mut self,
-        field: &Key,
-        value: bool,
-    ) -> Result<(), ::subscriber::RecordError> {
+    fn record_bool(&mut self, field: &Key, value: bool) -> Result<(), ::subscriber::RecordError> {
         self.record_fmt(field, format_args!("{}", value))
     }
 
@@ -93,15 +82,11 @@ pub trait Record {
     /// This defaults to calling `self.record_str()`; implementations wishing to
     /// provide behaviour specific to strings may override the default
     /// implementation.
-    fn record_str(
-        &mut self,
-        field: &Key,
-        value: &str,
-    ) -> Result<(), ::subscriber::RecordError> {
+    fn record_str(&mut self, field: &Key, value: &str) -> Result<(), ::subscriber::RecordError> {
         self.record_fmt(field, format_args!("{}", value))
     }
 
-     /// Record a set of pre-compiled format arguments.
+    /// Record a set of pre-compiled format arguments.
     fn record_fmt(
         &mut self,
         field: &Key,
@@ -216,7 +201,11 @@ impl<T> Value for DisplayValue<T>
 where
     T: fmt::Display + Send,
 {
-    fn record(&self, key: &Key, recorder: &mut dyn Record) -> Result<(), ::subscriber::RecordError> {
+    fn record(
+        &self,
+        key: &Key,
+        recorder: &mut dyn Record,
+    ) -> Result<(), ::subscriber::RecordError> {
         recorder.record_fmt(key, format_args!("{}", self.0))
     }
 }
@@ -229,7 +218,11 @@ impl<T: fmt::Debug> Value for DebugValue<T>
 where
     T: fmt::Debug + Send,
 {
-    fn record(&self, key: &Key, recorder: &mut dyn Record) -> Result<(), ::subscriber::RecordError> {
+    fn record(
+        &self,
+        key: &Key,
+        recorder: &mut dyn Record,
+    ) -> Result<(), ::subscriber::RecordError> {
         recorder.record_fmt(key, format_args!("{:?}", self.0))
     }
 }
@@ -237,7 +230,11 @@ where
 impl<'a> ::sealed::Sealed for &'a str {}
 
 impl<'a> Value for &'a str {
-    fn record(&self, key: &Key, recorder: &mut dyn Record) -> Result<(), ::subscriber::RecordError> {
+    fn record(
+        &self,
+        key: &Key,
+        recorder: &mut dyn Record,
+    ) -> Result<(), ::subscriber::RecordError> {
         recorder.record_str(key, self)
     }
 }
@@ -245,7 +242,11 @@ impl<'a> Value for &'a str {
 impl ::sealed::Sealed for bool {}
 
 impl Value for bool {
-    fn record(&self, key: &Key, recorder: &mut dyn Record) -> Result<(), ::subscriber::RecordError> {
+    fn record(
+        &self,
+        key: &Key,
+        recorder: &mut dyn Record,
+    ) -> Result<(), ::subscriber::RecordError> {
         recorder.record_bool(key, *self)
     }
 }
@@ -253,7 +254,11 @@ impl Value for bool {
 impl ::sealed::Sealed for i64 {}
 
 impl Value for i64 {
-    fn record(&self, key: &Key, recorder: &mut dyn Record) -> Result<(), ::subscriber::RecordError> {
+    fn record(
+        &self,
+        key: &Key,
+        recorder: &mut dyn Record,
+    ) -> Result<(), ::subscriber::RecordError> {
         recorder.record_i64(key, *self)
     }
 }
@@ -261,21 +266,26 @@ impl Value for i64 {
 impl ::sealed::Sealed for u64 {}
 
 impl Value for u64 {
-    fn record(&self, key: &Key, recorder: &mut dyn Record) -> Result<(), ::subscriber::RecordError> {
+    fn record(
+        &self,
+        key: &Key,
+        recorder: &mut dyn Record,
+    ) -> Result<(), ::subscriber::RecordError> {
         recorder.record_u64(key, *self)
     }
 }
 
-impl<'a, V> ::sealed::Sealed for &'a V
-where
-    V: Value + ::sealed::Sealed + Send + Sync,
-{}
+impl<'a, V> ::sealed::Sealed for &'a V where V: Value + ::sealed::Sealed + Send + Sync {}
 
 impl<'a, V> Value for &'a V
 where
     V: Value + ::sealed::Sealed + Send + Sync,
 {
-    fn record(&self, key: &Key, recorder: &mut dyn Record) -> Result<(), ::subscriber::RecordError> {
+    fn record(
+        &self,
+        key: &Key,
+        recorder: &mut dyn Record,
+    ) -> Result<(), ::subscriber::RecordError> {
         (*self).record(key, recorder)
     }
 }

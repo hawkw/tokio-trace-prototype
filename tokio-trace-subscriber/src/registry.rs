@@ -1,7 +1,7 @@
 use tokio_trace::{
     field,
     span::{Attributes, Id},
-    subscriber::{RecordError, FollowsError},
+    subscriber::{FollowsError, RecordError},
 };
 
 use std::{

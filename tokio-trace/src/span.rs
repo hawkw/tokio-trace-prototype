@@ -355,9 +355,7 @@ impl SpanExt for Span {
         Q: field::AsKey,
     {
         if let Some(meta) = self.metadata() {
-            let key = field
-                .as_key(meta)
-                .ok_or(subscriber::RecordError::NoField)?;
+            let key = field.as_key(meta).ok_or(subscriber::RecordError::NoField)?;
             self.record(&key, value)
         } else {
             Ok(())

@@ -155,9 +155,7 @@ impl Subscriber for SloggishSubscriber {
         value: &dyn tokio_trace::field::Value,
     ) -> Result<(), subscriber::RecordError> {
         let mut spans = self.spans.lock().expect("mutex poisoned!");
-        let span = spans
-            .get_mut(span)
-            .ok_or(subscriber::RecordError::NoSpan)?;
+        let span = spans.get_mut(span).ok_or(subscriber::RecordError::NoSpan)?;
         span.record(name, value)?;
         Ok(())
     }
@@ -173,7 +171,10 @@ impl Subscriber for SloggishSubscriber {
 
     #[inline]
     fn observe_event<'a>(&self, event: &'a tokio_trace::Event<'a>) {
-        struct Display<'a> { key: field::Key<'a>, value: &'a dyn field::Value };
+        struct Display<'a> {
+            key: field::Key<'a>,
+            value: &'a dyn field::Value,
+        };
         impl<'a> fmt::Display for Display<'a> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 self.value

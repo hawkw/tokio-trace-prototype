@@ -9,7 +9,7 @@ use std::{
 use {
     callsite::Callsite,
     field::{self, Key},
-    subscriber::{RecordError, FollowsError, Interest, Subscriber},
+    subscriber::{FollowsError, Interest, RecordError, Subscriber},
     Dispatch, Meta, StaticMeta,
 };
 

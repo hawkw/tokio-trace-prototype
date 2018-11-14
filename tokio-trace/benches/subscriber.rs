@@ -127,7 +127,15 @@ fn span_repeatedly(b: &mut Bencher) {
 #[bench]
 fn span_with_fields(b: &mut Bencher) {
     tokio_trace::Dispatch::to(EnabledSubscriber).as_default(|| {
-        b.iter(|| span!("span", foo = "foo", bar = "bar", baz = 3u64, quuux = tokio_trace::Value::debug(0.99)))
+        b.iter(|| {
+            span!(
+                "span",
+                foo = "foo",
+                bar = "bar",
+                baz = 3u64,
+                quuux = tokio_trace::Value::debug(0.99)
+            )
+        })
     });
 }
 

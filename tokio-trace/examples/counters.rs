@@ -30,9 +30,7 @@ impl<'a> field::Record for &'a Counters {
         value: i64,
     ) -> Result<(), ::subscriber::RecordError> {
         let registry = (*self).0.read().unwrap();
-        if let Some(counter) = field.name().and_then(|name| {
-            registry.get(name)
-        }) {
+        if let Some(counter) = field.name().and_then(|name| registry.get(name)) {
             if value > 0 {
                 counter.fetch_add(value as usize, Ordering::Release);
             } else {
@@ -48,9 +46,7 @@ impl<'a> field::Record for &'a Counters {
         value: u64,
     ) -> Result<(), ::subscriber::RecordError> {
         let registry = (*self).0.read().unwrap();
-        if let Some(counter) = field.name().and_then(|name| {
-            registry.get(name)
-        }) {
+        if let Some(counter) = field.name().and_then(|name| registry.get(name)) {
             counter.fetch_add(value as usize, Ordering::Release);
         };
         Ok(())
@@ -105,7 +101,12 @@ impl Subscriber for CounterSubscriber {
         Ok(())
     }
 
-    fn record(&self, _span: &span::Id, key: &field::Key, value: &dyn field::Value) -> Result<(), ::subscriber::RecordError> {
+    fn record(
+        &self,
+        _span: &span::Id,
+        key: &field::Key,
+        value: &dyn field::Value,
+    ) -> Result<(), ::subscriber::RecordError> {
         value.record(key, &mut &self.counters)
     }
 

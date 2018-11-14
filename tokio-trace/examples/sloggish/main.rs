@@ -13,7 +13,7 @@
 #[macro_use]
 extern crate tokio_trace;
 
-use tokio_trace::{Level, field};
+use tokio_trace::{field, Level};
 
 mod sloggish_subscriber;
 use self::sloggish_subscriber::SloggishSubscriber;

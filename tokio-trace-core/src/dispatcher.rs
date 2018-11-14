@@ -97,7 +97,12 @@ impl Subscriber for Dispatch {
     }
 
     #[inline]
-    fn record(&self, span: &span::Id, key: &field::Key, value: &dyn field::Value) -> Result<(), ::subscriber::RecordError> {
+    fn record(
+        &self,
+        span: &span::Id,
+        key: &field::Key,
+        value: &dyn field::Value,
+    ) -> Result<(), ::subscriber::RecordError> {
         self.subscriber.record(span, key, value)
     }
 
@@ -142,7 +147,12 @@ impl Subscriber for NoSubscriber {
         span::Id::from_u64(0)
     }
 
-    fn record(&self, _span: &span::Id, _key: &field::Key, _value: &dyn field::Value) -> Result<(), ::subscriber::RecordError> {
+    fn record(
+        &self,
+        _span: &span::Id,
+        _key: &field::Key,
+        _value: &dyn field::Value,
+    ) -> Result<(), ::subscriber::RecordError> {
         Ok(())
     }
 

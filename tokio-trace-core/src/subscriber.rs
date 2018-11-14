@@ -123,7 +123,12 @@ pub trait Subscriber {
     /// - The span does not have a field with the given name.
     /// - The span has a field with the given name, but the value has already
     ///   been set.
-    fn record(&self, span: &span::Id, key: &field::Key, value: &dyn field::Value) -> Result<(), RecordError>;
+    fn record(
+        &self,
+        span: &span::Id,
+        key: &field::Key,
+        value: &dyn field::Value,
+    ) -> Result<(), RecordError>;
 
     /// Adds an indication that `span` follows from the span with the id
     /// `follows`.
@@ -314,10 +319,7 @@ mod test_support {
 
     use super::*;
     use span::{self, MockSpan};
-    use {
-        field,
-        Event, Meta, SpanAttributes, SpanId,
-    };
+    use {field, Event, Meta, SpanAttributes, SpanId};
 
     use std::{
         collections::{HashMap, VecDeque},
@@ -420,7 +422,12 @@ mod test_support {
             (self.filter)(meta)
         }
 
-        fn record(&self, _span: &span::Id, _key: &field::Key, _value: &dyn field::Value) -> Result<(), ::subscriber::RecordError> {
+        fn record(
+            &self,
+            _span: &span::Id,
+            _key: &field::Key,
+            _value: &dyn field::Value,
+        ) -> Result<(), ::subscriber::RecordError> {
             Ok(())
         }
 
