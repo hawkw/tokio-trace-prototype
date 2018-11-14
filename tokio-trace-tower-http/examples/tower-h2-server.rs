@@ -79,7 +79,7 @@ impl Service<Request<RecvBody>> for Svc {
         if uri.path() != ROOT {
             let body = RspBody::empty();
             let rsp = rsp.status(404).body(body).unwrap();
-            event!(Level::Warn, { status_code = 404, path = uri.path() }, "unrecognized URI");
+            event!(Level::Warn, { status_code = Value::display(404), path = Value::debug(uri.path()) }, "unrecognized URI");
             return future::ok(rsp);
         }
 
@@ -115,8 +115,8 @@ fn main() {
 
         span!(
             "serve",
-            local_ip = &Value::debug(addr.ip()),
-            local_port = &addr.port()
+            local_ip = Value::debug(addr.ip()),
+            local_port = addr.port() as u64
         ).enter(move || {
             let new_svc = tokio_trace_tower_http::InstrumentedNewService::new(NewSvc);
             let h2 = Server::new(new_svc, Default::default(), reactor.clone());
@@ -127,8 +127,8 @@ fn main() {
                     let addr = sock.peer_addr().expect("can't get addr");
                     span!(
                         "conn",
-                        remote_ip = &Value::debug(addr.ip()),
-                        remote_port = &addr.port()
+                        remote_ip = Value::debug(addr.ip()),
+                        remote_port = addr.port() as u64
                     ).enter(|| {
                         if let Err(e) = sock.set_nodelay(true) {
                             return Err(e);

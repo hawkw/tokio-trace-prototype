@@ -13,7 +13,7 @@
 //! ```
 //! # #[macro_use] extern crate tokio_trace;
 //! # fn main() {
-//! let my_var = 5;
+//! let my_var: u64 = 5;
 //! let mut my_span = span!("my_span", my_var = &my_var);
 //!
 //! my_span.enter(|| {
@@ -440,8 +440,8 @@ mod tests {
         Dispatch::to(subscriber::mock().run()).as_default(|| {
             // Even though these spans have the same name and fields, they will have
             // differing metadata, since they were created on different lines.
-            let foo1 = span!("foo", bar = &1, baz = &false);
-            let foo2 = span!("foo", bar = &1, baz = &false);
+            let foo1 = span!("foo", bar = 1u64, baz = false);
+            let foo2 = span!("foo", bar = 1u64, baz = false);
 
             assert_ne!(foo1, foo2);
             // assert_ne!(foo1.data(), foo2.data());
@@ -453,7 +453,7 @@ mod tests {
         // Every time time this function is called, it will return a _new
         // instance_ of a span with the same metadata, name, and fields.
         fn make_span() -> Span {
-            span!("foo", bar = &1, baz = &false)
+            span!("foo", bar = 1u64, baz = false)
         }
 
         Dispatch::to(subscriber::mock().run()).as_default(|| {

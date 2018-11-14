@@ -87,7 +87,7 @@ macro_rules! callsite {
 /// # #[macro_use]
 /// # extern crate tokio_trace;
 /// # fn main() {
-/// span!("my span", foo = &2, bar = &"a string").enter(|| {
+/// span!("my span", foo = 2u64, bar = "a string").enter(|| {
 ///     // do work inside the span...
 /// });
 /// # }

@@ -12,7 +12,7 @@ fn main() {
     let subscriber = tokio_trace_log::TraceLogger::new();
 
     tokio_trace::Dispatch::to(subscriber).as_default(|| {
-        let num = 1;
+        let num: u64 = 1;
 
         let mut span = span!("Getting rec from another function.", number_of_recs = &num);
         span.enter(|| {
