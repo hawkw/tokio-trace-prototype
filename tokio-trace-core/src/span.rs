@@ -454,13 +454,7 @@ impl Enter {
     /// returns `Ok(())` if the other span was added as a precedent of this
     /// span, or an error if this was not possible.
     pub fn follows_from(&self, from: Id) -> Result<(), FollowsError> {
-        match self.subscriber.add_follows_from(&self.id, from) {
-            Ok(()) => Ok(()),
-            Err(FollowsError::NoSpan(ref id)) if id == &self.id => {
-                panic!("span {:?} should exist to add a preceeding span", self.id)
-            }
-            Err(e) => Err(e),
-        }
+        self.subscriber.add_follows_from(&self.id, from)
     }
 
     /// Returns the span's ID.

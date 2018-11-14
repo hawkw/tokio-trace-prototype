@@ -229,7 +229,7 @@ pub struct RecordError {
     kind: RecordErrorKind,
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug)]
 enum RecordErrorKind {
     /// The span with the given ID does not exist.
     NoSpan(SpanId),
@@ -241,11 +241,14 @@ enum RecordErrorKind {
     Record,
 }
 
-/// Errors which may prevent a prior span from being added to a span.
-// TODO: before releasing core 0.1 this needs to be made private, to avoid
-// future breaking changes.
-#[derive(Clone, Debug)]
-pub enum FollowsError {
+/// Errors which may prevent a span from following another span.
+#[derive(Debug)]
+pub struct FollowsError {
+    kind: FollowsErrorKind,
+}
+
+#[derive(Debug)]
+enum FollowsErrorKind {
     /// The span with the given ID does not exist.
     /// TODO: can this error type be generalized between `FollowsError` and
     /// `RecordError`?
@@ -391,6 +394,50 @@ impl From<fmt::Error> for RecordError {
         RecordError::record()
     }
 }
+
+// ===== impl FollowsError =====
+
+impl FollowsError {
+    /// Returns an error indicating that no span exists for the given `id`.
+    pub fn no_following_span(id: SpanId) -> Self {
+        Self {
+            kind: FollowsErrorKind::NoSpan(id),
+        }
+    }
+
+    /// Returns an error indicating the preceeding span does not exist.
+    pub fn no_preceeding_span() -> Self {
+        Self {
+            kind: FollowsErrorKind::NoPreceedingId,
+        }
+    }
+
+    /// Returns `true` if this error was due to the following span not existing.
+    pub fn is_no_following_span(&self) -> bool {
+        match self.kind {
+            FollowsErrorKind::NoSpan(_) => true,
+            _ => false,
+        }
+    }
+
+    /// Returns `true` if this error was due to the preceeding span not existing.
+    pub fn is_no_preceeding_span(&self) -> bool {
+        match self.kind {
+            FollowsErrorKind::NoPreceedingId => true,
+            _ => false,
+        }
+    }
+}
+
+impl fmt::Display for FollowsError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self.kind {
+            FollowsErrorKind::NoSpan(ref id) => write!(f, "no span exists with id {:?}", id),
+            FollowsErrorKind::NoPreceedingId => f.pad("the preceeding span does not exist"),
+        }
+    }
+}
+
 
 #[cfg(any(test, feature = "test-support"))]
 pub use self::test_support::*;
