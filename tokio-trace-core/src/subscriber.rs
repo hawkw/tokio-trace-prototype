@@ -210,6 +210,35 @@ pub trait Subscriber {
     /// [`Span`]: ::span::Span
     /// [`SpanId`]: ::span::Id
     fn close(&self, span: span::Id);
+
+    /// Notifies the subscriber that a [`Span`] handle with the given [`Id`] has
+    /// been cloned.
+    ///
+    /// This function is guaranteed to only be called with span IDs that were
+    /// returned by this subscriber's `new_span` function.
+    ///
+    /// Note that typically this is just the identity function, passing through
+    /// the identifier. For more unsafe situations, however, if `id` is itself a
+    /// pointer of some kind this can be used as a hook to "clone" the pointer,
+    /// depending on what that means for the specified pointer.
+    fn clone_span(&self, id: span::Id) -> span::Id {
+        id
+    }
+
+    /// Notifies the subscriber that a [`Span`] handle with the given [`Id`] has
+    /// been dropped.
+    ///
+    /// This function is guaranteed to only be called with span IDs that were
+    /// returned by this subscriber's `new_span` function.
+    ///
+    /// This function provides a hook for schemes which encode pointers in this
+    /// `id` argument to deallocate resources associated with the pointer. It's
+    /// guaranteed that if this function has been called once more than the
+    /// number of times `clone_span` was called with the same `id`, then no more
+    /// `Span`s using that `id` exist.
+    fn drop_span(&self, id: span::Id) {
+        let _ = id;
+    }
 }
 
 /// Indicates a `Subscriber`'s interest in a particular callsite.
