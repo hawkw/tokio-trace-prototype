@@ -85,7 +85,7 @@ pub trait RegisterSpan {
     /// the identifier. For more unsafe situations, however, if `id` is itself a
     /// pointer of some kind this can be used as a hook to "clone" the pointer,
     /// depending on what that means for the specified pointer.
-    fn clone_span(&self, id: span::Id) -> span::Id {
+    fn clone_span(&self, id: Id) -> Id {
         id
     }
 
@@ -105,7 +105,7 @@ pub trait RegisterSpan {
     /// implementations should ensure that they are unwind-safe. Panicking from
     /// inside of a `drop_span` function may cause a double panic, if the span
     /// was dropped due to a thread unwinding.
-    fn drop_span(&self, id: span::Id) {
+    fn drop_span(&self, id: Id) {
         let _ = id;
     }
 }
