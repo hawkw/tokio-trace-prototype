@@ -5,7 +5,7 @@ extern crate test;
 use test::Bencher;
 
 use std::sync::Mutex;
-use tokio_trace::{field, span, subscriber, Event, Meta};
+use tokio_trace::{field, span, subscriber, Event, Meta, Level};
 
 /// A subscriber that is enabled but otherwise does nothing.
 struct EnabledSubscriber;
@@ -136,6 +136,31 @@ fn span_with_fields(b: &mut Bencher) {
                 quuux = tokio_trace::Value::debug(0.99)
             )
         })
+    });
+}
+
+#[bench]
+fn event_no_fields(b: &mut Bencher) {
+    tokio_trace::Dispatch::new(EnabledSubscriber).as_default(|| {
+        span!("my great span").enter(|| {
+            b.iter(|| { event!(Level::Info, {}, "my event!"); })
+        });
+    });
+}
+
+#[bench]
+fn event_with_fields(b: &mut Bencher) {
+    tokio_trace::Dispatch::new(EnabledSubscriber).as_default(|| {
+        span!("my great span").enter(|| {
+            b.iter(|| {
+                event!(Level::Info, {
+                    foo = "foo",
+                    bar = "bar",
+                    baz = 3u64,
+                    quuux = tokio_trace::Value::debug(0.99)
+                }, "my event!");
+            });
+        });
     });
 }
 

@@ -18,6 +18,17 @@ fn bench_span_no_subscriber(b: &mut Bencher) {
 }
 
 #[bench]
+fn bench_event_no_subscriber(b: &mut Bencher) {
+    let n = test::black_box(1);
+    b.iter(|| {
+        (0..n).fold(0, |old, new| {
+            event!(tokio_trace::Level::Info, {}, "event");
+            old ^ new
+        })
+    });
+}
+
+#[bench]
 fn bench_log_no_logger(b: &mut Bencher) {
     let n = test::black_box(1);
     b.iter(|| {
