@@ -553,7 +553,7 @@ mod tests {
             .run();
         Dispatch::new(subscriber).as_default(|| {
             let mut span = span!("foo");
-            let span2 = span.enter(|| Span::current());
+            let _span2 = span.enter(|| Span::current());
         })
     }
 
@@ -568,7 +568,7 @@ mod tests {
             .run();
         Dispatch::new(subscriber).as_default(|| {
             let mut span = span!("foo");
-            let span2 = span.enter(|| Span::current());
+            let _span2 = span.enter(|| Span::current());
             drop(span);
         })
     }
