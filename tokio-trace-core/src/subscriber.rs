@@ -496,6 +496,8 @@ mod test_support {
         Enter(MockSpan),
         Exit(MockSpan),
         Close(MockSpan),
+        CloneSpan(MockSpan),
+        DropSpan(MockSpan),
         Nothing,
     }
 
@@ -531,6 +533,16 @@ mod test_support {
 
         pub fn close(mut self, span: MockSpan) -> Self {
             self.expected.push_back(Expect::Close(span));
+            self
+        }
+
+        pub fn clone_span(mut self, span: MockSpan) -> Self {
+            self.expected.push_back(Expect::CloneSpan(span));
+            self
+        }
+
+        pub fn drop_span(mut self, span: MockSpan) -> Self {
+            self.expected.push_back(Expect::DropSpan(span));
             self
         }
 
@@ -620,6 +632,14 @@ mod test_support {
                     "expected to close span {:?} but got an event",
                     expected_span.name,
                 ),
+                Some(Expect::CloneSpan(expected_span)) => panic!(
+                    "expected to clone span {:?}, but got an event",
+                    expected_span.name,
+                ),
+                Some(Expect::DropSpan(expected_span)) => panic!(
+                    "expected to drop span {:?}, but got an event",
+                    expected_span.name,
+                ),
                 Some(Expect::Nothing) => {
                     panic!("expected nothing else to happen, but got an event")
                 }
@@ -651,6 +671,16 @@ mod test_support {
                 ),
                 Some(Expect::Close(expected_span)) => panic!(
                     "expected to close span {:?}, but entered span {:?} instead",
+                    expected_span.name,
+                    span.name()
+                ),
+                Some(Expect::CloneSpan(expected_span)) => panic!(
+                    "expected to clone span {:?}, but entered span {:?} instead",
+                    expected_span.name,
+                    span.name()
+                ),
+                Some(Expect::DropSpan(expected_span)) => panic!(
+                    "expected to drop span {:?}, but entered span {:?} instead",
                     expected_span.name,
                     span.name()
                 ),
@@ -689,10 +719,21 @@ mod test_support {
                     expected_span.name,
                     span.name()
                 ),
+                Some(Expect::CloneSpan(expected_span)) => panic!(
+                    "expected to clone span {:?}, but exited span {:?} instead",
+                    expected_span.name,
+                    span.name()
+                ),
+                Some(Expect::DropSpan(expected_span)) => panic!(
+                    "expected to drop span {:?}, but exited span {:?} instead",
+                    expected_span.name,
+                    span.name()
+                ),
                 Some(Expect::Nothing) => panic!(
                     "expected nothing else to happen, but exited span {:?}",
                     span.name(),
                 ),
+
             }
         }
 
@@ -722,11 +763,48 @@ mod test_support {
                         assert_eq!(name, span.name());
                     }
                     // TODO: expect fields
-                }
+                },
+                Some(Expect::CloneSpan(expected_span)) => panic!(
+                    "expected to clone span {:?}, but closed span {:?} instead",
+                    expected_span.name,
+                    span.name()
+                ),
+                Some(Expect::DropSpan(expected_span)) => panic!(
+                    "expected to drop span {:?}, but closed span {:?} instead",
+                    expected_span.name,
+                    span.name()
+                ),
                 Some(Expect::Nothing) => panic!(
                     "expected nothing else to happen, but closed span {:?}",
                     span.name(),
                 ),
+            }
+        }
+
+        fn clone_span(&self, id: span::Id) -> span::Id {
+            let mut expected = self.expected.lock().unwrap();
+            let was_expected = if let Some(Expect::CloneSpan(ref span)) = expected.front() {
+                assert_eq!(self.spans.lock().unwrap().get(&id).map(SpanAttributes::name), span.name);
+                true
+            } else {
+                false
+            };
+            if was_expected {
+                expected.pop_front();
+            }
+            id
+        }
+
+        fn drop_span(&self, id: span::Id) {
+            let mut expected = self.expected.lock().unwrap();
+            let was_expected = if let Some(Expect::DropSpan(ref span)) = expected.front() {
+                assert_eq!(self.spans.lock().unwrap().get(&id).map(SpanAttributes::name), span.name);
+                true
+            } else {
+                false
+            };
+            if was_expected {
+                expected.pop_front();
             }
         }
     }
