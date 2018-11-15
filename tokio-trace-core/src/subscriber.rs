@@ -782,6 +782,7 @@ mod test_support {
         }
 
         fn clone_span(&self, id: span::Id) -> span::Id {
+            println!("clone_span: {:?}", id);
             let mut expected = self.expected.lock().unwrap();
             let was_expected = if let Some(Expect::CloneSpan(ref span)) = expected.front() {
                 assert_eq!(self.spans.lock().unwrap().get(&id).map(SpanAttributes::name), span.name);
@@ -796,15 +797,21 @@ mod test_support {
         }
 
         fn drop_span(&self, id: span::Id) {
-            let mut expected = self.expected.lock().unwrap();
-            let was_expected = if let Some(Expect::DropSpan(ref span)) = expected.front() {
-                assert_eq!(self.spans.lock().unwrap().get(&id).map(SpanAttributes::name), span.name);
-                true
-            } else {
-                false
-            };
-            if was_expected {
-                expected.pop_front();
+            println!("drop_span: {:?}", id);
+            if let Ok(mut expected) = self.expected.lock() {
+                let was_expected = if let Some(Expect::DropSpan(ref span)) = expected.front() {
+                    // Don't assert if this function was called while panicking,
+                    // as failing the assertion can cause a double panic.
+                    if !::std::thread::panicking() {
+                        assert_eq!(self.spans.lock().unwrap().get(&id).map(SpanAttributes::name), span.name);
+                    }
+                    true
+                } else {
+                    false
+                };
+                if was_expected {
+                    expected.pop_front();
+                }
             }
         }
     }
