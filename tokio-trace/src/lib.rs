@@ -133,7 +133,7 @@ macro_rules! event {
                 $target, $( $k ),*
             };
             let field_values: &[ &dyn Value ] = &[ $( &$val ),* ];
-            Event::observe(
+            Event::new(
                 callsite,
                 &field_values[..],
                 &[],

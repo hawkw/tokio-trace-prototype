@@ -152,6 +152,20 @@ pub struct Event<'a> {
     message: fmt::Arguments<'a>,
 }
 
+/// A handle on an `Event` which has yet to be observed.
+///
+/// This handle may be used to add follows_from annotations to the event.
+pub struct EventHandle<'a> {
+    inner: Option<ObserveEvent<'a>>
+}
+
+struct ObserveEvent<'a> {
+    /// The event
+    event: Event<'a>,
+    /// The dispatcher to which this event should be sent.
+    dispatch: Dispatch,
+}
+
 /// Metadata describing a [`Span`] or [`Event`].
 ///
 /// This includes the source code location where the span or event occurred, the
@@ -334,29 +348,38 @@ impl<'a> Event<'a> {
     ///
     /// [`Subscriber`]: ::subscriber::Subscriber
     /// [`Callsite`]: ::callsite::Callsite
-    pub fn observe(
+    pub fn new(
         callsite: &'a dyn callsite::Callsite,
-        field_values: &[&dyn field::Value],
-        follows_from: &[SpanId],
+        field_values: &'a [&'a (dyn field::Value + 'a)],
+        follows_from: &'a [SpanId],
         message: fmt::Arguments<'a>,
-    ) {
+    ) -> EventHandle<'a> {
         let interest = callsite.interest();
         if interest == Interest::NEVER {
-            return;
+            return EventHandle {
+                inner: None,
+            };
         }
-        Dispatch::with_current(|dispatch| {
+        let inner = Dispatch::with_current(|dispatch| {
             let meta = callsite.metadata();
             if interest == Interest::SOMETIMES && !dispatch.enabled(meta) {
-                return;
+                return None
             }
-            dispatch.observe_event(&Event {
+            let event = Event {
                 parent: SpanId::current(),
                 follows_from,
                 meta,
                 field_values,
                 message,
-            });
-        })
+            };
+            Some(ObserveEvent {
+                event,
+                dispatch: dispatch.clone(),
+            })
+        });
+        EventHandle {
+            inner
+        }
     }
 
     /// Returns an iterator over the names of all the fields on this `Event`.
@@ -411,6 +434,12 @@ impl<'a> IntoIterator for &'a Event<'a> {
     type IntoIter = Box<Iterator<Item = (field::Key<'a>, &'a dyn Value)> + 'a>; // TODO: unbox
     fn into_iter(self) -> Self::IntoIter {
         Box::new(self.fields())
+    }
+}
+
+impl<'a> Drop for ObserveEvent<'a> {
+    fn drop(&mut self) {
+        self.dispatch.observe_event(&self.event);
     }
 }
 

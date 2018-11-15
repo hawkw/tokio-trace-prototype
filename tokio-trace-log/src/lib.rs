@@ -59,13 +59,13 @@ pub fn format_trace(record: &log::Record) -> io::Result<()> {
             &self.0
         }
     }
-
-    tokio_trace::Event::observe(
-        &LogCallsite(record.as_trace()),
+    let callsite = LogCallsite(record.as_trace());
+    drop(tokio_trace::Event::new(
+        &callsite,
         &[],
         &[],
         record.args().clone(),
-    );
+    ));
     Ok(())
 }
 
