@@ -236,6 +236,11 @@ pub trait Subscriber {
     /// guaranteed that if this function has been called once more than the
     /// number of times `clone_span` was called with the same `id`, then no more
     /// `Span`s using that `id` exist.
+    ///
+    /// **Note**: since this function is called when spans are dropped,
+    /// implementations should ensure that they are unwind-safe. Panicking from
+    /// inside of a `drop_span` function may cause a double panic, if the span
+    /// was dropped due to a thread unwinding.
     fn drop_span(&self, id: span::Id) {
         let _ = id;
     }
