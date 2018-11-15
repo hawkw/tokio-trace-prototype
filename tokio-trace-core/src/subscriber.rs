@@ -738,7 +738,6 @@ mod test_support {
                     "expected nothing else to happen, but exited span {:?}",
                     span.name(),
                 ),
-
             }
         }
 
@@ -768,7 +767,7 @@ mod test_support {
                         assert_eq!(name, span.name());
                     }
                     // TODO: expect fields
-                },
+                }
                 Some(Expect::CloneSpan(expected_span)) => panic!(
                     "expected to clone span {:?}, but closed span {:?} instead",
                     expected_span.name,
@@ -790,7 +789,14 @@ mod test_support {
             println!("clone_span: {:?}", id);
             let mut expected = self.expected.lock().unwrap();
             let was_expected = if let Some(Expect::CloneSpan(ref span)) = expected.front() {
-                assert_eq!(self.spans.lock().unwrap().get(&id).map(SpanAttributes::name), span.name);
+                assert_eq!(
+                    self.spans
+                        .lock()
+                        .unwrap()
+                        .get(&id)
+                        .map(SpanAttributes::name),
+                    span.name
+                );
                 true
             } else {
                 false
@@ -808,7 +814,14 @@ mod test_support {
                     // Don't assert if this function was called while panicking,
                     // as failing the assertion can cause a double panic.
                     if !::std::thread::panicking() {
-                        assert_eq!(self.spans.lock().unwrap().get(&id).map(SpanAttributes::name), span.name);
+                        assert_eq!(
+                            self.spans
+                                .lock()
+                                .unwrap()
+                                .get(&id)
+                                .map(SpanAttributes::name),
+                            span.name
+                        );
                     }
                     true
                 } else {

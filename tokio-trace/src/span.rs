@@ -419,7 +419,6 @@ mod tests {
         });
     }
 
-
     #[test]
     fn handles_to_the_same_span_are_equal() {
         // Create a mock subscriber that will return `true` on calls to
@@ -554,7 +553,7 @@ mod tests {
             .run();
         Dispatch::new(subscriber).as_default(|| {
             let mut span = span!("foo");
-            let span2 = span.enter(|| { Span::current() });
+            let span2 = span.enter(|| Span::current());
         })
     }
 
@@ -569,7 +568,7 @@ mod tests {
             .run();
         Dispatch::new(subscriber).as_default(|| {
             let mut span = span!("foo");
-            let span2 = span.enter(|| { Span::current() });
+            let span2 = span.enter(|| Span::current());
             drop(span);
         })
     }
@@ -596,7 +595,7 @@ mod tests {
         // Even though we enter subscriber 2's context, the subscriber that
         // tagged the span should see the enter/exit.
         subscriber2.as_default(move || {
-            let foo2 = foo.enter(|| { Span::current() });
+            let foo2 = foo.enter(|| Span::current());
             drop(foo);
             drop(foo2);
         });
@@ -688,7 +687,9 @@ mod tests {
                 .enter(span::mock().named(Some("foo")))
                 .exit(span::mock().named(Some("foo")))
                 .close(span::mock().named(Some("foo")))
-                .drop_span(span::mock().named(Some("foo"))).done().run();
+                .drop_span(span::mock().named(Some("foo")))
+                .done()
+                .run();
             Dispatch::new(subscriber).as_default(|| {
                 let span = span!("foo").into_shared();
                 let foo1 = span.clone();
