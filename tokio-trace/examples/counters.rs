@@ -4,7 +4,7 @@ extern crate tokio_trace;
 use tokio_trace::{
     field, span,
     subscriber::{self, Subscriber},
-    Event, Level, Meta, Id,
+    Level, Meta, Id,
 };
 
 use std::{

@@ -34,7 +34,7 @@ use std::{
 use tokio_trace::{
     field, span,
     subscriber::{self, Subscriber},
-    Event, Meta, Id,
+    Meta, Id,
 };
 
 /// Format a log record as a trace event in the current span.
@@ -143,10 +143,6 @@ pub struct TraceLogger {
     // TODO: the hashmap can definitely be replaced with some kind of arena eventually.
     in_progress: Mutex<HashMap<Id, LineBuilder>>,
 }
-
-struct LogFields<'a, 'b: 'a, I: 'a>(&'a I)
-where
-    &'a I: IntoIterator<Item = (field::Key<'b>, &'b field::Value)>;
 
 // ===== impl LogTracer =====
 
