@@ -528,6 +528,22 @@ mod tests {
         })
     }
 
+     #[test]
+    fn enter_final_closes_span() {
+        let subscriber = subscriber::mock()
+            .enter(span::mock().named(Some("foo")))
+            .exit(span::mock().named(Some("foo")))
+            .close(span::mock().named(Some("foo")))
+            .drop_span(span::mock().named(Some("foo")))
+            .done()
+            .run();
+        Dispatch::new(subscriber).as_default(|| {
+            let mut span = span!("foo");
+            span.enter(|| {});
+            drop(span);
+        })
+    }
+
     #[test]
     fn dropping_a_span_calls_drop_span() {
         let subscriber = subscriber::mock()

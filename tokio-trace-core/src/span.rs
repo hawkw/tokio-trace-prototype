@@ -202,6 +202,42 @@ impl Span {
         }
     }
 
+    /// Executes the given function in the context of this span, and close the
+    /// span when it is exited
+    ///
+    /// If this span is enabled, then this function enters the span, invokes and
+    /// then exits the span, attempting to close it if possible.. If the span is
+    /// disabled, `f` will still be invoked, but in the context of the
+    /// currently-executing span (if there is one).
+    ///
+    /// This is functionally equivalent to
+    // TODO: it would be nice to have doctests for this, but there's no easy
+    // way to create spans outside of `tokio-trace`. Would prefer not to create
+    // a whole handwritten callsite so that this doctest compiles.
+    /// ```ignore
+    /// span.enter(|| {
+    ///     // ...
+    ///     Span::current().close();
+    ///     // ...
+    /// })
+    /// ```
+    /// but without the overhead of getting the current span.
+    ///
+    /// Returns the result of evaluating `f`.
+    pub fn enter_final<F: FnOnce() -> T, T>(&mut self, f: F) -> T {
+        match self.inner.take() {
+            Some(inner) => {
+                self.is_closed = true;
+                inner.close();
+                let guard = inner.enter();
+                let result = f();
+                guard.exit();
+                result
+            }
+            None => f(),
+        }
+    }
+
     /// Returns the `Id` of the parent of this span, if one exists.
     pub fn parent(&self) -> Option<Id> {
         self.inner.as_ref().and_then(Enter::parent)
