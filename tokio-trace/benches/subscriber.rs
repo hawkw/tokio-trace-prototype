@@ -5,21 +5,22 @@ extern crate test;
 use test::Bencher;
 
 use std::sync::Mutex;
-use tokio_trace::{field, span, subscriber, Event, Meta};
+use tokio_trace::{field, span, subscriber, Event, Meta, Id};
 
 /// A subscriber that is enabled but otherwise does nothing.
 struct EnabledSubscriber;
 
 impl tokio_trace::Subscriber for EnabledSubscriber {
-    fn new_span(&self, span: span::Attributes) -> Id {
+    fn new_id(&self, span: span::Attributes) -> Id {
         let _ = span;
         Id::from_u64(0)
     }
-    fn record(
+
+    fn record_fmt(
         &self,
         span: &Id,
         field: &field::Key,
-        value: &dyn field::Value,
+        value: ::std::fmt::Arguments,
     ) -> Result<(), tokio_trace::subscriber::RecordError> {
         let _ = (span, field, value);
         Ok(())
@@ -39,10 +40,6 @@ impl tokio_trace::Subscriber for EnabledSubscriber {
         true
     }
 
-    fn observe_event<'event>(&self, event: &'event Event<'event>) {
-        let _ = event;
-    }
-
     fn enter(&self, span: Id) {
         let _ = span;
     }
@@ -56,22 +53,27 @@ impl tokio_trace::Subscriber for EnabledSubscriber {
     }
 }
 
-/// Simulates a subscriber that caches span data.
-struct AddAttributes(Mutex<Option<span::Attributes>>);
+/// Simulates a subscriber that records span data.
+struct Record(Mutex<Option<span::SpanAttributes>>);
 
-impl tokio_trace::Subscriber for AddAttributes {
-    fn new_span(&self, span: span::Attributes) -> Id {
+impl tokio_trace::Subscriber for Record {
+    fn new_span(&self, span: span::SpanAttributes) -> Id {
         *self.0.lock().unwrap() = Some(span.into());
         Id::from_u64(0)
     }
 
-    fn record(
+    fn new_id(&self, span: span::Attributes) -> Id {
+        Id::from_u64(0)
+    }
+
+    fn record_fmt(
         &self,
         span: &Id,
         field: &field::Key,
-        value: &dyn field::Value,
+        value: ::std::fmt::Arguments,
     ) -> Result<(), tokio_trace::subscriber::RecordError> {
-        unimplemented!("TODO: reimplement this")
+        let _ = ::std::fmt::format(value);
+        Ok(())
     }
 
     fn add_follows_from(
@@ -86,10 +88,6 @@ impl tokio_trace::Subscriber for AddAttributes {
     fn enabled(&self, metadata: &Meta) -> bool {
         let _ = metadata;
         true
-    }
-
-    fn observe_event<'event>(&self, event: &'event Event<'event>) {
-        let _ = event;
     }
 
     fn enter(&self, span: Id) {
@@ -142,7 +140,7 @@ fn span_with_fields(b: &mut Bencher) {
 // TODO: bring this back
 // #[bench]
 // fn span_with_fields_add_data(b: &mut Bencher) {
-//     tokio_trace::Dispatch::new(AddAttributes(Mutex::new(None))).as_default(|| {
+//     tokio_trace::Dispatch::new(Record(Mutex::new(None))).as_default(|| {
 //         b.iter(|| span!("span", foo = &"foo", bar = &"bar", baz = &3, quuux = &0.99))
 //     });
 // }
