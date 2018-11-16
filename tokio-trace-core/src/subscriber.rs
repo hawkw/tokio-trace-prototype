@@ -114,7 +114,11 @@ pub trait Subscriber {
     ///
     /// [span ID]: ::span::Id
     /// [`Span`]: ::span::Span
-    fn new_span(&self, span: span::SpanAttributes) -> span::Id;
+    fn new_span(&self, span: span::SpanAttributes) -> span::Id {
+        self.new_event(span)
+    }
+
+    fn new_event(&self, attrs: span::Attributes) -> span::Id;
 
     /// Record a signed 64-bit integer value.
     ///
@@ -244,14 +248,6 @@ pub trait Subscriber {
     fn enabled(&self, metadata: &Meta) -> bool;
 
     // === Notification methods ===============================================
-
-    /// Records that an [`Event`] has occurred.
-    ///
-    /// When an `Event` takes place, this function is called to notify the
-    /// subscriber of that event.
-    ///
-    /// [`Event`]: ../struct.Event.html
-    fn observe_event<'a>(&self, event: &'a Event<'a>);
 
     /// Records that a [`Span`] has been entered.
     ///
@@ -680,41 +676,17 @@ mod test_support {
             Ok(())
         }
 
+        fn new_event(&self, span: span::Attributes) -> span::Id {
+            let id = self.ids.fetch_add(1, Ordering::SeqCst);
+            let id = span::Id::from_u64(id as u64);
+            id
+        }
+
         fn new_span(&self, span: SpanAttributes) -> span::Id {
             let id = self.ids.fetch_add(1, Ordering::SeqCst);
             let id = span::Id::from_u64(id as u64);
             self.spans.lock().unwrap().insert(id.clone(), span);
             id
-        }
-
-        fn observe_event<'a>(&self, _event: &'a Event<'a>) {
-            match self.expected.lock().unwrap().pop_front() {
-                None => {}
-                Some(Expect::Event(_)) => unimplemented!(),
-                Some(Expect::Enter(expected_span)) => panic!(
-                    "expected to enter span {:?}, but got an event",
-                    expected_span.name
-                ),
-                Some(Expect::Exit(expected_span)) => panic!(
-                    "expected to exit span {:?} but got an event",
-                    expected_span.name
-                ),
-                Some(Expect::Close(expected_span)) => panic!(
-                    "expected to close span {:?} but got an event",
-                    expected_span.name,
-                ),
-                Some(Expect::CloneSpan(expected_span)) => panic!(
-                    "expected to clone span {:?}, but got an event",
-                    expected_span.name,
-                ),
-                Some(Expect::DropSpan(expected_span)) => panic!(
-                    "expected to drop span {:?}, but got an event",
-                    expected_span.name,
-                ),
-                Some(Expect::Nothing) => {
-                    panic!("expected nothing else to happen, but got an event")
-                }
-            }
         }
 
         fn enter(&self, span: span::Id) {

@@ -98,25 +98,25 @@ where
         self.filter.enabled(metadata) && self.observer.filter().enabled(metadata)
     }
 
-    fn new_span(&self, new_span: span::Attributes) -> span::Id {
+    fn new_span(&self, new_span: span::SpanAttributes) -> span::Id {
         self.registry.new_span(new_span)
     }
 
-    fn record(
+    fn new_event(&self, new_event: span::Attributes) -> span::Id {
+        self.registry.new_event(new_event)
+    }
+
+    fn record_fmt(
         &self,
         span: &span::Id,
         name: &tokio_trace::field::Key,
-        value: &dyn field::Value,
+        value: ::std::fmt::Arguments,
     ) -> Result<(), RecordError> {
-        self.registry.record(span, name, value)
+        unimplemented!()
     }
 
     fn add_follows_from(&self, span: &span::Id, follows: span::Id) -> Result<(), FollowsError> {
         self.registry.add_follows_from(span, follows)
-    }
-
-    fn observe_event<'a>(&self, event: &'a Event<'a>) {
-        self.observer.observe_event(event)
     }
 
     fn enter(&self, id: span::Id) {

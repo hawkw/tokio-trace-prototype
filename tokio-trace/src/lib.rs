@@ -161,7 +161,7 @@ pub mod subscriber;
 pub use self::{
     dispatcher::Dispatch,
     field::Value,
-    span::{Attributes as SpanAttributes, Id as SpanId, Span},
+    span::{Attributes, Id as SpanId, Span, SpanAttributes},
     subscriber::Subscriber,
     tokio_trace_core::{
         callsite::{self, Callsite},

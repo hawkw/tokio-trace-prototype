@@ -1,7 +1,7 @@
 use {
     callsite, field,
     span::{self, Span},
-    subscriber::{self, Subscriber},
+    subscriber::{self, Subscriber, RecordError},
     Event, Meta,
 };
 
@@ -92,8 +92,13 @@ impl Subscriber for Dispatch {
     }
 
     #[inline]
-    fn new_span(&self, span: span::Attributes) -> span::Id {
+    fn new_span(&self, span: span::SpanAttributes) -> span::Id {
         self.subscriber.new_span(span)
+    }
+
+    #[inline]
+    fn new_event(&self, span: span::Attributes) -> span::Id {
+        self.subscriber.new_event(span)
     }
 
     #[inline]
@@ -161,11 +166,6 @@ impl Subscriber for Dispatch {
     }
 
     #[inline]
-    fn observe_event<'a>(&self, event: &'a Event<'a>) {
-        self.subscriber.observe_event(event)
-    }
-
-    #[inline]
     fn enter(&self, span: span::Id) {
         self.subscriber.enter(span)
     }
@@ -193,7 +193,7 @@ impl Subscriber for Dispatch {
 
 struct NoSubscriber;
 impl Subscriber for NoSubscriber {
-    fn new_span(&self, _span: span::Attributes) -> span::Id {
+    fn new_event(&self, _span: span::Attributes) -> span::Id {
         span::Id::from_u64(0)
     }
 
@@ -216,10 +216,6 @@ impl Subscriber for NoSubscriber {
 
     fn enabled(&self, _metadata: &Meta) -> bool {
         false
-    }
-
-    fn observe_event<'a>(&self, _event: &'a Event<'a>) {
-        // Do nothing.
     }
 
     fn enter(&self, _span: span::Id) {}

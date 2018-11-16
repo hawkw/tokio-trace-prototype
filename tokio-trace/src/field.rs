@@ -46,20 +46,20 @@ impl<'a, W: fmt::Write + 'a> DebugRecorder<'a, W> {
     }
 }
 
-impl<'a, W: fmt::Write + 'a> Record for DebugRecorder<'a, W> {
-    fn record_fmt(
-        &mut self,
-        key: &Key,
-        args: fmt::Arguments,
-    ) -> Result<(), ::subscriber::RecordError> {
-        if self.with_key {
-            self.write
-                .write_fmt(format_args!("{}=", key.name().unwrap_or("???")))?;
-        }
-        self.write.write_fmt(args)?;
-        Ok(())
-    }
-}
+// impl<'a, W: fmt::Write + 'a> Record for DebugRecorder<'a, W> {
+//     fn record_fmt(
+//         &mut self,
+//         key: &Key,
+//         args: fmt::Arguments,
+//     ) -> Result<(), ::subscriber::RecordError> {
+//         if self.with_key {
+//             self.write
+//                 .write_fmt(format_args!("{}=", key.name().unwrap_or("???")))?;
+//         }
+//         self.write.write_fmt(args)?;
+//         Ok(())
+//     }
+// }
 
 // ===== impl AsKey =====
 
