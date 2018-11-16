@@ -1,47 +1,37 @@
 //! `Span` and `Event` key-value data.
 //!
 //! Spans and events may be annotated with key-value data, referred to as known
-//! as _fields_. These fields consist of a mapping from a `&'static str` to a
-//! piece of data, known as a `Value`.
-//!
-//! # Values and Recorders
-//!
-//! `tokio_trace` represents values as either one of a set of Rust primitives
-//! (`i64`, `u64`, `bool`, and `&str`) or using a `fmt::Display` or `fmt::Debug`
-//! implementation. The `Record` trait represents a type that can consume these
-//! values.
-//!
-//! By default, `Record` implements the trait functions for recording primitives
-//! by calling its `record_fmt` function, so that only the `record_fmt` function
-//! must be implemented. However, implementors of `Record` that wish to consume
-//! these primitives as their types may override the `record` methods for any
-//! types they care about. For example, we might record integers by incrementing
-//! counters for their field names, rather than printing them.
+//! as _fields_. These fields consist of a mapping
 //!
 //! # `Value`s and `Subscriber`s
 //!
 //! `Subscriber`s consume `Value`s as fields attached to `Event`s or `Span`s.
-//! These cases are handled somewhat differently.
+//! The set of field keys on a given `Span` or `Event` is defined on its
+//! `Metadata`. Once the span or event has been created (i.e., the `new_id` or
+//! `new_span` methods on the `Subscriber` have been called), field values may
+//! be added by calls to the subscriber's `record_` methods.
 //!
-//! When a field is attached to an `Event`, the `Subscriber::observe_event`
-//! method is passed an `Event` struct which provides an iterator
-//! (`Event::fields`) to iterate over the event's fields, providing references
-//! to the values as `Value` trait objects.
+//! `tokio_trace` represents values as either one of a set of Rust primitives
+//! (`i64`, `u64`, `bool`, and `&str`) or using a `fmt::Display` or `fmt::Debug`
+//! implementation. The `record_` trait functions on the `Subscriber` trait allow
+//! `Subscriber` implementations to provide type-specific behaviour for
+//! consuming values of each type.
 //!
-//! `Span`s, on the other hand, are somewhat more complex. As `Span`s are not
-//! instantaneous, the values of their fields may be discovered and added to the
-//! span _during_ the `Span`'s execution. Thus, rather than receiving all the
-//! field values when the span is initially created, subscribers are instead
-//! notified of each field as it is added to the span, via the
-//! `Subscriber::record` method. That method is called with the span's ID, the
-//! name of the field whose value is being added, and the value to add.
+//! The `Subscriber` trait provides default implementations of `record_u64`,
+//! `record_i64`, `record_bool`, and `record_str` which call the `record_fmt`
+//! function, so that only the `record_fmt` function must be implemented.
+//! However, implementors of `Subscriber` that wish to consume these primitives
+//! as their types may override the `record` methods for any types they care
+//! about. For example, we might record integers by incrementing counters for
+//! their field names, rather than printing them.
+//
 use std::fmt;
 use {span::Id, Subscriber, Meta};
 
 /// A field value of an erased type.
 ///
 /// Implementors of `Value` may call the appropriate typed recording methods on
-/// the `Record` passed to `Record` in order to indicate how their data
+/// the `Subscriber` passed to `record` in order to indicate how their data
 /// should be recorded.
 pub trait Value: ::sealed::Sealed + Send {
     /// Records this value with the given `Subscriber`.
@@ -79,7 +69,7 @@ pub struct DebugValue<T: fmt::Debug>(T);
 
 impl Value {
     /// Wraps a type implementing `fmt::Display` as a `Value` that can be
-    /// serialized using its `Display` implementation.
+    /// recorded using its `Display` implementation.
     pub fn display<'a, T>(t: T) -> DisplayValue<T>
     where
         T: fmt::Display,
@@ -88,7 +78,7 @@ impl Value {
     }
 
     /// Wraps a type implementing `fmt::Debug` as a `Value` that can be
-    /// serialized using its `Debug` implementation.
+    /// recorded using its `Debug` implementation.
     pub fn debug<T>(t: T) -> DebugValue<T>
     where
         T: fmt::Debug,

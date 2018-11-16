@@ -357,7 +357,7 @@ impl<'a> Event<'a> {
             }
             let parent = Id::current();
             let attrs = Attributes::new(parent.clone(), meta);
-            let id = dispatch.new_event(attrs);
+            let id = dispatch.new_id(attrs);
             let inner = Enter::new(id, parent, dispatch, meta);
             inner.has_entered.store(true, Ordering::Relaxed);
             inner.close();

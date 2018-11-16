@@ -139,7 +139,7 @@ impl Subscriber for SloggishSubscriber {
         true
     }
 
-    fn new_event(&self, span: tokio_trace::span::Attributes) -> tokio_trace::span::Id {
+    fn new_id(&self, span: tokio_trace::span::Attributes) -> tokio_trace::span::Id {
         let next = self.ids.fetch_add(1, Ordering::SeqCst) as u64;
         let id = tokio_trace::span::Id::from_u64(next);
         id

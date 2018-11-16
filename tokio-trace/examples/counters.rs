@@ -42,7 +42,7 @@ impl Subscriber for CounterSubscriber {
         interest
     }
 
-    fn new_event(&self, _new_span: span::Attributes) -> span::Id {
+    fn new_id(&self, _new_span: span::Attributes) -> span::Id {
         let id = self.ids.fetch_add(1, Ordering::SeqCst);
         span::Id::from_u64(id as u64)
     }

@@ -97,8 +97,8 @@ impl Subscriber for Dispatch {
     }
 
     #[inline]
-    fn new_event(&self, span: span::Attributes) -> span::Id {
-        self.subscriber.new_event(span)
+    fn new_id(&self, span: span::Attributes) -> span::Id {
+        self.subscriber.new_id(span)
     }
 
     #[inline]
@@ -193,7 +193,7 @@ impl Subscriber for Dispatch {
 
 struct NoSubscriber;
 impl Subscriber for NoSubscriber {
-    fn new_event(&self, _span: span::Attributes) -> span::Id {
+    fn new_id(&self, _span: span::Attributes) -> span::Id {
         span::Id::from_u64(0)
     }
 

@@ -93,7 +93,7 @@ impl<'a> AsLog for Meta<'a> {
 impl<'a> AsTrace for log::Record<'a> {
     type Trace = Meta<'a>;
     fn as_trace(&self) -> Self::Trace {
-        Meta::new_event(
+        Meta::new_id(
             self.target(),
             self.level().as_trace(),
             self.module_path(),
@@ -238,7 +238,7 @@ impl Subscriber for TraceLogger {
         log::logger().enabled(&metadata.as_log())
     }
 
-    fn new_event(&self, new_span: span::Attributes) -> span::Id {
+    fn new_id(&self, new_span: span::Attributes) -> span::Id {
         static NEXT_ID: AtomicUsize = ATOMIC_USIZE_INIT;
         let id = span::Id::from_u64(NEXT_ID.fetch_add(1, Ordering::SeqCst) as u64);
         self.in_progress

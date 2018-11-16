@@ -39,10 +39,10 @@ pub trait RegisterSpan {
     ///
     /// [span ID]: ../span/struct.Id.html
     fn new_span(&self, new_span: SpanAttributes) -> Id {
-        self.new_event(new_span)
+        self.new_id(new_span)
     }
 
-    fn new_event(&self, new_event: Attributes) -> Id;
+    fn new_id(&self, new_id: Attributes) -> Id;
 
     fn record(
         &self,
@@ -178,7 +178,7 @@ impl RegisterSpan for IncreasingCounter {
         id
     }
 
-    fn new_event(&self, new_event: span::Attributes) -> Id {
+    fn new_id(&self, new_id: span::Attributes) -> Id {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
         let id = Id::from_u64(id as u64);
         id

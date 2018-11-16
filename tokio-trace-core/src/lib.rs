@@ -224,7 +224,7 @@ impl<'a> Meta<'a> {
 
     /// Construct new metadata for an event, with a target, level, field names,
     /// and optional source code location.
-    pub fn new_event(
+    pub fn new_id(
         target: &'a str,
         level: Level,
         module_path: Option<&'a str>,

@@ -96,29 +96,44 @@ pub trait Subscriber {
         Interest::from_filter(self.enabled(metadata))
     }
 
-    /// Record the construction of a new [`Span`], returning a a new [span ID] for
-    /// the span being constructed.
+    /// Record the construction of a new [`Span`], returning a a new [span ID]
+    /// for the span being constructed.
     ///
-    /// Span IDs are used to uniquely identify spans within the context
-    /// of a subscriber, so span equality will be based on the returned
-    /// ID. Thus, if the subscriber wishes for all spans with the same
-    /// metadata to be considered equal, it should return the same ID
-    /// every time it is given a particular set of metadata. Similarly,
-    /// if it wishes for two separate instances of a span with the same
-    /// metadata to *not* be equal, it should return a distinct ID every
-    /// time this function is called, regardless of the metadata.
+    /// Unlike [`new_id`], this function is always called with span
+    /// [`Attributes`] which are valid for the `'static` lifetime, rather than
+    /// `Event` `Attributes`, which only live for a generic lifetime.
+    ///
+    /// his function defaults to simply calling `self.new_id`, but if the
+    /// subscriber wishes to do something with the the known-`'static` span
+    /// `Attributes` (such as storing a reference to them in some collection) it
+    /// may override the default implementation to do so. It may then generate a
+    /// new ID for that span, either by calling `new_id`, or through a different
+    /// method from the ID generation for events.
+    ///
+    /// [span ID]: ::span::Id [`Span`]: ::span::Span [`new_id`]:
+    /// ::subscriber::Subscriber::new_id [`Attributes`]: ::span::Attributes
+    fn new_span(&self, span: span::SpanAttributes) -> span::Id {
+        self.new_id(span)
+    }
+
+    /// Record the construction of a new [`Span`] or [`Event`], returning a new
+    /// [ID] for the span or event being constructed.
+    ///
+    /// IDs are used to uniquely identify spans and events within the context of a
+    /// subscriber, so span equality will be based on the returned ID. Thus, if
+    /// the subscriber wishes for all spans with the same metadata to be
+    /// considered equal, it should return the same ID every time it is given a
+    /// particular set of metadata. Similarly, if it wishes for two separate
+    /// instances of a span with the same metadata to *not* be equal, it should
+    /// return a distinct ID every time this function is called, regardless of
+    /// the metadata.
     ///
     /// Subscribers which do not rely on the implementations of `PartialEq`,
     /// `Eq`, and `Hash` for `Span`s are free to return span IDs with value 0
     /// from all calls to this function, if they so choose.
     ///
-    /// [span ID]: ::span::Id
-    /// [`Span`]: ::span::Span
-    fn new_span(&self, span: span::SpanAttributes) -> span::Id {
-        self.new_event(span)
-    }
-
-    fn new_event(&self, attrs: span::Attributes) -> span::Id;
+    /// [ID]: ::span::Id [`Span`]: ::span::Span [`Event`]: ::span::Event
+    fn new_id(&self, attrs: span::Attributes) -> span::Id;
 
     /// Record a signed 64-bit integer value.
     ///
@@ -676,7 +691,7 @@ mod test_support {
             Ok(())
         }
 
-        fn new_event(&self, span: span::Attributes) -> span::Id {
+        fn new_id(&self, span: span::Attributes) -> span::Id {
             let id = self.ids.fetch_add(1, Ordering::SeqCst);
             let id = span::Id::from_u64(id as u64);
             id

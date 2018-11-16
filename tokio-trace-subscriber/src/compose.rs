@@ -102,8 +102,8 @@ where
         self.registry.new_span(new_span)
     }
 
-    fn new_event(&self, new_event: span::Attributes) -> span::Id {
-        self.registry.new_event(new_event)
+    fn new_id(&self, new_id: span::Attributes) -> span::Id {
+        self.registry.new_id(new_id)
     }
 
     fn record_fmt(
