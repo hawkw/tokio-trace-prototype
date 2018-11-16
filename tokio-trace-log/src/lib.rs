@@ -25,7 +25,7 @@ extern crate tokio_trace_subscriber;
 
 use std::{
     collections::HashMap,
-    fmt, io,
+    fmt::{self, Write}, io,
     sync::{
         atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT},
         Mutex,
@@ -147,6 +147,7 @@ pub struct TraceLoggerBuilder {
     log_enters: bool,
     log_exits: bool,
     log_ids: bool,
+    parent_fields: bool,
 }
 
 struct InProgress {
@@ -216,6 +217,13 @@ impl TraceLoggerBuilder {
         }
     }
 
+    pub fn with_parent_fields(self, parent_fields: bool) -> Self {
+        Self {
+            parent_fields,
+            ..self
+        }
+    }
+
     pub fn with_span_entry(self, log_enters: bool) -> Self {
         Self {
             log_enters,
@@ -249,8 +257,7 @@ struct SpanLineBuilder {
 }
 
 impl SpanLineBuilder {
-    fn new(attrs: span::SpanAttributes, id: Id, settings: &TraceLoggerBuilder) -> Self {
-        use std::fmt::Write;
+    fn new(attrs: span::SpanAttributes, fields: String, id: Id, settings: &TraceLoggerBuilder) -> Self {
         let mut log_line = String::new();
         let meta = attrs.metadata();
         write!(
@@ -270,12 +277,11 @@ impl SpanLineBuilder {
         Self {
             attrs,
             log_line,
-            fields: String::new(),
+            fields,
         }
     }
 
     fn record(&mut self, key: &field::Key, val: fmt::Arguments) -> fmt::Result {
-        use std::fmt::Write;
         write!(&mut self.fields, "{}=", key.name().unwrap_or("???"))?;
         self.fields.write_fmt(val)?;
         self.fields.write_str("; ")
@@ -313,7 +319,6 @@ struct EventLineBuilder {
 
 impl EventLineBuilder {
     fn new(attrs: span::Attributes, id: Id, settings: &TraceLoggerBuilder) -> Self {
-        use std::fmt::Write;
         let mut log_line = String::new();
         let meta = attrs.metadata();
         if settings.log_ids {
@@ -336,7 +341,6 @@ impl EventLineBuilder {
     }
 
     fn record(&mut self, key: &field::Key, val: fmt::Arguments) -> fmt::Result {
-        use std::fmt::Write;
         if key.name() == Some("message") {
             self.message.write_fmt(val)
         } else {
@@ -375,11 +379,22 @@ impl Subscriber for TraceLogger {
 
     fn new_span(&self, new_span: span::SpanAttributes) -> Id {
         let id = self.next_id();
-        self.in_progress
+        let mut in_progress = self.in_progress
             .lock()
-            .unwrap()
-            .spans
-            .insert(id.clone(), SpanLineBuilder::new(new_span, id.clone(), &self.settings));
+            .unwrap();
+        let mut fields = String::new();
+        if self.settings.parent_fields {
+            let mut next_parent = new_span.parent();
+            while let Some(ref parent) = next_parent
+                .and_then(|p| in_progress.spans.get(&p))
+            {
+                write!(&mut fields, "{}", parent.fields)
+                    .expect("write to string cannot fail");
+                next_parent = parent.attrs.parent();
+            }
+        }
+        in_progress.spans
+            .insert(id.clone(), SpanLineBuilder::new(new_span, fields, id.clone(), &self.settings));
         id
     }
 
