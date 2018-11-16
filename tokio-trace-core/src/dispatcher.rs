@@ -149,6 +149,11 @@ impl Subscriber for Dispatch {
     fn drop_span(&self, id: span::Id) {
         self.subscriber.drop_span(id)
     }
+
+    #[inline]
+    fn handle_count(&self, id: span::Id) -> Option<usize> {
+        self.subscriber.handle_count(id)
+    }
 }
 
 struct NoSubscriber;

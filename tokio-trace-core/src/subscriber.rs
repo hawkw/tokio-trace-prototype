@@ -244,6 +244,13 @@ pub trait Subscriber {
     fn drop_span(&self, id: span::Id) {
         let _ = id;
     }
+
+    /// If this subscriber is tracking the number of active span handles using
+    /// `clone_span`/`drop_span`, then it should implement this function
+    /// returning the number of handles to the span with the given ID.
+    fn handle_count(&self, id: span::Id) -> Option<usize> {
+        None,
+    }
 }
 
 /// Indicates a `Subscriber`'s interest in a particular callsite.

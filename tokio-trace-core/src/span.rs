@@ -514,7 +514,11 @@ impl Enter {
     ///   have never been entered),
     /// - there aren't multiple handles capable of entering the span.
     fn should_close(&self) -> bool {
-        self.wants_close() && self.has_entered() && self.handle_count() == 1
+        self.wants_close() && self.has_entered() && self.accurate_handle_count() == 1
+    }
+
+    fn accurate_handle_count(&self) -> usize {
+        self.subscriber.handle_count(self.id).unwrap_or_else(self.handle_count())
     }
 
     fn has_entered(&self) -> bool {
