@@ -691,7 +691,7 @@ mod test_support {
             Ok(())
         }
 
-        fn new_id(&self, span: span::Attributes) -> Id {
+        fn new_id(&self, _span: span::Attributes) -> Id {
             let id = self.ids.fetch_add(1, Ordering::SeqCst);
             let id = Id::from_u64(id as u64);
             id

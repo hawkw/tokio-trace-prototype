@@ -108,9 +108,9 @@ where
 
     fn record_fmt(
         &self,
-        span: &Id,
-        name: &tokio_trace::field::Key,
-        value: ::std::fmt::Arguments,
+        _span: &Id,
+        _name: &tokio_trace::field::Key,
+        _value: ::std::fmt::Arguments,
     ) -> Result<(), RecordError> {
         unimplemented!()
     }

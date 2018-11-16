@@ -178,7 +178,7 @@ impl RegisterSpan for IncreasingCounter {
         id
     }
 
-    fn new_id(&self, new_id: span::Attributes) -> Id {
+    fn new_id(&self, _new_id: span::Attributes) -> Id {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
         let id = Id::from_u64(id as u64);
         id
