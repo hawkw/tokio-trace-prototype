@@ -121,7 +121,7 @@ fn span_with_fields(b: &mut Bencher) {
                 foo = "foo",
                 bar = "bar",
                 baz = 3u64,
-                quuux = tokio_trace::Value::debug(0.99)
+                quuux = tokio_trace::field::debug(0.99)
             )
         })
     });
