@@ -74,7 +74,7 @@
 #[macro_use]
 extern crate lazy_static;
 
-use std::{borrow::Borrow, fmt, slice};
+use std::borrow::Borrow;
 
 /// Describes the level of verbosity of a `Span` or `Event`.
 #[repr(usize)]
@@ -193,8 +193,6 @@ enum KindInner {
     Span,
     Event,
 }
-
-type StaticMeta = Meta<'static>;
 
 // ===== impl Meta =====
 

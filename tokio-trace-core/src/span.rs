@@ -10,11 +10,8 @@ use {
     callsite::Callsite,
     field::{self, Key},
     subscriber::{FollowsError, Interest, RecordError, Subscriber},
-    Dispatch, Meta, StaticMeta,
+    Dispatch, Meta,
 };
-
-pub type SpanAttributes = Attributes<'static>;
-pub type Enter = Inner<'static>;
 
 thread_local! {
     // TODO: can this be a `Cell`?
@@ -76,6 +73,12 @@ pub struct Attributes<'a> {
     metadata: &'a Meta<'a>,
 }
 
+/// Unlike `Event` [`Attributes`], `Span` attributes are always constructed from
+/// metadata which is known to me valid for the `'static` lifetime.
+///
+/// [`Attributes`]: ::span::Attributes
+pub type SpanAttributes = Attributes<'static>;
+
 /// Identifies a span within the context of a process.
 ///
 /// Span IDs are used primarily to determine of two handles refer to the same
@@ -125,6 +128,10 @@ pub struct Inner<'a> {
 
     meta: &'a Meta<'a>,
 }
+
+/// When an `Inner` corresponds to a `Span` rather than an `Event`, it can be
+/// used to enter that span.
+pub type Enter = Inner<'static>;
 
 /// A guard representing a span which has been entered and is currently
 /// executing.
@@ -367,6 +374,7 @@ impl<'a> Event<'a> {
         })
     }
 
+    /// Adds a formattable message describing the event that occurred.
     pub fn message(
         &mut self,
         key: &field::Key,
@@ -649,16 +657,6 @@ impl Enter {
         Entered { prior }
     }
 
-    pub fn exit_and_join(&self, other: Entered) {
-        if let Some(other) = other.exit() {
-            self.handles.store(other.handle_count(), Ordering::Release);
-            self.has_entered
-                .store(other.has_entered(), Ordering::Release);
-            self.wants_close
-                .store(other.take_close(), Ordering::Release);
-        }
-    }
-
     /// Exits the span entry represented by an `Entered` guard, consuming it,
     /// and updates `self` to canonically represent the referenced span's state
     /// after the other entry has exited.
@@ -674,6 +672,16 @@ impl Enter {
     /// This function is intended to be used by span handle implementations to
     /// ensuring that multiple entering handles are kept consistent. Probably
     /// don't use this unless you know what you're doing.
+    pub fn exit_and_join(&self, other: Entered) {
+        if let Some(other) = other.exit() {
+            self.handles.store(other.handle_count(), Ordering::Release);
+            self.has_entered
+                .store(other.has_entered(), Ordering::Release);
+            self.wants_close
+                .store(other.take_close(), Ordering::Release);
+        }
+    }
+
     fn clone_current() -> Option<Self> {
         CURRENT_SPAN.with(|current| {
             current.borrow().as_ref().map(|ref current| {

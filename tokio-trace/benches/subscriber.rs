@@ -1,11 +1,9 @@
 #![feature(test)]
-#[macro_use]
-extern crate tokio_trace;
 extern crate test;
 use test::Bencher;
 
 use std::sync::Mutex;
-use tokio_trace::{field, span, subscriber, Event, Meta, Id};
+use tokio_trace::{field, span, subscriber, Meta, Id};
 
 /// A subscriber that is enabled but otherwise does nothing.
 struct EnabledSubscriber;
@@ -68,8 +66,8 @@ impl tokio_trace::Subscriber for Record {
 
     fn record_fmt(
         &self,
-        span: &Id,
-        field: &field::Key,
+        _span: &Id,
+        _field: &field::Key,
         value: ::std::fmt::Arguments,
     ) -> Result<(), tokio_trace::subscriber::RecordError> {
         let _ = ::std::fmt::format(value);
@@ -119,7 +117,7 @@ fn span_repeatedly(b: &mut Bencher) {
 
     let n = test::black_box(N_SPANS);
     tokio_trace::Dispatch::new(EnabledSubscriber)
-        .as_default(|| b.iter(|| (0..n).fold(mk_span(0), |span, i| mk_span(i as u64))));
+        .as_default(|| b.iter(|| (0..n).fold(mk_span(0), |_, i| mk_span(i as u64))));
 }
 
 #[bench]

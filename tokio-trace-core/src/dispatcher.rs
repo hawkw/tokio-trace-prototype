@@ -2,7 +2,7 @@ use {
     callsite, field,
     span::{self, Span},
     subscriber::{self, Subscriber, RecordError},
-    Event, Meta, Id,
+    Meta, Id,
 };
 
 use std::{
