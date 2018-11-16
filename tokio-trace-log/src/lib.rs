@@ -137,7 +137,16 @@ pub struct LogTracer {
 /// A `tokio_trace_subscriber::Observe` implementation that logs all recorded
 /// trace events.
 pub struct TraceLogger {
+    settings: TraceLoggerBuilder,
     in_progress: Mutex<InProgress>,
+}
+
+#[derive(Default)]
+pub struct TraceLoggerBuilder {
+    log_span_closes: bool,
+    log_enters: bool,
+    log_exits: bool,
+    log_ids: bool,
 }
 
 struct InProgress {
@@ -174,7 +183,16 @@ impl log::Log for LogTracer {
 
 impl TraceLogger {
     pub fn new() -> Self {
-        TraceLogger {
+        Self::builder().finish()
+    }
+
+    pub fn builder() -> TraceLoggerBuilder {
+        Default::default()
+    }
+
+    fn from_builder(settings: TraceLoggerBuilder) -> Self {
+        Self {
+            settings,
             in_progress: Mutex::new(InProgress {
                 spans: HashMap::new(),
                 events: HashMap::new(),
@@ -188,6 +206,42 @@ impl TraceLogger {
     }
 }
 
+// ===== impl TraceLoggerBuilder =====
+
+impl TraceLoggerBuilder {
+    pub fn with_span_closes(self, log_span_closes: bool) -> Self {
+        Self {
+            log_span_closes,
+            ..self
+        }
+    }
+
+    pub fn with_span_entry(self, log_enters: bool) -> Self {
+        Self {
+            log_enters,
+            ..self
+        }
+    }
+
+    pub fn with_span_exits(self, log_exits: bool) -> Self {
+        Self {
+            log_exits,
+            ..self
+        }
+    }
+
+    pub fn with_ids(self, log_ids: bool) -> Self {
+        Self {
+            log_ids,
+            ..self
+        }
+    }
+
+    pub fn finish(self) -> TraceLogger {
+        TraceLogger::from_builder(self)
+    }
+}
+
 struct SpanLineBuilder {
     attrs: span::SpanAttributes,
     log_line: String,
@@ -195,18 +249,24 @@ struct SpanLineBuilder {
 }
 
 impl SpanLineBuilder {
-    fn new(attrs: span::SpanAttributes, id: Id) -> Self {
+    fn new(attrs: span::SpanAttributes, id: Id, settings: &TraceLoggerBuilder) -> Self {
         use std::fmt::Write;
         let mut log_line = String::new();
         let meta = attrs.metadata();
         write!(
             &mut log_line,
-            "{}{}span={:?}; parent={:?};",
-            meta.name.unwrap_or(""),
-            if meta.name.is_some() { " " } else { "" },
-            id,
-            attrs.parent(),
-        ).unwrap();
+            "{}",
+            meta.name.unwrap_or("unknown span"),
+        ).expect("write to string shouldn't fail");
+        if settings.log_ids {
+            write!(
+                &mut log_line,
+                "{}span={:?}; parent={:?};",
+                if meta.name.is_some() { " " } else { "" },
+                id,
+                attrs.parent(),
+            ).expect("write to string shouldn't fail");
+        }
         Self {
             attrs,
             log_line,
@@ -252,16 +312,18 @@ struct EventLineBuilder {
 }
 
 impl EventLineBuilder {
-    fn new(attrs: span::Attributes, id: Id) -> Self {
+    fn new(attrs: span::Attributes, id: Id, settings: &TraceLoggerBuilder) -> Self {
         use std::fmt::Write;
         let mut log_line = String::new();
         let meta = attrs.metadata();
-        write!(
-            &mut log_line,
-            "event={:?}; parent={:?}; ",
-            id,
-            attrs.parent(),
-        ).unwrap();
+        if settings.log_ids {
+            write!(
+                &mut log_line,
+                "event={:?}; parent={:?}; ",
+                id,
+                attrs.parent(),
+            ).expect("write to string shouldn't fail");
+        }
         Self {
             level: meta.level,
             file: meta.file.map(|s| s.to_owned()),
@@ -317,7 +379,7 @@ impl Subscriber for TraceLogger {
             .lock()
             .unwrap()
             .spans
-            .insert(id.clone(), SpanLineBuilder::new(new_span, id.clone()));
+            .insert(id.clone(), SpanLineBuilder::new(new_span, id.clone(), &self.settings));
         id
     }
 
@@ -327,7 +389,7 @@ impl Subscriber for TraceLogger {
             .lock()
             .unwrap()
             .events
-            .insert(id.clone(), EventLineBuilder::new(new_span, id.clone()));
+            .insert(id.clone(), EventLineBuilder::new(new_span, id.clone(), &self.settings));
         id
     }
 
@@ -362,29 +424,35 @@ impl Subscriber for TraceLogger {
     }
 
     fn enter(&self, span: Id) {
-        let logger = log::logger();
-        logger.log(
-            &log::Record::builder()
-                .level(log::Level::Trace)
-                .args(format_args!("enter: span={:?};", span))
-                .build(),
-        );
+        if self.settings.log_enters {
+            let logger = log::logger();
+            logger.log(
+                &log::Record::builder()
+                    .level(log::Level::Trace)
+                    .args(format_args!("enter: span={:?};", span))
+                    .build(),
+            );
+        }
     }
 
     fn exit(&self, span: Id) {
-        let logger = log::logger();
-        logger.log(
-            &log::Record::builder()
-                .level(log::Level::Trace)
-                .args(format_args!("exit: id={:?};", span))
-                .build(),
-        );
+        if self.settings.log_exits {
+            let logger = log::logger();
+            logger.log(
+                &log::Record::builder()
+                    .level(log::Level::Trace)
+                    .args(format_args!("exit: id={:?};", span))
+                    .build(),
+            );
+        }
     }
 
     fn close(&self, id: Id) {
         let mut in_progress = self.in_progress.lock().unwrap();
         if let Some(span) = in_progress.spans.remove(&id) {
-            span.finish();
+            if self.settings.log_span_closes {
+                span.finish();
+            }
             return
         };
         let event = in_progress.events.remove(&id);
