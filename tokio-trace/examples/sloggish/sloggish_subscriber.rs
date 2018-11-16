@@ -68,13 +68,14 @@ impl Span {
     fn record(
         &mut self,
         key: &tokio_trace::field::Key,
-        value: &dyn tokio_trace::field::Value,
+        value: fmt::Arguments,
     ) -> Result<(), subscriber::RecordError> {
         let mut s = String::new();
-        value.record(key, &mut tokio_trace::field::DebugRecorder::new(&mut s))?;
+        // value.record(key, &mut tokio_trace::field::DebugRecorder::new(&mut s))?;
         // TODO: shouldn't have to alloc the key...
-        self.kvs.push((key.name().unwrap_or("???").to_owned(), s));
-        Ok(())
+        // self.kvs.push((key.name().unwrap_or("???").to_owned(), s));
+        unimplemented!()
+        // Ok(())
     }
 }
 
@@ -138,7 +139,13 @@ impl Subscriber for SloggishSubscriber {
         true
     }
 
-    fn new_span(&self, span: tokio_trace::span::Attributes) -> tokio_trace::span::Id {
+    fn new_event(&self, span: tokio_trace::span::Attributes) -> tokio_trace::span::Id {
+        let next = self.ids.fetch_add(1, Ordering::SeqCst) as u64;
+        let id = tokio_trace::span::Id::from_u64(next);
+        id
+    }
+
+    fn new_span(&self, span: tokio_trace::span::SpanAttributes) -> tokio_trace::span::Id {
         let next = self.ids.fetch_add(1, Ordering::SeqCst) as u64;
         let id = tokio_trace::span::Id::from_u64(next);
         self.spans
@@ -148,18 +155,19 @@ impl Subscriber for SloggishSubscriber {
         id
     }
 
-    fn record(
+    fn record_fmt(
         &self,
         span: &tokio_trace::SpanId,
         name: &tokio_trace::field::Key,
-        value: &dyn tokio_trace::field::Value,
+        value: fmt::Arguments,
     ) -> Result<(), subscriber::RecordError> {
         let mut spans = self.spans.lock().expect("mutex poisoned!");
         let span = spans
             .get_mut(span)
             .ok_or_else(|| subscriber::RecordError::no_span(span.clone()))?;
-        span.record(name, value)?;
-        Ok(())
+        // span.record(name, value)?;
+        unimplemented!()
+        // Ok(())
     }
 
     fn add_follows_from(
@@ -169,50 +177,6 @@ impl Subscriber for SloggishSubscriber {
     ) -> Result<(), subscriber::FollowsError> {
         // unimplemented
         Ok(())
-    }
-
-    #[inline]
-    fn observe_event<'a>(&self, event: &'a tokio_trace::Event<'a>) {
-        struct Display<'a> {
-            key: field::Key<'a>,
-            value: &'a dyn field::Value,
-        };
-        impl<'a> fmt::Display for Display<'a> {
-            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                self.value
-                    .record(&self.key, &mut field::DebugRecorder::new(f))
-                    .map_err(|_| fmt::Error)
-            }
-        }
-        let mut stderr = self.stderr.lock();
-
-        let stack = self.stack.lock().unwrap();
-        if let Some(idx) = stack
-            .iter()
-            .position(|id| event.parent().as_ref().map(|p| p == id).unwrap_or(false))
-        {
-            self.print_indent(&mut stderr, idx + 1).unwrap();
-        }
-        write!(
-            &mut stderr,
-            "{} ",
-            humantime::format_rfc3339_seconds(SystemTime::now())
-        ).unwrap();
-        self.print_meta(&mut stderr, event.metadata()).unwrap();
-        write!(
-            &mut stderr,
-            "{}",
-            Style::new().bold().paint(format!("{}", event.message()))
-        ).unwrap();
-        self.print_kvs(
-            &mut stderr,
-            event.fields().map(|(key, value)| {
-                let display = Display { key, value };
-                (display.key.clone(), display)
-            }),
-            ", ",
-        ).unwrap();
-        write!(&mut stderr, "\n").unwrap();
     }
 
     #[inline]

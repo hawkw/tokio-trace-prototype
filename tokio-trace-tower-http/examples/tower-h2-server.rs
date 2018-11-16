@@ -139,7 +139,7 @@ fn main() {
 
                         let serve = h2
                             .serve(sock)
-                            .map_err(|e| event!(Level::Error, {}, "error {:?}", e))
+                            .map_err(|e| { event!(Level::Error, {}, "error {:?}", e); })
                             .and_then(|_| {
                                 event!(Level::Debug, {}, "response finished");
                                 future::ok(())
@@ -148,7 +148,7 @@ fn main() {
 
                         Ok((h2, reactor))
                     })
-                }).map_err(|e| event!(Level::Error, {}, "serve error {:?}", e))
+                }).map_err(|e| { event!(Level::Error, {}, "serve error {:?}", e); })
                 .map(|_| {})
                 .in_current_span();
 
