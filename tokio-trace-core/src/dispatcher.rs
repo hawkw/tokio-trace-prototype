@@ -151,7 +151,7 @@ impl Subscriber for Dispatch {
     }
 
     #[inline]
-    fn handle_count(&self, id: span::Id) -> Option<usize> {
+    fn handle_count(&self, id: &span::Id) -> Option<usize> {
         self.subscriber.handle_count(id)
     }
 }

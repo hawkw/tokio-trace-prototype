@@ -245,11 +245,16 @@ pub trait Subscriber {
         let _ = id;
     }
 
+    /// Returns the subscriber's perspective on the number of handles to the
+    /// span with the given `id`.
+    ///
     /// If this subscriber is tracking the number of active span handles using
     /// `clone_span`/`drop_span`, then it should implement this function
     /// returning the number of handles to the span with the given ID.
-    fn handle_count(&self, id: span::Id) -> Option<usize> {
-        None,
+    /// Otherwise, the default implementation returns `None`.
+    fn handle_count(&self, id: &span::Id) -> Option<usize> {
+        let _ = id;
+        None
     }
 }
 

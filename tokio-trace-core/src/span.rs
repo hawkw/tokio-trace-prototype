@@ -501,7 +501,7 @@ impl Enter {
             parent: self.parent.clone(),
             wants_close: AtomicBool::from(self.wants_close()),
             has_entered: AtomicBool::from(self.has_entered()),
-            handles: AtomicUsize::from(self.handle_count()),
+            handles: AtomicUsize::from(self.my_handle_count()),
             meta: self.meta,
         }
     }
@@ -514,11 +514,11 @@ impl Enter {
     ///   have never been entered),
     /// - there aren't multiple handles capable of entering the span.
     fn should_close(&self) -> bool {
-        self.wants_close() && self.has_entered() && self.accurate_handle_count() == 1
+        self.wants_close() && self.has_entered() && self.handle_count() == 1
     }
 
-    fn accurate_handle_count(&self) -> usize {
-        self.subscriber.handle_count(self.id).unwrap_or_else(self.handle_count())
+    fn handle_count(&self) -> usize {
+        self.subscriber.handle_count(&self.id).unwrap_or_else(|| { self.my_handle_count() })
     }
 
     fn has_entered(&self) -> bool {
@@ -533,7 +533,12 @@ impl Enter {
         self.wants_close.swap(false, Ordering::Release)
     }
 
-    fn handle_count(&self) -> usize {
+    /// Returns this `Span`s count of the number of handles that exist for the
+    /// span.
+    ///
+    /// If the subscriber is tracking span handle counts, its perspective is
+    /// likely to be more accurate.
+    fn my_handle_count(&self) -> usize {
         self.handles.load(Ordering::Acquire)
     }
 }
