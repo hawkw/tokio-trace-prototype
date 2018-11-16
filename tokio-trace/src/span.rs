@@ -196,14 +196,17 @@
 //! [`Attributes`]: ::span::Attributes
 //! [shared span]: ::span::Shared
 //! [`IntoShared`]: ::span::IntoShared
-pub use tokio_trace_core::span::{Attributes, Id, Span, Event, SpanAttributes};
+pub use tokio_trace_core::span::{Attributes, Event, Id, Span, SpanAttributes};
 
 #[cfg(any(test, feature = "test-support"))]
 pub use tokio_trace_core::span::{mock, MockSpan};
 
 use std::{fmt, sync::Arc};
 use tokio_trace_core::span::Enter;
-use {field, subscriber::{self, RecordError}};
+use {
+    field,
+    subscriber::{self, RecordError},
+};
 
 /// Trait for converting a `Span` into a cloneable `Shared` span.
 pub trait IntoShared {
@@ -217,8 +220,7 @@ pub trait SpanExt: field::Record + ::sealed::Sealed {
     fn record<Q: ?Sized, V: ?Sized>(&mut self, field: &Q, value: &V) -> Result<(), RecordError>
     where
         Q: field::AsKey,
-        V: field::Value,
-    ;
+        V: field::Value;
 
     fn has_field_for<Q: ?Sized>(&self, field: &Q) -> bool
     where
@@ -349,9 +351,7 @@ impl field::Record for Span {
         Q: field::AsKey,
     {
         if let Some(meta) = self.metadata() {
-            let key = field
-                .as_key(meta)
-                .ok_or_else(RecordError::no_field)?;
+            let key = field.as_key(meta).ok_or_else(RecordError::no_field)?;
             self.record_value_i64(&key, value)?;
         }
         Ok(())
@@ -363,9 +363,7 @@ impl field::Record for Span {
         Q: field::AsKey,
     {
         if let Some(meta) = self.metadata() {
-            let key = field
-                .as_key(meta)
-                .ok_or_else(RecordError::no_field)?;
+            let key = field.as_key(meta).ok_or_else(RecordError::no_field)?;
             self.record_value_u64(&key, value)?;
         }
         Ok(())
@@ -377,9 +375,7 @@ impl field::Record for Span {
         Q: field::AsKey,
     {
         if let Some(meta) = self.metadata() {
-            let key = field
-                .as_key(meta)
-                .ok_or_else(RecordError::no_field)?;
+            let key = field.as_key(meta).ok_or_else(RecordError::no_field)?;
             self.record_value_bool(&key, value)?;
         }
         Ok(())
@@ -391,27 +387,19 @@ impl field::Record for Span {
         Q: field::AsKey,
     {
         if let Some(meta) = self.metadata() {
-            let key = field
-                .as_key(meta)
-                .ok_or_else(RecordError::no_field)?;
+            let key = field.as_key(meta).ok_or_else(RecordError::no_field)?;
             self.record_value_str(&key, value)?;
         }
         Ok(())
     }
 
     #[inline]
-    fn record_fmt<Q: ?Sized>(
-        &mut self,
-        field: &Q,
-        value: fmt::Arguments,
-    ) -> Result<(), RecordError>
+    fn record_fmt<Q: ?Sized>(&mut self, field: &Q, value: fmt::Arguments) -> Result<(), RecordError>
     where
         Q: field::AsKey,
     {
         if let Some(meta) = self.metadata() {
-            let key = field
-                .as_key(meta)
-                .ok_or_else(RecordError::no_field)?;
+            let key = field.as_key(meta).ok_or_else(RecordError::no_field)?;
             self.record_value_fmt(&key, value)?;
         }
         Ok(())
@@ -425,9 +413,7 @@ impl<'a> field::Record for Event<'a> {
         Q: field::AsKey,
     {
         if let Some(meta) = self.metadata() {
-            let key = field
-                .as_key(meta)
-                .ok_or_else(RecordError::no_field)?;
+            let key = field.as_key(meta).ok_or_else(RecordError::no_field)?;
             self.record_value_i64(&key, value)?;
         }
         Ok(())
@@ -439,9 +425,7 @@ impl<'a> field::Record for Event<'a> {
         Q: field::AsKey,
     {
         if let Some(meta) = self.metadata() {
-            let key = field
-                .as_key(meta)
-                .ok_or_else(RecordError::no_field)?;
+            let key = field.as_key(meta).ok_or_else(RecordError::no_field)?;
             self.record_value_u64(&key, value)?;
         }
         Ok(())
@@ -453,9 +437,7 @@ impl<'a> field::Record for Event<'a> {
         Q: field::AsKey,
     {
         if let Some(meta) = self.metadata() {
-            let key = field
-                .as_key(meta)
-                .ok_or_else(RecordError::no_field)?;
+            let key = field.as_key(meta).ok_or_else(RecordError::no_field)?;
             self.record_value_bool(&key, value)?;
         }
         Ok(())
@@ -467,27 +449,19 @@ impl<'a> field::Record for Event<'a> {
         Q: field::AsKey,
     {
         if let Some(meta) = self.metadata() {
-            let key = field
-                .as_key(meta)
-                .ok_or_else(RecordError::no_field)?;
+            let key = field.as_key(meta).ok_or_else(RecordError::no_field)?;
             self.record_value_str(&key, value)?;
         }
         Ok(())
     }
 
     #[inline]
-    fn record_fmt<Q: ?Sized>(
-        &mut self,
-        field: &Q,
-        value: fmt::Arguments,
-    ) -> Result<(), RecordError>
+    fn record_fmt<Q: ?Sized>(&mut self, field: &Q, value: fmt::Arguments) -> Result<(), RecordError>
     where
         Q: field::AsKey,
     {
         if let Some(meta) = self.metadata() {
-            let key = field
-                .as_key(meta)
-                .ok_or_else(RecordError::no_field)?;
+            let key = field.as_key(meta).ok_or_else(RecordError::no_field)?;
             self.record_value_fmt(&key, value)?;
         }
         Ok(())

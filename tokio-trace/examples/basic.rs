@@ -3,7 +3,7 @@ extern crate tokio_trace;
 extern crate env_logger;
 extern crate tokio_trace_log;
 
-use tokio_trace::{Level, Span, field};
+use tokio_trace::{field, Level, Span};
 
 fn main() {
     env_logger::Builder::new().parse("trace").init();

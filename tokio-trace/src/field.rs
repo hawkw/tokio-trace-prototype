@@ -1,7 +1,7 @@
 pub use tokio_trace_core::field::*;
 
 use std::fmt;
-use {Meta, ::subscriber::RecordError};
+use {subscriber::RecordError, Meta};
 
 /// Trait implemented to allow a type to be used as a field key.
 ///
@@ -31,7 +31,8 @@ pub trait Record {
     /// - The span has a field with the given name, but the value has already
     ///   been set.
     fn record_i64<Q: ?Sized>(&mut self, field: &Q, value: i64) -> Result<(), RecordError>
-    where Q: AsKey;
+    where
+        Q: AsKey;
 
     /// Record an umsigned 64-bit integer value.
     ///
@@ -45,7 +46,8 @@ pub trait Record {
     /// - The span has a field with the given name, but the value has already
     ///   been set.
     fn record_u64<Q: ?Sized>(&mut self, field: &Q, value: u64) -> Result<(), RecordError>
-    where Q: AsKey;
+    where
+        Q: AsKey;
 
     /// Record a boolean value.
     ///
@@ -59,7 +61,8 @@ pub trait Record {
     /// - The span has a field with the given name, but the value has already
     ///   been set.
     fn record_bool<Q: ?Sized>(&mut self, field: &Q, value: bool) -> Result<(), RecordError>
-    where Q: AsKey;
+    where
+        Q: AsKey;
 
     /// Record a string value.
     ///
@@ -73,7 +76,8 @@ pub trait Record {
     /// - The span has a field with the given name, but the value has already
     ///   been set.
     fn record_str<Q: ?Sized>(&mut self, field: &Q, value: &str) -> Result<(), RecordError>
-    where Q: AsKey;
+    where
+        Q: AsKey;
 
     /// Record a set of pre-compiled format arguments.
     ///
@@ -87,7 +91,8 @@ pub trait Record {
         field: &Q,
         value: fmt::Arguments,
     ) -> Result<(), RecordError>
-    where Q: AsKey;
+    where
+        Q: AsKey;
 }
 
 /// A field value of an erased type.
@@ -114,7 +119,6 @@ pub struct DisplayValue<T: fmt::Display>(T);
 /// A `Value` which serializes as a string using `fmt::Debug`.
 #[derive(Clone)]
 pub struct DebugValue<T: fmt::Debug>(T);
-
 
 /// Wraps a type implementing `fmt::Display` as a `Value` that can be
 /// recorded using its `Display` implementation.
@@ -231,11 +235,7 @@ impl<'a, T: ?Sized> Value for &'a T
 where
     T: Value + 'a,
 {
-    fn record<Q: ?Sized, R>(
-        &self,
-        key: &Q,
-        recorder: &mut R,
-    ) -> Result<(), RecordError>
+    fn record<Q: ?Sized, R>(&self, key: &Q, recorder: &mut R) -> Result<(), RecordError>
     where
         Q: AsKey,
         R: Record,
@@ -244,18 +244,13 @@ where
     }
 }
 
-
 // ===== impl DisplayValue =====
 
 impl<T> Value for DisplayValue<T>
 where
     T: fmt::Display,
 {
-    fn record<Q: ?Sized, R>(
-        &self,
-        key: &Q,
-        recorder: &mut R,
-    ) -> Result<(), RecordError>
+    fn record<Q: ?Sized, R>(&self, key: &Q, recorder: &mut R) -> Result<(), RecordError>
     where
         Q: AsKey,
         R: Record,
@@ -270,11 +265,7 @@ impl<T: fmt::Debug> Value for DebugValue<T>
 where
     T: fmt::Debug,
 {
-    fn record<Q: ?Sized, R>(
-        &self,
-        key: &Q,
-        recorder: &mut R,
-    ) -> Result<(), RecordError>
+    fn record<Q: ?Sized, R>(&self, key: &Q, recorder: &mut R) -> Result<(), RecordError>
     where
         Q: AsKey,
         R: Record,

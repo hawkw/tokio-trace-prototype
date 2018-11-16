@@ -257,7 +257,7 @@ impl Span {
     /// - The span does not have a field with the given name.
     /// - The span has a field with the given name, but the value has already
     ///   been set.
-    pub fn record_value_i64(&self,  field: &Key, value: i64) -> Result<(), RecordError> {
+    pub fn record_value_i64(&self, field: &Key, value: i64) -> Result<(), RecordError> {
         if let Some(ref inner) = self.inner {
             inner.record_value_i64(field, value)?;
         }
@@ -450,7 +450,7 @@ impl<'a> Event<'a> {
     /// - The span does not have a field with the given name.
     /// - The span has a field with the given name, but the value has already
     ///   been set.
-    pub fn record_value_i64(&mut self,  field: &Key, value: i64) -> Result<(), RecordError> {
+    pub fn record_value_i64(&mut self, field: &Key, value: i64) -> Result<(), RecordError> {
         if let Some(ref inner) = self.inner {
             inner.record_value_i64(field, value)?;
         }
@@ -693,7 +693,7 @@ impl<'a> Inner<'a> {
     /// - The span does not have a field with the given name.
     /// - The span has a field with the given name, but the value has already
     ///   been set.
-     pub(crate) fn record_value_u64(&self, field: &Key, value: u64) -> Result<(), RecordError> {
+    pub(crate) fn record_value_u64(&self, field: &Key, value: u64) -> Result<(), RecordError> {
         if !self.meta.contains_key(field) {
             return Err(RecordError::no_field());
         }
@@ -738,7 +738,11 @@ impl<'a> Inner<'a> {
     /// - The span does not have a field with the given name.
     /// - The span has a field with the given name, but the value has already
     ///   been set.
-    pub(crate) fn record_value_fmt(&self, field: &Key, value: fmt::Arguments) -> Result<(), RecordError> {
+    pub(crate) fn record_value_fmt(
+        &self,
+        field: &Key,
+        value: fmt::Arguments,
+    ) -> Result<(), RecordError> {
         if !self.meta.contains_key(field) {
             return Err(RecordError::no_field());
         }
