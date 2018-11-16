@@ -49,7 +49,7 @@ struct Event {
     level: tokio_trace::Level,
     target: String,
     message: String,
-    kvs: Vec<(String, String)>
+    kvs: Vec<(String, String)>,
 }
 
 struct ColorLevel(Level);
@@ -107,7 +107,7 @@ impl Event {
     ) -> Result<(), subscriber::RecordError> {
         if key.name() == Some("message") {
             self.message = fmt::format(value);
-            return Ok(())
+            return Ok(());
         }
 
         // TODO: shouldn't have to alloc the key...
@@ -198,7 +198,7 @@ impl Subscriber for SloggishSubscriber {
     ) -> Result<(), subscriber::RecordError> {
         let mut events = self.events.lock().expect("mutex poisoned!");
         if let Some(event) = events.get_mut(span) {
-            return event.record(name, value)
+            return event.record(name, value);
         };
         let mut spans = self.spans.lock().expect("mutex poisoned!");
         let span = spans
@@ -254,11 +254,7 @@ impl Subscriber for SloggishSubscriber {
 
     #[inline]
     fn close(&self, id: tokio_trace::Id) {
-        if let Some(event) = self.events
-            .lock()
-            .expect("mutex poisoned")
-            .remove(&id)
-        {
+        if let Some(event) = self.events.lock().expect("mutex poisoned").remove(&id) {
             let mut stderr = self.stderr.lock();
             let indent = self.stack.lock().unwrap().len();
             self.print_indent(&mut stderr, indent).unwrap();
@@ -270,7 +266,11 @@ impl Subscriber for SloggishSubscriber {
                 target = &event.target,
                 message = Style::new().bold().paint(event.message),
             ).unwrap();
-            self.print_kvs(&mut stderr, event.kvs.iter().map(|&(ref k, ref v)| (k, v)), ", ").unwrap();
+            self.print_kvs(
+                &mut stderr,
+                event.kvs.iter().map(|&(ref k, ref v)| (k, v)),
+                ", ",
+            ).unwrap();
             write!(&mut stderr, "\n").unwrap();
         }
         // TODO: it's *probably* safe to remove the span from the cache
