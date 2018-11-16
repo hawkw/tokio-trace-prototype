@@ -23,9 +23,6 @@ use tokio_trace_futures::Instrument;
 use tower_h2::{Body, RecvBody, Server};
 use tower_service::{MakeService, Service};
 
-#[path = "../../tokio-trace/examples/sloggish/sloggish_subscriber.rs"]
-mod sloggish;
-use self::sloggish::SloggishSubscriber;
 
 type Response = http::Response<RspBody>;
 
@@ -105,7 +102,10 @@ impl tower_service::Service<()> for NewSvc {
 }
 
 fn main() {
-    let subscriber = SloggishSubscriber::new(2);
+    env_logger::Builder::new().parse("tower_h2_server=trace").init();
+    let subscriber = tokio_trace_log::TraceLogger::builder()
+        .with_parent_fields(true)
+        .finish();
 
     tokio_trace::Dispatch::new(subscriber).as_default(|| {
         let mut rt = Runtime::new().unwrap();
