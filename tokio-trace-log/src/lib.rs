@@ -137,10 +137,13 @@ pub struct LogTracer {
 /// A `tokio_trace_subscriber::Observe` implementation that logs all recorded
 /// trace events.
 pub struct TraceLogger {
-    // TODO: the hashmap can definitely be replaced with some kind of arena eventually.
-    in_progress: Mutex<HashMap<Id, LineBuilder>>,
+    in_progress: Mutex<InProgress>,
 }
 
+struct InProgress {
+    spans: HashMap<Id, SpanLineBuilder>,
+    events: HashMap<Id, EventLineBuilder>,
+}
 // ===== impl LogTracer =====
 
 impl LogTracer {
@@ -172,60 +175,135 @@ impl log::Log for LogTracer {
 impl TraceLogger {
     pub fn new() -> Self {
         TraceLogger {
-            in_progress: Mutex::new(HashMap::new()),
+            in_progress: Mutex::new(InProgress {
+                spans: HashMap::new(),
+                events: HashMap::new(),
+            })
         }
+    }
+
+    fn next_id(&self) -> Id {
+        static NEXT_ID: AtomicUsize = ATOMIC_USIZE_INIT;
+        Id::from_u64(NEXT_ID.fetch_add(1, Ordering::SeqCst) as u64)
     }
 }
 
-struct LineBuilder {
+struct SpanLineBuilder {
+    attrs: span::SpanAttributes,
+    log_line: String,
+    fields: String,
+}
+
+impl SpanLineBuilder {
+    fn new(attrs: span::SpanAttributes, id: Id) -> Self {
+        use std::fmt::Write;
+        let mut log_line = String::new();
+        let meta = attrs.metadata();
+        write!(
+            &mut log_line,
+            "{}{}span={:?}; parent={:?};",
+            meta.name.unwrap_or(""),
+            if meta.name.is_some() { " " } else { "" },
+            id,
+            attrs.parent(),
+        ).unwrap();
+        Self {
+            attrs,
+            log_line,
+            fields: String::new(),
+        }
+    }
+
+    fn record(&mut self, key: &field::Key, val: fmt::Arguments) -> fmt::Result {
+        use std::fmt::Write;
+        write!(&mut self.fields, "{}=", key.name().unwrap_or("???"))?;
+        self.fields.write_fmt(val)?;
+        self.fields.write_str("; ")
+    }
+
+    fn finish(self) {
+        let meta = self.attrs.metadata();
+        let log_meta = meta.as_log();
+        let logger = log::logger();
+        if logger.enabled(&log_meta) {
+            logger.log(
+                &log::Record::builder()
+                    .metadata(log_meta)
+                    .target(meta.target)
+                    .module_path(meta.module_path)
+                    .file(meta.file)
+                    .line(meta.line)
+                    .args(format_args!("close {}; {}", self.log_line, self.fields))
+                    .build(),
+            );
+        }
+
+    }
+}
+
+struct EventLineBuilder {
+    level: tokio_trace::Level,
     file: Option<String>,
     line: Option<u32>,
     module_path: Option<String>,
     target: String,
+    message: String,
     log_line: String,
 }
 
-impl LineBuilder {
+impl EventLineBuilder {
     fn new(attrs: span::Attributes, id: Id) -> Self {
         use std::fmt::Write;
         let mut log_line = String::new();
         let meta = attrs.metadata();
         write!(
             &mut log_line,
-            "{}{}{}={:?}; parent={:?};",
-            meta.name.unwrap_or(""),
-            if meta.name.is_some() { " " } else { "" },
-            if meta.is_span() { "span" } else { "event" },
+            "event={:?}; parent={:?}; ",
             id,
             attrs.parent(),
         ).unwrap();
         Self {
+            level: meta.level,
             file: meta.file.map(|s| s.to_owned()),
             line: meta.line,
             module_path: meta.module_path.map(|s| s.to_owned()),
             target: meta.target.to_owned(),
+            message: String::new(),
             log_line,
         }
     }
 
     fn record(&mut self, key: &field::Key, val: fmt::Arguments) -> fmt::Result {
         use std::fmt::Write;
-        write!(&mut self.log_line, "{}=", key.name().unwrap_or("???"))?;
-        self.log_line.write_fmt(val)?;
-        self.log_line.write_str("; ")
+        if key.name() == Some("message") {
+            self.message.write_fmt(val)
+        } else {
+            write!(&mut self.log_line, "{}=", key.name().unwrap_or("???"))?;
+            self.log_line.write_fmt(val)?;
+            self.log_line.write_str("; ")
+        }
     }
 
-    fn finish(self) {
-        log::logger().log(
-            &log::Record::builder()
-                .target(self.target.as_ref())
-                .module_path(self.module_path.as_ref().map(String::as_ref))
-                .file(self.file.as_ref().map(String::as_ref))
-                .line(self.line)
-                .args(format_args!("close {}", self.log_line,))
-                .build(),
-        );
+    fn finish(self, current_span: &str) {
+        let logger = log::logger();
+        let log_meta = log::MetadataBuilder::new()
+            .level(self.level.as_log())
+            .target(self.target.as_ref())
+            .build();
+        if logger.enabled(&log_meta) {
+            logger.log(
+                &log::Record::builder()
+                    .metadata(log_meta)
+                    .target(self.target.as_ref())
+                    .module_path(self.module_path.as_ref().map(String::as_ref))
+                    .file(self.file.as_ref().map(String::as_ref))
+                    .line(self.line)
+                    .args(format_args!("{}; {}{}", self.message, current_span, self.log_line))
+                    .build(),
+            );
+        }
     }
+
 }
 
 impl Subscriber for TraceLogger {
@@ -233,13 +311,23 @@ impl Subscriber for TraceLogger {
         log::logger().enabled(&metadata.as_log())
     }
 
-    fn new_id(&self, new_span: span::Attributes) -> Id {
-        static NEXT_ID: AtomicUsize = ATOMIC_USIZE_INIT;
-        let id = Id::from_u64(NEXT_ID.fetch_add(1, Ordering::SeqCst) as u64);
+    fn new_span(&self, new_span: span::SpanAttributes) -> Id {
+        let id = self.next_id();
         self.in_progress
             .lock()
             .unwrap()
-            .insert(id.clone(), LineBuilder::new(new_span, id.clone()));
+            .spans
+            .insert(id.clone(), SpanLineBuilder::new(new_span, id.clone()));
+        id
+    }
+
+    fn new_id(&self, new_span: span::Attributes) -> Id {
+        let id = self.next_id();
+        self.in_progress
+            .lock()
+            .unwrap()
+            .events
+            .insert(id.clone(), EventLineBuilder::new(new_span, id.clone()));
         id
     }
 
@@ -249,8 +337,13 @@ impl Subscriber for TraceLogger {
         key: &field::Key,
         val: fmt::Arguments,
     ) -> Result<(), subscriber::RecordError> {
-        if let Some(span) = self.in_progress.lock().unwrap().get_mut(span) {
+        let mut in_progress = self.in_progress.lock().unwrap();
+        if let Some(span) = in_progress.spans.get_mut(span) {
             span.record(key, val)?;
+            return Ok(());
+        }
+        if let Some(event) = in_progress.events.get_mut(span) {
+            event.record(key, val)?;
             Ok(())
         } else {
             Err(subscriber::RecordError::no_span(span.clone()))
@@ -288,9 +381,20 @@ impl Subscriber for TraceLogger {
         );
     }
 
-    fn close(&self, span: Id) {
-        if let Some(line) = self.in_progress.lock().unwrap().remove(&span) {
-            line.finish()
+    fn close(&self, id: Id) {
+        let mut in_progress = self.in_progress.lock().unwrap();
+        if let Some(span) = in_progress.spans.remove(&id) {
+            span.finish();
+            return
+        };
+        let event = in_progress.events.remove(&id);
+        if let Some(event) = event {
+            if let Some(id) = Id::current() {
+                if let Some(ref span) = in_progress.spans.get(&id) {
+                    return event.finish(&span.fields);
+                }
+            }
+            event.finish("")
         }
     }
 }
