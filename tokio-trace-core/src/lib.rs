@@ -29,9 +29,9 @@
 //! An [`Event`] represents a _point_ in time. It signifies something that
 //! happened while the trace was executing. `Event`s are comparable to the log
 //! records emitted by unstructured logging code, but unlike a typical log line,
-//! an `Event` always occurs within the context of a `Span`. Like a `Span`, it
+//! an `Event` may occur within the context of a `Span`. Like a `Span`, it
 //! may have fields, and implicitly inherits any of the fields present on its
-//! parent span. Additionally, it may be linked with one or more additional
+//! parent span, and it may be linked with one or more additional
 //! spans that are not its parent; in this case, the event is said to _follow
 //! from_ those spans.
 //!
@@ -42,6 +42,10 @@
 //! within the context of the tree of spans that comprise a trase. Thus,
 //! individual log record-like events can be pinpointed not only in time, but
 //! in the logical execution flow of the system.
+//!
+//! Events are represented as a special case of spans --- they are created, they
+//! may have fields added, and then they close immediately, without being
+//! entered.
 //!
 //! # `Subscriber`s
 //!
