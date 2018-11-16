@@ -528,7 +528,7 @@ mod tests {
         })
     }
 
-     #[test]
+    #[test]
     fn enter_final_closes_span() {
         let subscriber = subscriber::mock()
             .enter(span::mock().named(Some("foo")))
