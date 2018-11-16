@@ -25,7 +25,7 @@ macro_rules! callsite {
             module_path: Some(module_path!()),
             file: Some(file!()),
             line: Some(line!()),
-            field_names: &[ $(stringify!($field_name)),* ],
+            field_names: &[ "message", $(stringify!($field_name)),* ],
             kind: $crate::MetaKind::EVENT,
         })
     });
