@@ -114,20 +114,100 @@ pub trait Subscriber {
     ///
     /// [span ID]: ::span::Id
     /// [`Span`]: ::span::Span
-    fn new_span(&self, span: span::Attributes) -> span::Id;
+    fn new_span(&self, span: span::SpanAttributes) -> span::Id;
 
-    /// Adds a new field to an existing span observed by this `Subscriber`.
+    /// Record a signed 64-bit integer value.
+    ///
+    /// This defaults to calling `self.record_fmt()`; implementations wishing to
+    /// provide behaviour specific to signed integers may override the default
+    /// implementation.
     ///
     /// This is expected to return an error under the following conditions:
     /// - The span ID does not correspond to a span which currently exists.
     /// - The span does not have a field with the given name.
     /// - The span has a field with the given name, but the value has already
     ///   been set.
-    fn record(
+    fn record_i64(
         &self,
         span: &span::Id,
-        key: &field::Key,
-        value: &dyn field::Value,
+        field: &field::Key,
+        value: i64,
+    ) -> Result<(), RecordError> {
+        self.record_fmt(span, field, format_args!("{}", value))
+    }
+
+    /// Record an umsigned 64-bit integer value.
+    ///
+    /// This defaults to calling `self.record_fmt()`; implementations wishing to
+    /// provide behaviour specific to unsigned integers may override the default
+    /// implementation.
+    ///
+    /// This is expected to return an error under the following conditions:
+    /// - The span ID does not correspond to a span which currently exists.
+    /// - The span does not have a field with the given name.
+    /// - The span has a field with the given name, but the value has already
+    ///   been set.
+    fn record_u64(
+        &self,
+        span: &span::Id,
+        field: &field::Key,
+        value: u64,
+    ) -> Result<(), RecordError> {
+        self.record_fmt(span, field, format_args!("{}", value))
+    }
+
+    /// Record a boolean value.
+    ///
+    /// This defaults to calling `self.record_fmt()`; implementations wishing to
+    /// provide behaviour specific to booleans may override the default
+    /// implementation.
+    ///
+    /// This is expected to return an error under the following conditions:
+    /// - The span ID does not correspond to a span which currently exists.
+    /// - The span does not have a field with the given name.
+    /// - The span has a field with the given name, but the value has already
+    ///   been set.
+    fn record_bool(
+        &self,
+        span: &span::Id,
+        field: &field::Key,
+        value: bool,
+    ) -> Result<(), RecordError> {
+        self.record_fmt(span, field, format_args!("{}", value))
+    }
+
+    /// Record a string value.
+    ///
+    /// This defaults to calling `self.record_str()`; implementations wishing to
+    /// provide behaviour specific to strings may override the default
+    /// implementation.
+    ///
+    /// This is expected to return an error under the following conditions:
+    /// - The span ID does not correspond to a span which currently exists.
+    /// - The span does not have a field with the given name.
+    /// - The span has a field with the given name, but the value has already
+    ///   been set.
+    fn record_str(
+        &self,
+        span: &span::Id,
+        field: &field::Key,
+        value: &str,
+    ) -> Result<(), RecordError> {
+        self.record_fmt(span, field, format_args!("{}", value))
+    }
+
+    /// Record a set of pre-compile``d format arguments.
+    ///
+    /// This is expected to return an error under the following conditions:
+    /// - The span ID does not correspond to a span which currently exists.
+    /// - The span does not have a field with the given name.
+    /// - The span has a field with the given name, but the value has already
+    ///   been set.
+    fn record_fmt(
+        &self,
+        span: &span::Id,
+        field: &field::Key,
+        value: fmt::Arguments,
     ) -> Result<(), RecordError>;
 
     /// Adds an indication that `span` follows from the span with the id
@@ -576,32 +656,18 @@ mod test_support {
         }
     }
 
-    impl<'a, F> field::Record for &'a Running<F>
-    where
-        F: Fn(&Meta) -> bool,
-        F: 'a,
-    {
-        fn record_fmt(
-            &mut self,
-            _field: &field::Key,
-            _value: ::std::fmt::Arguments,
-        ) -> Result<(), ::subscriber::RecordError> {
-            // TODO: it would be nice to be able to expect field values...
-            Ok(())
-        }
-    }
-
     impl<F: Fn(&Meta) -> bool> Subscriber for Running<F> {
         fn enabled(&self, meta: &Meta) -> bool {
             (self.filter)(meta)
         }
 
-        fn record(
+        fn record_fmt(
             &self,
-            _span: &span::Id,
-            _key: &field::Key,
-            _value: &dyn field::Value,
+            _id: &span::Id,
+            _field: &field::Key,
+            _value: ::std::fmt::Arguments,
         ) -> Result<(), ::subscriber::RecordError> {
+            // TODO: it would be nice to be able to expect field values...
             Ok(())
         }
 

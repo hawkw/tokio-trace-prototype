@@ -97,13 +97,53 @@ impl Subscriber for Dispatch {
     }
 
     #[inline]
-    fn record(
+    fn record_i64(
         &self,
         span: &span::Id,
-        key: &field::Key,
-        value: &dyn field::Value,
-    ) -> Result<(), ::subscriber::RecordError> {
-        self.subscriber.record(span, key, value)
+        field: &field::Key,
+        value: i64,
+    ) -> Result<(), RecordError> {
+        self.subscriber.record_i64(span, field, value)
+    }
+
+    #[inline]
+    fn record_u64(
+        &self,
+        span: &span::Id,
+        field: &field::Key,
+        value: u64,
+    ) -> Result<(), RecordError> {
+        self.subscriber.record_u64(span, field, value)
+    }
+
+    #[inline]
+    fn record_bool(
+        &self,
+        span: &span::Id,
+        field: &field::Key,
+        value: bool,
+    ) -> Result<(), RecordError> {
+        self.subscriber.record_bool(span, field, value)
+    }
+
+    #[inline]
+    fn record_str(
+        &self,
+        span: &span::Id,
+        field: &field::Key,
+        value: &str,
+    ) -> Result<(), RecordError> {
+        self.subscriber.record_str(span, field, value)
+    }
+
+    #[inline]
+    fn record_fmt(
+        &self,
+        span: &span::Id,
+        field: &field::Key,
+        value: fmt::Arguments,
+    ) -> Result<(), RecordError> {
+        self.subscriber.record_fmt(span, field, value)
     }
 
     #[inline]
@@ -157,11 +197,11 @@ impl Subscriber for NoSubscriber {
         span::Id::from_u64(0)
     }
 
-    fn record(
+    fn record_fmt(
         &self,
         _span: &span::Id,
         _key: &field::Key,
-        _value: &dyn field::Value,
+        _value: fmt::Arguments,
     ) -> Result<(), ::subscriber::RecordError> {
         Ok(())
     }
