@@ -119,7 +119,7 @@ impl Subscriber for CounterSubscriber {
             .any(|f| f.name().map(|name| name.contains("count")).unwrap_or(false))
     }
 
-    fn observe_event<'a>(&self, event: &'a Event<'a>) {
+    fn observe_event<'a>(&self, event: &Event<'a>) {
         for (key, value) in event.fields() {
             value.record(&key, &mut &self.counters);
         }

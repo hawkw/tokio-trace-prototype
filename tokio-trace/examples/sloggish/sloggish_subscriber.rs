@@ -172,7 +172,7 @@ impl Subscriber for SloggishSubscriber {
     }
 
     #[inline]
-    fn observe_event<'a>(&self, event: &'a tokio_trace::Event<'a>) {
+    fn observe_event<'a>(&self, event: &tokio_trace::Event<'a>) {
         struct Display<'a> {
             key: field::Key<'a>,
             value: &'a dyn field::Value,

@@ -136,7 +136,7 @@ pub struct Event<'a> {
 
     /// The IDs of a set of spans which are causally linked with this event, but
     /// are not its direct parent.
-    follows_from: &'a [SpanId],
+    follows_from: Vec<SpanId>,
 
     /// Metadata describing this event.
     meta: &'a Meta<'a>,
@@ -146,7 +146,7 @@ pub struct Event<'a> {
     /// The names of these fields are defined in the event's metadata. Each
     /// index in this array corresponds to the name at the same index in
     /// `self.meta.field_names`.
-    field_values: &'a [&'a dyn Value],
+    field_values: &'a mut [ Option<&'a dyn Value> ],
 
     /// A textual message describing the event that occurred.
     message: fmt::Arguments<'a>,
@@ -350,8 +350,7 @@ impl<'a> Event<'a> {
     /// [`Callsite`]: ::callsite::Callsite
     pub fn new(
         callsite: &'a dyn callsite::Callsite,
-        field_values: &'a [&'a (dyn field::Value + 'a)],
-        follows_from: &'a [SpanId],
+        field_values: impl FnOnce() -> [ Option<&'a dyn Value> ],
         message: fmt::Arguments<'a>,
     ) -> EventHandle<'a> {
         let interest = callsite.interest();
@@ -360,16 +359,16 @@ impl<'a> Event<'a> {
                 inner: None,
             };
         }
-        let inner = Dispatch::with_current(|dispatch| {
+        let inner = Dispatch::with_current(move |dispatch| {
             let meta = callsite.metadata();
             if interest == Interest::SOMETIMES && !dispatch.enabled(meta) {
                 return None
             }
             let event = Event {
                 parent: SpanId::current(),
-                follows_from,
+                follows_from: Vec::new(),
                 meta,
-                field_values,
+                field_values: field_values(),
                 message,
             };
             Some(ObserveEvent {
@@ -417,23 +416,39 @@ impl<'a> Event<'a> {
         if !self.has_field(key) {
             return None;
         }
-        self.field_values.get(key.as_usize()).map(|&v| v)
+        self.field_values.get(key.as_usize()).and_then(Option::as_ref).map(|&v| v)
     }
 
     /// Returns an iterator over all the field names and values on this event.
-    pub fn fields<'b: 'a>(&'b self) -> impl Iterator<Item = (field::Key<'a>, &'a dyn Value)> {
+    pub fn fields(&self) -> impl Iterator<Item = (field::Key<'a>, &dyn Value)> {
         self.meta.fields().filter_map(move |key| {
             let val = self.field(&key)?;
             Some((key, val))
         })
     }
+
+    /// Returns a slice containing the `SpanId`s that this event follows from.
+    pub fn follows_from(&self) -> &[SpanId] {
+        &self.follows_from[..]
+    }
 }
 
-impl<'a> IntoIterator for &'a Event<'a> {
-    type Item = (field::Key<'a>, &'a dyn Value);
-    type IntoIter = Box<Iterator<Item = (field::Key<'a>, &'a dyn Value)> + 'a>; // TODO: unbox
+impl<'a, 'b: 'a> IntoIterator for &'b Event<'a> {
+    type Item = (field::Key<'b>, &'b dyn Value);
+    type IntoIter = Box<Iterator<Item = (field::Key<'b>, &'b dyn Value)> + 'b>; // TODO: unbox
     fn into_iter(self) -> Self::IntoIter {
         Box::new(self.fields())
+    }
+}
+
+impl<'a> EventHandle<'a> {
+    /// Indicates that the span with the given ID is causally linked with this
+    /// event.
+    pub fn add_follows_from(mut self, id: SpanId) -> Self {
+        if let Some(ref mut inner) = self.inner {
+            inner.event.follows_from.push(id);
+        }
+        self
     }
 }
 

@@ -171,7 +171,7 @@ pub trait Subscriber {
     /// subscriber of that event.
     ///
     /// [`Event`]: ../struct.Event.html
-    fn observe_event<'a>(&self, event: &'a Event<'a>);
+    fn observe_event<'a>(&self, event: &Event<'a>);
 
     /// Records that a [`Span`] has been entered.
     ///
@@ -575,7 +575,7 @@ mod test_support {
             id
         }
 
-        fn observe_event<'a>(&self, _event: &'a Event<'a>) {
+        fn observe_event<'a>(&self, _event: &Event<'a>) {
             match self.expected.lock().unwrap().pop_front() {
                 None => {}
                 Some(Expect::Event(_)) => unimplemented!(),

@@ -124,22 +124,20 @@ macro_rules! span {
 #[macro_export]
 macro_rules! event {
     (target: $target:expr, $lvl:expr, { $($k:ident = $val:expr),* }, $($arg:tt)+ ) => ({
-        {
-            use $crate::{callsite, SpanAttributes, SpanId, Subscriber, Event, field::Value};
-            use $crate::callsite::Callsite;
-            let callsite = callsite! { event:
-                $lvl,
-                target:
-                $target, $( $k ),*
-            };
-            let field_values: &[ &dyn Value ] = &[ $( &$val ),* ];
-            Event::new(
-                callsite,
-                &field_values[..],
-                &[],
-                format_args!( $($arg)+ ),
-            );
-        }
+
+        use $crate::{callsite, SpanAttributes, SpanId, Subscriber, Event, field::Value};
+        use $crate::callsite::Callsite;
+        let callsite = callsite! { event:
+            $lvl,
+            target:
+            $target, $( $k ),*
+        };
+
+        Event::new(
+            callsite,
+            || { [ $( { let $k: (); None} ),* ] },
+            format_args!( $($arg)+ ),
+        )
     });
     ($lvl:expr, { $($k:ident = $val:expr),* }, $($arg:tt)+ ) => (
         event!(target: module_path!(), $lvl, { $($k = $val),* }, $($arg)+)

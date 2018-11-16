@@ -115,7 +115,7 @@ where
         self.registry.add_follows_from(span, follows)
     }
 
-    fn observe_event<'a>(&self, event: &'a Event<'a>) {
+    fn observe_event<'a>(&self, event: &Event<'a>) {
         self.observer.observe_event(event)
     }
 

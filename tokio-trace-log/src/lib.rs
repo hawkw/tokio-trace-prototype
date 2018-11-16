@@ -62,8 +62,7 @@ pub fn format_trace(record: &log::Record) -> io::Result<()> {
     let callsite = LogCallsite(record.as_trace());
     drop(tokio_trace::Event::new(
         &callsite,
-        &[],
-        &[],
+        || { &mut [] },
         record.args().clone(),
     ));
     Ok(())
@@ -268,7 +267,7 @@ impl Subscriber for TraceLogger {
         Ok(())
     }
 
-    fn observe_event<'a>(&self, event: &'a Event<'a>) {
+    fn observe_event<'a>(&self, event: &Event<'a>) {
         let meta = event.metadata();
         let log_meta = meta.as_log();
         let logger = log::logger();
@@ -283,7 +282,8 @@ impl Subscriber for TraceLogger {
                         "{}; in_span={:?}; {:?}",
                         event.message(),
                         event.parent(),
-                        LogFields(event),
+                        // LogFields(event),
+                        unimplemented!(),
                     )).build(),
             );
         }

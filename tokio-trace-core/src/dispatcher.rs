@@ -121,7 +121,7 @@ impl Subscriber for Dispatch {
     }
 
     #[inline]
-    fn observe_event<'a>(&self, event: &'a Event<'a>) {
+    fn observe_event<'a>(&self, event: &Event<'a>) {
         self.subscriber.observe_event(event)
     }
 
@@ -168,7 +168,7 @@ impl Subscriber for NoSubscriber {
         false
     }
 
-    fn observe_event<'a>(&self, _event: &'a Event<'a>) {
+    fn observe_event<'a>(&self, _event: &Event<'a>) {
         // Do nothing.
     }
 

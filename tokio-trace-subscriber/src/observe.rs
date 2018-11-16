@@ -10,7 +10,7 @@ use tokio_trace::{Event, Meta};
 /// Implementations of this trait describe the logic needed to process envent
 /// and span notifications, but don't implement span registration.
 pub trait Observe {
-    fn observe_event<'a>(&self, event: &'a Event<'a>);
+    fn observe_event<'a>(&self, event: &Event<'a>);
     fn enter<'a>(&self, span: &SpanRef<'a>);
     fn exit<'a>(&self, span: &SpanRef<'a>);
     fn close<'a>(&self, span: &SpanRef<'a>);
@@ -256,7 +256,7 @@ where
     F: Filter,
 {
     #[inline]
-    fn observe_event<'a>(&self, event: &'a Event<'a>) {
+    fn observe_event<'a>(&self, event: &Event<'a>) {
         self.inner.observe_event(event)
     }
 
@@ -302,7 +302,7 @@ where
     A: Observe,
     B: Observe,
 {
-    fn observe_event<'a>(&self, event: &'a Event<'a>) {
+    fn observe_event<'a>(&self, event: &Event<'a>) {
         self.a.observe_event(event);
         self.b.observe_event(event);
     }
@@ -347,7 +347,7 @@ where
     A: Observe,
     B: Observe,
 {
-    fn observe_event<'a>(&self, event: &'a Event<'a>) {
+    fn observe_event<'a>(&self, event: &Event<'a>) {
         match self {
             Either::A(a) => a.observe_event(event),
             Either::B(b) => b.observe_event(event),
@@ -397,7 +397,7 @@ where
 }
 
 impl Observe for NoObserver {
-    fn observe_event<'a>(&self, _event: &'a Event<'a>) {}
+    fn observe_event<'a>(&self, _event: &Event<'a>) {}
 
     fn enter<'a>(&self, _span: &SpanRef<'a>) {}
 

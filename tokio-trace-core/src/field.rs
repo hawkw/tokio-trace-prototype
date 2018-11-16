@@ -136,6 +136,10 @@ impl Value {
     {
         DebugValue(t)
     }
+
+    pub fn erased<T: Value>(t: &T) -> &dyn Value {
+        t
+    }
 }
 
 // ===== impl Field =====
