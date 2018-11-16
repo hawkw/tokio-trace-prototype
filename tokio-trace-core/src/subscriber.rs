@@ -1,5 +1,5 @@
 //! Subscribers collect and record trace data.
-use {field, span, Meta, Id};
+use {field, span, Id, Meta};
 
 use std::{error::Error, fmt};
 
@@ -146,12 +146,7 @@ pub trait Subscriber {
     /// - The span does not have a field with the given name.
     /// - The span has a field with the given name, but the value has already
     ///   been set.
-    fn record_i64(
-        &self,
-        span: &Id,
-        field: &field::Key,
-        value: i64,
-    ) -> Result<(), RecordError> {
+    fn record_i64(&self, span: &Id, field: &field::Key, value: i64) -> Result<(), RecordError> {
         self.record_fmt(span, field, format_args!("{}", value))
     }
 
@@ -166,12 +161,7 @@ pub trait Subscriber {
     /// - The span does not have a field with the given name.
     /// - The span has a field with the given name, but the value has already
     ///   been set.
-    fn record_u64(
-        &self,
-        span: &Id,
-        field: &field::Key,
-        value: u64,
-    ) -> Result<(), RecordError> {
+    fn record_u64(&self, span: &Id, field: &field::Key, value: u64) -> Result<(), RecordError> {
         self.record_fmt(span, field, format_args!("{}", value))
     }
 
@@ -186,12 +176,7 @@ pub trait Subscriber {
     /// - The span does not have a field with the given name.
     /// - The span has a field with the given name, but the value has already
     ///   been set.
-    fn record_bool(
-        &self,
-        span: &Id,
-        field: &field::Key,
-        value: bool,
-    ) -> Result<(), RecordError> {
+    fn record_bool(&self, span: &Id, field: &field::Key, value: bool) -> Result<(), RecordError> {
         self.record_fmt(span, field, format_args!("{}", value))
     }
 
@@ -206,12 +191,7 @@ pub trait Subscriber {
     /// - The span does not have a field with the given name.
     /// - The span has a field with the given name, but the value has already
     ///   been set.
-    fn record_str(
-        &self,
-        span: &Id,
-        field: &field::Key,
-        value: &str,
-    ) -> Result<(), RecordError> {
+    fn record_str(&self, span: &Id, field: &field::Key, value: &str) -> Result<(), RecordError> {
         self.record_fmt(span, field, format_args!("{}", value))
     }
 
@@ -572,7 +552,7 @@ mod test_support {
 
     use super::*;
     use span::{self, MockSpan};
-    use {field, Meta, SpanAttributes, Id};
+    use {field, Id, Meta, SpanAttributes};
 
     use std::{
         collections::{HashMap, VecDeque},
@@ -682,11 +662,7 @@ mod test_support {
             Ok(())
         }
 
-        fn add_follows_from(
-            &self,
-            _span: &Id,
-            _follows: Id,
-        ) -> Result<(), FollowsError> {
+        fn add_follows_from(&self, _span: &Id, _follows: Id) -> Result<(), FollowsError> {
             // TODO: it should be possible to expect spans to follow from other spans
             Ok(())
         }

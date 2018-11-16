@@ -34,7 +34,7 @@ use std::{
 use tokio_trace::{
     field, span,
     subscriber::{self, Subscriber},
-    Meta, Id,
+    Id, Meta,
 };
 
 /// Format a log record as a trace event in the current span.
@@ -61,12 +61,9 @@ pub fn format_trace(record: &log::Record) -> io::Result<()> {
     }
     let callsite = LogCallsite(record.as_trace());
     let k = callsite.0.key_for(&"message").unwrap();
-    drop(tokio_trace::Event::new(
-        &callsite,
-        |event| {
-            event.message(&k, record.args().clone()).unwrap();
-        }
-    ));
+    drop(tokio_trace::Event::new(&callsite, |event| {
+        event.message(&k, record.args().clone()).unwrap();
+    }));
     Ok(())
 }
 
@@ -193,7 +190,9 @@ impl LineBuilder {
         use std::fmt::Write;
         let mut log_line = String::new();
         let meta = attrs.metadata();
-        write!(&mut log_line, "{}{}{}={:?}; parent={:?};",
+        write!(
+            &mut log_line,
+            "{}{}{}={:?}; parent={:?};",
             meta.name.unwrap_or(""),
             if meta.name.is_some() { " " } else { "" },
             if meta.is_span() { "span" } else { "event" },
@@ -258,11 +257,7 @@ impl Subscriber for TraceLogger {
         }
     }
 
-    fn add_follows_from(
-        &self,
-        span: &Id,
-        follows: Id,
-    ) -> Result<(), subscriber::FollowsError> {
+    fn add_follows_from(&self, span: &Id, follows: Id) -> Result<(), subscriber::FollowsError> {
         // TODO: this should eventually track the relationship?
         log::logger().log(
             &log::Record::builder()

@@ -116,7 +116,6 @@ pub use self::{
     subscriber::{Interest, Subscriber},
 };
 
-
 /// Metadata describing a [`Span`] or [`Event`].
 ///
 /// This includes the source code location where the span or event occurred, the
@@ -282,7 +281,6 @@ impl<'a> PartialEq for Meta<'a> {
         ::std::ptr::eq(self, other)
     }
 }
-
 
 // ===== impl Level =====
 

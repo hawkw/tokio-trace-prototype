@@ -1,8 +1,8 @@
 use {
     callsite, field,
     span::{self, Span},
-    subscriber::{self, Subscriber, RecordError},
-    Meta, Id,
+    subscriber::{self, RecordError, Subscriber},
+    Id, Meta,
 };
 
 use std::{
@@ -102,42 +102,22 @@ impl Subscriber for Dispatch {
     }
 
     #[inline]
-    fn record_i64(
-        &self,
-        span: &Id,
-        field: &field::Key,
-        value: i64,
-    ) -> Result<(), RecordError> {
+    fn record_i64(&self, span: &Id, field: &field::Key, value: i64) -> Result<(), RecordError> {
         self.subscriber.record_i64(span, field, value)
     }
 
     #[inline]
-    fn record_u64(
-        &self,
-        span: &Id,
-        field: &field::Key,
-        value: u64,
-    ) -> Result<(), RecordError> {
+    fn record_u64(&self, span: &Id, field: &field::Key, value: u64) -> Result<(), RecordError> {
         self.subscriber.record_u64(span, field, value)
     }
 
     #[inline]
-    fn record_bool(
-        &self,
-        span: &Id,
-        field: &field::Key,
-        value: bool,
-    ) -> Result<(), RecordError> {
+    fn record_bool(&self, span: &Id, field: &field::Key, value: bool) -> Result<(), RecordError> {
         self.subscriber.record_bool(span, field, value)
     }
 
     #[inline]
-    fn record_str(
-        &self,
-        span: &Id,
-        field: &field::Key,
-        value: &str,
-    ) -> Result<(), RecordError> {
+    fn record_str(&self, span: &Id, field: &field::Key, value: &str) -> Result<(), RecordError> {
         self.subscriber.record_str(span, field, value)
     }
 
@@ -152,11 +132,7 @@ impl Subscriber for Dispatch {
     }
 
     #[inline]
-    fn add_follows_from(
-        &self,
-        span: &Id,
-        follows: Id,
-    ) -> Result<(), subscriber::FollowsError> {
+    fn add_follows_from(&self, span: &Id, follows: Id) -> Result<(), subscriber::FollowsError> {
         self.subscriber.add_follows_from(span, follows)
     }
 
@@ -206,11 +182,7 @@ impl Subscriber for NoSubscriber {
         Ok(())
     }
 
-    fn add_follows_from(
-        &self,
-        _span: &Id,
-        _follows: Id,
-    ) -> Result<(), subscriber::FollowsError> {
+    fn add_follows_from(&self, _span: &Id, _follows: Id) -> Result<(), subscriber::FollowsError> {
         Ok(())
     }
 

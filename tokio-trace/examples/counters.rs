@@ -4,7 +4,7 @@ extern crate tokio_trace;
 use tokio_trace::{
     field, span,
     subscriber::{self, Subscriber},
-    Level, Meta, Id,
+    Id, Level, Meta,
 };
 
 use std::{
@@ -47,11 +47,7 @@ impl Subscriber for CounterSubscriber {
         Id::from_u64(id as u64)
     }
 
-    fn add_follows_from(
-        &self,
-        _span: &Id,
-        _follows: Id,
-    ) -> Result<(), subscriber::FollowsError> {
+    fn add_follows_from(&self, _span: &Id, _follows: Id) -> Result<(), subscriber::FollowsError> {
         // unimplemented
         Ok(())
     }

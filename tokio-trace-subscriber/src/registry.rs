@@ -1,6 +1,6 @@
 use tokio_trace::{
     field,
-    span::{self, Attributes, SpanAttributes, Id},
+    span::{self, Attributes, Id, SpanAttributes},
     subscriber::{FollowsError, RecordError},
 };
 

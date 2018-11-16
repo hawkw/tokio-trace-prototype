@@ -16,7 +16,7 @@ use self::ansi_term::{Color, Style};
 use super::tokio_trace::{
     self, field,
     subscriber::{self, Subscriber},
-    Level, SpanAttributes, Id,
+    Id, Level, SpanAttributes,
 };
 
 use std::{

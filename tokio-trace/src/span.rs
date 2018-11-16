@@ -196,7 +196,7 @@
 //! [`Attributes`]: ::span::Attributes
 //! [shared span]: ::span::Shared
 //! [`IntoShared`]: ::span::IntoShared
-pub use tokio_trace_core::span::{Attributes, SpanAttributes, Id, Span};
+pub use tokio_trace_core::span::{Attributes, Id, Span, SpanAttributes};
 
 #[cfg(any(test, feature = "test-support"))]
 pub use tokio_trace_core::span::{mock, MockSpan};
