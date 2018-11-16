@@ -609,7 +609,7 @@ mod test_support {
 
         pub fn event(mut self) -> Self {
             // TODO: expect message/fields!
-            self.expected.push_back(Expect::Event( ExpectEvent { } ));
+            self.expected.push_back(Expect::Event(ExpectEvent {}));
             self
         }
 
@@ -681,14 +681,20 @@ mod test_support {
         fn new_id(&self, _span: span::Attributes) -> Id {
             let id = self.ids.fetch_add(1, Ordering::SeqCst);
             let id = Id::from_u64(id as u64);
-            self.spans.lock().unwrap().insert(id.clone(), SpanOrEvent::Event);
+            self.spans
+                .lock()
+                .unwrap()
+                .insert(id.clone(), SpanOrEvent::Event);
             id
         }
 
         fn new_span(&self, span: SpanAttributes) -> Id {
             let id = self.ids.fetch_add(1, Ordering::SeqCst);
             let id = Id::from_u64(id as u64);
-            self.spans.lock().unwrap().insert(id.clone(), SpanOrEvent::Span(span));
+            self.spans
+                .lock()
+                .unwrap()
+                .insert(id.clone(), SpanOrEvent::Span(span));
             id
         }
 
@@ -790,13 +796,13 @@ mod test_support {
                 .get(&span)
                 .unwrap_or_else(|| panic!("no span for ID {:?}", span));
             match (span, self.expected.lock().unwrap().pop_front()) {
-                (_, None) => {},
+                (_, None) => {}
                 (SpanOrEvent::Event, Some(Expect::Event(_))) => {
                     // TODO: expect fields, message!
-                },
-                (SpanOrEvent::Event, Some(_)) => panic!(
-                    "expected to close a span, but closed an event instead",
-                ),
+                }
+                (SpanOrEvent::Event, Some(_)) => {
+                    panic!("expected to close a span, but closed an event instead",)
+                }
                 (SpanOrEvent::Span(span), Some(Expect::Event(_))) => panic!(
                     "expected an event, but closed span {:?} instead",
                     span.name()
@@ -806,7 +812,7 @@ mod test_support {
                     expected_span.name,
                     span.name()
                 ),
-                (SpanOrEvent::Span(span), Some(Expect::Exit(ref expected_span)))=> panic!(
+                (SpanOrEvent::Span(span), Some(Expect::Exit(ref expected_span))) => panic!(
                     "expected to exit span {:?}, but closed span {:?} instead",
                     expected_span.name,
                     span.name()
@@ -831,9 +837,9 @@ mod test_support {
                     "expected nothing else to happen, but closed span {:?}",
                     span.name(),
                 ),
-                (SpanOrEvent::Event, Some(Expect::Nothing)) => panic!(
-                    "expected nothing else to happen, but closed an event"
-                ),
+                (SpanOrEvent::Event, Some(Expect::Nothing)) => {
+                    panic!("expected nothing else to happen, but closed an event")
+                }
             }
         }
 
@@ -842,17 +848,13 @@ mod test_support {
             let mut expected = self.expected.lock().unwrap();
             let was_expected = if let Some(Expect::CloneSpan(ref span)) = expected.front() {
                 assert_eq!(
-                    self.spans
-                        .lock()
-                        .unwrap()
-                        .get(&id)
-                        .map(|span_or_event| {
-                            if let SpanOrEvent::Span(ref span) = span_or_event {
-                                span.metadata().name
-                            } else {
-                                Some("event")
-                            }
-                        }),
+                    self.spans.lock().unwrap().get(&id).map(|span_or_event| {
+                        if let SpanOrEvent::Span(ref span) = span_or_event {
+                            span.metadata().name
+                        } else {
+                            Some("event")
+                        }
+                    }),
                     span.name
                 );
                 true
@@ -873,17 +875,13 @@ mod test_support {
                     // as failing the assertion can cause a double panic.
                     if !::std::thread::panicking() {
                         assert_eq!(
-                            self.spans
-                                .lock()
-                                .unwrap()
-                                .get(&id)
-                                .map(|span_or_event| {
-                                    if let SpanOrEvent::Span(ref span) = span_or_event {
-                                        span.metadata().name
-                                    } else {
-                                        Some("event")
-                                    }
-                                }),
+                            self.spans.lock().unwrap().get(&id).map(|span_or_event| {
+                                if let SpanOrEvent::Span(ref span) = span_or_event {
+                                    span.metadata().name
+                                } else {
+                                    Some("event")
+                                }
+                            }),
                             span.name
                         );
                     }

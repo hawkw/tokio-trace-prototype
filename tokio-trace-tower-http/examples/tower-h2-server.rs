@@ -23,7 +23,6 @@ use tokio_trace_futures::Instrument;
 use tower_h2::{Body, RecvBody, Server};
 use tower_service::{MakeService, Service};
 
-
 type Response = http::Response<RspBody>;
 
 struct RspBody(Option<Bytes>);
@@ -102,7 +101,9 @@ impl tower_service::Service<()> for NewSvc {
 }
 
 fn main() {
-    env_logger::Builder::new().parse("tower_h2_server=trace").init();
+    env_logger::Builder::new()
+        .parse("tower_h2_server=trace")
+        .init();
     let subscriber = tokio_trace_log::TraceLogger::builder()
         .with_parent_fields(true)
         .finish();
