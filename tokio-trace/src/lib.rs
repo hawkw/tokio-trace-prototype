@@ -125,7 +125,7 @@ macro_rules! span {
 macro_rules! event {
     (target: $target:expr, $lvl:expr, { $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => ({
         {
-            use $crate::{callsite, SpanAttributes, SpanId, Subscriber, Event, field::Value};
+            use $crate::{callsite, SpanAttributes, Id, Subscriber, Event, field::Value};
             use $crate::callsite::Callsite;
             let callsite = callsite! { event:
                 $lvl,
@@ -170,7 +170,7 @@ pub mod subscriber;
 pub use self::{
     dispatcher::Dispatch,
     field::Value,
-    span::{Attributes, Id as SpanId, Span, SpanAttributes},
+    span::{Attributes, Id, Span, SpanAttributes},
     subscriber::Subscriber,
     tokio_trace_core::{
         callsite::{self, Callsite},

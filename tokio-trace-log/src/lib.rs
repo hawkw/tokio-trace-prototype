@@ -34,7 +34,7 @@ use std::{
 use tokio_trace::{
     field, span,
     subscriber::{self, Subscriber},
-    Event, Meta,
+    Event, Meta, Id,
 };
 
 /// Format a log record as a trace event in the current span.
@@ -141,7 +141,7 @@ pub struct LogTracer {
 /// trace events.
 pub struct TraceLogger {
     // TODO: the hashmap can definitely be replaced with some kind of arena eventually.
-    in_progress: Mutex<HashMap<span::Id, LineBuilder>>,
+    in_progress: Mutex<HashMap<Id, LineBuilder>>,
 }
 
 struct LogFields<'a, 'b: 'a, I: 'a>(&'a I)
@@ -193,7 +193,7 @@ struct LineBuilder {
 }
 
 impl LineBuilder {
-    fn new(attrs: span::Attributes, id: span::Id) -> Self {
+    fn new(attrs: span::Attributes, id: Id) -> Self {
         use std::fmt::Write;
         let mut log_line = String::new();
         let meta = attrs.metadata();
@@ -238,9 +238,9 @@ impl Subscriber for TraceLogger {
         log::logger().enabled(&metadata.as_log())
     }
 
-    fn new_id(&self, new_span: span::Attributes) -> span::Id {
+    fn new_id(&self, new_span: span::Attributes) -> Id {
         static NEXT_ID: AtomicUsize = ATOMIC_USIZE_INIT;
-        let id = span::Id::from_u64(NEXT_ID.fetch_add(1, Ordering::SeqCst) as u64);
+        let id = Id::from_u64(NEXT_ID.fetch_add(1, Ordering::SeqCst) as u64);
         self.in_progress
             .lock()
             .unwrap()
@@ -250,7 +250,7 @@ impl Subscriber for TraceLogger {
 
     fn record_fmt(
         &self,
-        span: &span::Id,
+        span: &Id,
         key: &field::Key,
         val: fmt::Arguments,
     ) -> Result<(), subscriber::RecordError> {
@@ -264,8 +264,8 @@ impl Subscriber for TraceLogger {
 
     fn add_follows_from(
         &self,
-        span: &span::Id,
-        follows: span::Id,
+        span: &Id,
+        follows: Id,
     ) -> Result<(), subscriber::FollowsError> {
         // TODO: this should eventually track the relationship?
         log::logger().log(
@@ -277,7 +277,7 @@ impl Subscriber for TraceLogger {
         Ok(())
     }
 
-    fn enter(&self, span: span::Id) {
+    fn enter(&self, span: Id) {
         let logger = log::logger();
         logger.log(
             &log::Record::builder()
@@ -287,7 +287,7 @@ impl Subscriber for TraceLogger {
         );
     }
 
-    fn exit(&self, span: span::Id) {
+    fn exit(&self, span: Id) {
         let logger = log::logger();
         logger.log(
             &log::Record::builder()
@@ -297,7 +297,7 @@ impl Subscriber for TraceLogger {
         );
     }
 
-    fn close(&self, span: span::Id) {
+    fn close(&self, span: Id) {
         if let Some(line) = self.in_progress.lock().unwrap().remove(&span) {
             line.finish()
         }

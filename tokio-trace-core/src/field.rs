@@ -26,7 +26,7 @@
 //! their field names, rather than printing them.
 //
 use std::fmt;
-use {span::Id, Subscriber, Meta};
+use {Id, Subscriber, Meta};
 
 /// A field value of an erased type.
 ///

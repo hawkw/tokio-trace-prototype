@@ -1,5 +1,5 @@
 //! Subscribers collect and record trace data.
-use {field, span, Event, Meta, SpanId};
+use {field, span, Event, Meta, Id};
 
 use std::{error::Error, fmt};
 
@@ -24,7 +24,7 @@ use std::{error::Error, fmt};
 ///   they occur.
 ///
 /// When a span is entered or exited, the subscriber is provided only with the
-/// [`SpanId`] with which it tagged that span when it was created. This means
+/// [`Id`] with which it tagged that span when it was created. This means
 /// that it is up to the subscriber to determine whether or not span _data_ ---
 /// the fields and metadata describing the span --- should be stored. The
 /// [`new_span`] function is called when a new span is created, and at that
@@ -33,7 +33,7 @@ use std::{error::Error, fmt};
 /// not be needed by the implementations of `enter` and `exit`, the subscriber
 /// may freely discard that data without allocating space to store it.
 ///
-/// [`SpanId`]: ::span::Id
+/// [`Id`]: ::Id
 /// [`new_span`]: ::Span::new_span
 pub trait Subscriber {
     // === Span registry methods ==============================================
@@ -110,9 +110,9 @@ pub trait Subscriber {
     /// new ID for that span, either by calling `new_id`, or through a different
     /// method from the ID generation for events.
     ///
-    /// [span ID]: ::span::Id [`Span`]: ::span::Span [`new_id`]:
+    /// [span ID]: ::Id [`Span`]: ::span::Span [`new_id`]:
     /// ::subscriber::Subscriber::new_id [`Attributes`]: ::span::Attributes
-    fn new_span(&self, span: span::SpanAttributes) -> span::Id {
+    fn new_span(&self, span: span::SpanAttributes) -> Id {
         self.new_id(span)
     }
 
@@ -132,8 +132,8 @@ pub trait Subscriber {
     /// `Eq`, and `Hash` for `Span`s are free to return span IDs with value 0
     /// from all calls to this function, if they so choose.
     ///
-    /// [ID]: ::span::Id [`Span`]: ::span::Span [`Event`]: ::span::Event
-    fn new_id(&self, attrs: span::Attributes) -> span::Id;
+    /// [ID]: ::Id [`Span`]: ::span::Span [`Event`]: ::span::Event
+    fn new_id(&self, attrs: span::Attributes) -> Id;
 
     /// Record a signed 64-bit integer value.
     ///
@@ -148,7 +148,7 @@ pub trait Subscriber {
     ///   been set.
     fn record_i64(
         &self,
-        span: &span::Id,
+        span: &Id,
         field: &field::Key,
         value: i64,
     ) -> Result<(), RecordError> {
@@ -168,7 +168,7 @@ pub trait Subscriber {
     ///   been set.
     fn record_u64(
         &self,
-        span: &span::Id,
+        span: &Id,
         field: &field::Key,
         value: u64,
     ) -> Result<(), RecordError> {
@@ -188,7 +188,7 @@ pub trait Subscriber {
     ///   been set.
     fn record_bool(
         &self,
-        span: &span::Id,
+        span: &Id,
         field: &field::Key,
         value: bool,
     ) -> Result<(), RecordError> {
@@ -208,7 +208,7 @@ pub trait Subscriber {
     ///   been set.
     fn record_str(
         &self,
-        span: &span::Id,
+        span: &Id,
         field: &field::Key,
         value: &str,
     ) -> Result<(), RecordError> {
@@ -224,7 +224,7 @@ pub trait Subscriber {
     ///   been set.
     fn record_fmt(
         &self,
-        span: &span::Id,
+        span: &Id,
         field: &field::Key,
         value: fmt::Arguments,
     ) -> Result<(), RecordError>;
@@ -249,7 +249,7 @@ pub trait Subscriber {
     /// follow from _b_), it should return a [`FollowsError`].
     ///
     /// [`FollowsError`]: FollowsError
-    fn add_follows_from(&self, span: &span::Id, follows: span::Id) -> Result<(), FollowsError>;
+    fn add_follows_from(&self, span: &Id, follows: Id) -> Result<(), FollowsError>;
 
     // === Filtering methods ==================================================
 
@@ -268,30 +268,30 @@ pub trait Subscriber {
     ///
     /// When entering a span, this method is called to notify the subscriber
     /// that the span has been entered. The subscriber is provided with the
-    /// [`SpanId`] that identifies the entered span, and the current [`State`]
+    /// [`Id`] that identifies the entered span, and the current [`State`]
     /// of the span.
     ///
     /// [`Span`]: ::span::Span
-    /// [`SpanId`]: ::span::Id
+    /// [`Id`]: ::Id
     /// [`State`]: ::span::State
-    fn enter(&self, span: span::Id);
+    fn enter(&self, span: Id);
 
     /// Records that a [`Span`] has been exited.
     ///
     /// When exiting a span, this method is called to notify the subscriber
     /// that the span has been exited. The subscriber is provided with the
-    /// [`SpanId`] that identifies the exited span.
+    /// [`Id`] that identifies the exited span.
     ///
     /// Exiting a span does not imply that the span will not be re-entered.
     /// [`Span`]: ::span::Span
-    /// [`SpanId`]: ::span::Id
-    fn exit(&self, span: span::Id);
+    /// [`Id`]: ::Id
+    fn exit(&self, span: Id);
 
     /// Records that a [`Span`] has been closed.
     ///
     /// When exiting a span, this method is called to notify the subscriber
     /// that the span has been closed. The subscriber is provided with the
-    /// [`SpanId`] that identifies the closed span.
+    /// [`Id`] that identifies the closed span.
     ///
     /// Unlike `exit`, this method implies that the span will not be entered
     /// again. The subscriber is free to use that guarantee as it sees fit (such
@@ -299,8 +299,8 @@ pub trait Subscriber {
     /// necessary).
     ///
     /// [`Span`]: ::span::Span
-    /// [`SpanId`]: ::span::Id
-    fn close(&self, span: span::Id);
+    /// [`Id`]: ::Id
+    fn close(&self, span: Id);
 
     /// Notifies the subscriber that a [`Span`] handle with the given [`Id`] has
     /// been cloned.
@@ -312,7 +312,7 @@ pub trait Subscriber {
     /// the identifier. For more unsafe situations, however, if `id` is itself a
     /// pointer of some kind this can be used as a hook to "clone" the pointer,
     /// depending on what that means for the specified pointer.
-    fn clone_span(&self, id: span::Id) -> span::Id {
+    fn clone_span(&self, id: Id) -> Id {
         id
     }
 
@@ -332,7 +332,7 @@ pub trait Subscriber {
     /// implementations should ensure that they are unwind-safe. Panicking from
     /// inside of a `drop_span` function may cause a double panic, if the span
     /// was dropped due to a thread unwinding.
-    fn drop_span(&self, id: span::Id) {
+    fn drop_span(&self, id: Id) {
         let _ = id;
     }
 }
@@ -357,7 +357,7 @@ pub struct RecordError {
 #[derive(Debug)]
 enum RecordErrorKind {
     /// The span with the given ID does not exist.
-    NoSpan(SpanId),
+    NoSpan(Id),
     /// The span exists, but does not have the specified field.
     NoField,
     /// The named field already has a value.
@@ -377,7 +377,7 @@ enum FollowsErrorKind {
     /// The span with the given ID does not exist.
     /// TODO: can this error type be generalized between `FollowsError` and
     /// `RecordError`?
-    NoSpan(SpanId),
+    NoSpan(Id),
     /// The span that this span follows from does not exist (it has no ID).
     NoPreceedingId,
 }
@@ -436,7 +436,7 @@ impl Interest {
 
 impl RecordError {
     /// Returns an error indicating that no span exists for the given `id`.
-    pub fn no_span(id: SpanId) -> Self {
+    pub fn no_span(id: Id) -> Self {
         Self {
             kind: RecordErrorKind::NoSpan(id),
         }
@@ -524,7 +524,7 @@ impl From<fmt::Error> for RecordError {
 
 impl FollowsError {
     /// Returns an error indicating that no span exists for the given `id`.
-    pub fn no_following_span(id: SpanId) -> Self {
+    pub fn no_following_span(id: Id) -> Self {
         Self {
             kind: FollowsErrorKind::NoSpan(id),
         }
@@ -572,7 +572,7 @@ mod test_support {
 
     use super::*;
     use span::{self, MockSpan};
-    use {field, Event, Meta, SpanAttributes, SpanId};
+    use {field, Event, Meta, SpanAttributes, Id};
 
     use std::{
         collections::{HashMap, VecDeque},
@@ -598,7 +598,7 @@ mod test_support {
     }
 
     struct Running<F: Fn(&Meta) -> bool> {
-        spans: Mutex<HashMap<SpanId, SpanAttributes>>,
+        spans: Mutex<HashMap<Id, SpanAttributes>>,
         expected: Mutex<VecDeque<Expect>>,
         ids: AtomicUsize,
         filter: F,
@@ -674,7 +674,7 @@ mod test_support {
 
         fn record_fmt(
             &self,
-            _id: &span::Id,
+            _id: &Id,
             _field: &field::Key,
             _value: ::std::fmt::Arguments,
         ) -> Result<(), ::subscriber::RecordError> {
@@ -684,27 +684,27 @@ mod test_support {
 
         fn add_follows_from(
             &self,
-            _span: &span::Id,
-            _follows: span::Id,
+            _span: &Id,
+            _follows: Id,
         ) -> Result<(), FollowsError> {
             // TODO: it should be possible to expect spans to follow from other spans
             Ok(())
         }
 
-        fn new_id(&self, span: span::Attributes) -> span::Id {
+        fn new_id(&self, span: span::Attributes) -> Id {
             let id = self.ids.fetch_add(1, Ordering::SeqCst);
-            let id = span::Id::from_u64(id as u64);
+            let id = Id::from_u64(id as u64);
             id
         }
 
-        fn new_span(&self, span: SpanAttributes) -> span::Id {
+        fn new_span(&self, span: SpanAttributes) -> Id {
             let id = self.ids.fetch_add(1, Ordering::SeqCst);
-            let id = span::Id::from_u64(id as u64);
+            let id = Id::from_u64(id as u64);
             self.spans.lock().unwrap().insert(id.clone(), span);
             id
         }
 
-        fn enter(&self, span: span::Id) {
+        fn enter(&self, span: Id) {
             println!("enter: {:?}", span);
             let spans = self.spans.lock().unwrap();
             let span = spans
@@ -749,7 +749,7 @@ mod test_support {
             }
         }
 
-        fn exit(&self, span: span::Id) {
+        fn exit(&self, span: Id) {
             println!("exit: {:?}", span);
             let spans = self.spans.lock().unwrap();
             let span = spans
@@ -794,7 +794,7 @@ mod test_support {
             }
         }
 
-        fn close(&self, span: span::Id) {
+        fn close(&self, span: Id) {
             let spans = self.spans.lock().unwrap();
             let span = spans
                 .get(&span)
@@ -838,7 +838,7 @@ mod test_support {
             }
         }
 
-        fn clone_span(&self, id: span::Id) -> span::Id {
+        fn clone_span(&self, id: Id) -> Id {
             println!("clone_span: {:?}", id);
             let mut expected = self.expected.lock().unwrap();
             let was_expected = if let Some(Expect::CloneSpan(ref span)) = expected.front() {
@@ -860,7 +860,7 @@ mod test_support {
             id
         }
 
-        fn drop_span(&self, id: span::Id) {
+        fn drop_span(&self, id: Id) {
             println!("drop_span: {:?}", id);
             if let Ok(mut expected) = self.expected.lock() {
                 let was_expected = if let Some(Expect::DropSpan(ref span)) = expected.front() {

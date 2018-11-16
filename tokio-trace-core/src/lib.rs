@@ -112,7 +112,7 @@ pub use self::{
     callsite::Callsite,
     dispatcher::Dispatch,
     field::{Key, Value},
-    span::{Attributes, Event, Id as SpanId, Span, SpanAttributes},
+    span::{Attributes, Event, Id, Span, SpanAttributes},
     subscriber::{Interest, Subscriber},
 };
 

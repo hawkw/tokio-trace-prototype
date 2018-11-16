@@ -4,7 +4,7 @@ extern crate tokio_trace;
 use tokio_trace::{
     field, span,
     subscriber::{self, Subscriber},
-    Event, Level, Meta,
+    Event, Level, Meta, Id,
 };
 
 use std::{
@@ -42,15 +42,15 @@ impl Subscriber for CounterSubscriber {
         interest
     }
 
-    fn new_id(&self, _new_span: span::Attributes) -> span::Id {
+    fn new_id(&self, _new_span: span::Attributes) -> Id {
         let id = self.ids.fetch_add(1, Ordering::SeqCst);
-        span::Id::from_u64(id as u64)
+        Id::from_u64(id as u64)
     }
 
     fn add_follows_from(
         &self,
-        _span: &span::Id,
-        _follows: span::Id,
+        _span: &Id,
+        _follows: Id,
     ) -> Result<(), subscriber::FollowsError> {
         // unimplemented
         Ok(())
@@ -58,7 +58,7 @@ impl Subscriber for CounterSubscriber {
 
     fn record_i64(
         &self,
-        _id: &span::Id,
+        _id: &Id,
         field: &field::Key,
         value: i64,
     ) -> Result<(), ::subscriber::RecordError> {
@@ -75,7 +75,7 @@ impl Subscriber for CounterSubscriber {
 
     fn record_u64(
         &self,
-        _id: &span::Id,
+        _id: &Id,
         field: &field::Key,
         value: u64,
     ) -> Result<(), ::subscriber::RecordError> {
@@ -95,7 +95,7 @@ impl Subscriber for CounterSubscriber {
     ///   been set.
     fn record_fmt(
         &self,
-        _id: &span::Id,
+        _id: &Id,
         _field: &field::Key,
         _value: ::std::fmt::Arguments,
     ) -> Result<(), ::subscriber::RecordError> {
@@ -111,9 +111,9 @@ impl Subscriber for CounterSubscriber {
             .any(|f| f.name().map(|name| name.contains("count")).unwrap_or(false))
     }
 
-    fn enter(&self, _span: span::Id) {}
-    fn exit(&self, _span: span::Id) {}
-    fn close(&self, _span: span::Id) {}
+    fn enter(&self, _span: Id) {}
+    fn exit(&self, _span: Id) {}
+    fn close(&self, _span: Id) {}
 }
 
 impl Counters {

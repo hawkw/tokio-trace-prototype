@@ -11,13 +11,13 @@ use tokio_trace::{field, span, subscriber, Event, Meta};
 struct EnabledSubscriber;
 
 impl tokio_trace::Subscriber for EnabledSubscriber {
-    fn new_span(&self, span: span::Attributes) -> span::Id {
+    fn new_span(&self, span: span::Attributes) -> Id {
         let _ = span;
-        span::Id::from_u64(0)
+        Id::from_u64(0)
     }
     fn record(
         &self,
-        span: &span::Id,
+        span: &Id,
         field: &field::Key,
         value: &dyn field::Value,
     ) -> Result<(), tokio_trace::subscriber::RecordError> {
@@ -27,8 +27,8 @@ impl tokio_trace::Subscriber for EnabledSubscriber {
 
     fn add_follows_from(
         &self,
-        span: &span::Id,
-        follows: span::Id,
+        span: &Id,
+        follows: Id,
     ) -> Result<(), subscriber::FollowsError> {
         let _ = (span, follows);
         Ok(())
@@ -43,15 +43,15 @@ impl tokio_trace::Subscriber for EnabledSubscriber {
         let _ = event;
     }
 
-    fn enter(&self, span: span::Id) {
+    fn enter(&self, span: Id) {
         let _ = span;
     }
 
-    fn exit(&self, span: span::Id) {
+    fn exit(&self, span: Id) {
         let _ = span;
     }
 
-    fn close(&self, span: span::Id) {
+    fn close(&self, span: Id) {
         let _ = span;
     }
 }
@@ -60,14 +60,14 @@ impl tokio_trace::Subscriber for EnabledSubscriber {
 struct AddAttributes(Mutex<Option<span::Attributes>>);
 
 impl tokio_trace::Subscriber for AddAttributes {
-    fn new_span(&self, span: span::Attributes) -> span::Id {
+    fn new_span(&self, span: span::Attributes) -> Id {
         *self.0.lock().unwrap() = Some(span.into());
-        span::Id::from_u64(0)
+        Id::from_u64(0)
     }
 
     fn record(
         &self,
-        span: &span::Id,
+        span: &Id,
         field: &field::Key,
         value: &dyn field::Value,
     ) -> Result<(), tokio_trace::subscriber::RecordError> {
@@ -76,8 +76,8 @@ impl tokio_trace::Subscriber for AddAttributes {
 
     fn add_follows_from(
         &self,
-        span: &span::Id,
-        follows: span::Id,
+        span: &Id,
+        follows: Id,
     ) -> Result<(), subscriber::FollowsError> {
         let _ = (span, follows);
         Ok(())
@@ -92,15 +92,15 @@ impl tokio_trace::Subscriber for AddAttributes {
         let _ = event;
     }
 
-    fn enter(&self, span: span::Id) {
+    fn enter(&self, span: Id) {
         let _ = span;
     }
 
-    fn exit(&self, span: span::Id) {
+    fn exit(&self, span: Id) {
         let _ = span;
     }
 
-    fn close(&self, span: span::Id) {
+    fn close(&self, span: Id) {
         let _ = span;
     }
 }

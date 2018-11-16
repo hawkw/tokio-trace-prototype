@@ -2,7 +2,7 @@ use {
     callsite, field,
     span::{self, Span},
     subscriber::{self, Subscriber, RecordError},
-    Event, Meta,
+    Event, Meta, Id,
 };
 
 use std::{
@@ -92,19 +92,19 @@ impl Subscriber for Dispatch {
     }
 
     #[inline]
-    fn new_span(&self, span: span::SpanAttributes) -> span::Id {
+    fn new_span(&self, span: span::SpanAttributes) -> Id {
         self.subscriber.new_span(span)
     }
 
     #[inline]
-    fn new_id(&self, span: span::Attributes) -> span::Id {
+    fn new_id(&self, span: span::Attributes) -> Id {
         self.subscriber.new_id(span)
     }
 
     #[inline]
     fn record_i64(
         &self,
-        span: &span::Id,
+        span: &Id,
         field: &field::Key,
         value: i64,
     ) -> Result<(), RecordError> {
@@ -114,7 +114,7 @@ impl Subscriber for Dispatch {
     #[inline]
     fn record_u64(
         &self,
-        span: &span::Id,
+        span: &Id,
         field: &field::Key,
         value: u64,
     ) -> Result<(), RecordError> {
@@ -124,7 +124,7 @@ impl Subscriber for Dispatch {
     #[inline]
     fn record_bool(
         &self,
-        span: &span::Id,
+        span: &Id,
         field: &field::Key,
         value: bool,
     ) -> Result<(), RecordError> {
@@ -134,7 +134,7 @@ impl Subscriber for Dispatch {
     #[inline]
     fn record_str(
         &self,
-        span: &span::Id,
+        span: &Id,
         field: &field::Key,
         value: &str,
     ) -> Result<(), RecordError> {
@@ -144,7 +144,7 @@ impl Subscriber for Dispatch {
     #[inline]
     fn record_fmt(
         &self,
-        span: &span::Id,
+        span: &Id,
         field: &field::Key,
         value: fmt::Arguments,
     ) -> Result<(), RecordError> {
@@ -154,8 +154,8 @@ impl Subscriber for Dispatch {
     #[inline]
     fn add_follows_from(
         &self,
-        span: &span::Id,
-        follows: span::Id,
+        span: &Id,
+        follows: Id,
     ) -> Result<(), subscriber::FollowsError> {
         self.subscriber.add_follows_from(span, follows)
     }
@@ -166,40 +166,40 @@ impl Subscriber for Dispatch {
     }
 
     #[inline]
-    fn enter(&self, span: span::Id) {
+    fn enter(&self, span: Id) {
         self.subscriber.enter(span)
     }
 
     #[inline]
-    fn exit(&self, span: span::Id) {
+    fn exit(&self, span: Id) {
         self.subscriber.exit(span)
     }
 
     #[inline]
-    fn close(&self, span: span::Id) {
+    fn close(&self, span: Id) {
         self.subscriber.close(span)
     }
 
     #[inline]
-    fn clone_span(&self, id: span::Id) -> span::Id {
+    fn clone_span(&self, id: Id) -> Id {
         self.subscriber.clone_span(id)
     }
 
     #[inline]
-    fn drop_span(&self, id: span::Id) {
+    fn drop_span(&self, id: Id) {
         self.subscriber.drop_span(id)
     }
 }
 
 struct NoSubscriber;
 impl Subscriber for NoSubscriber {
-    fn new_id(&self, _span: span::Attributes) -> span::Id {
-        span::Id::from_u64(0)
+    fn new_id(&self, _span: span::Attributes) -> Id {
+        Id::from_u64(0)
     }
 
     fn record_fmt(
         &self,
-        _span: &span::Id,
+        _span: &Id,
         _key: &field::Key,
         _value: fmt::Arguments,
     ) -> Result<(), ::subscriber::RecordError> {
@@ -208,8 +208,8 @@ impl Subscriber for NoSubscriber {
 
     fn add_follows_from(
         &self,
-        _span: &span::Id,
-        _follows: span::Id,
+        _span: &Id,
+        _follows: Id,
     ) -> Result<(), subscriber::FollowsError> {
         Ok(())
     }
@@ -218,11 +218,11 @@ impl Subscriber for NoSubscriber {
         false
     }
 
-    fn enter(&self, _span: span::Id) {}
+    fn enter(&self, _span: Id) {}
 
-    fn exit(&self, _span: span::Id) {}
+    fn exit(&self, _span: Id) {}
 
-    fn close(&self, _span: span::Id) {}
+    fn close(&self, _span: Id) {}
 }
 
 impl Registrar {

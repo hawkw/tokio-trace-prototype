@@ -16,7 +16,7 @@ use self::ansi_term::{Color, Style};
 use super::tokio_trace::{
     self, field,
     subscriber::{self, Subscriber},
-    Level, SpanAttributes, SpanId,
+    Level, SpanAttributes, Id,
 };
 
 use std::{
@@ -33,8 +33,8 @@ use std::{
 pub struct SloggishSubscriber {
     indent_amount: usize,
     stderr: io::Stderr,
-    stack: Mutex<Vec<SpanId>>,
-    spans: Mutex<HashMap<SpanId, Span>>,
+    stack: Mutex<Vec<Id>>,
+    spans: Mutex<HashMap<Id, Span>>,
     ids: AtomicUsize,
 }
 
@@ -139,15 +139,15 @@ impl Subscriber for SloggishSubscriber {
         true
     }
 
-    fn new_id(&self, span: tokio_trace::span::Attributes) -> tokio_trace::span::Id {
+    fn new_id(&self, span: tokio_trace::span::Attributes) -> tokio_trace::Id {
         let next = self.ids.fetch_add(1, Ordering::SeqCst) as u64;
-        let id = tokio_trace::span::Id::from_u64(next);
+        let id = tokio_trace::Id::from_u64(next);
         id
     }
 
-    fn new_span(&self, span: tokio_trace::span::SpanAttributes) -> tokio_trace::span::Id {
+    fn new_span(&self, span: tokio_trace::span::SpanAttributes) -> tokio_trace::Id {
         let next = self.ids.fetch_add(1, Ordering::SeqCst) as u64;
-        let id = tokio_trace::span::Id::from_u64(next);
+        let id = tokio_trace::Id::from_u64(next);
         self.spans
             .lock()
             .unwrap()
@@ -157,7 +157,7 @@ impl Subscriber for SloggishSubscriber {
 
     fn record_fmt(
         &self,
-        span: &tokio_trace::SpanId,
+        span: &tokio_trace::Id,
         name: &tokio_trace::field::Key,
         value: fmt::Arguments,
     ) -> Result<(), subscriber::RecordError> {
@@ -172,15 +172,15 @@ impl Subscriber for SloggishSubscriber {
 
     fn add_follows_from(
         &self,
-        _span: &tokio_trace::SpanId,
-        _follows: tokio_trace::SpanId,
+        _span: &tokio_trace::Id,
+        _follows: tokio_trace::Id,
     ) -> Result<(), subscriber::FollowsError> {
         // unimplemented
         Ok(())
     }
 
     #[inline]
-    fn enter(&self, span: tokio_trace::span::Id) {
+    fn enter(&self, span: tokio_trace::Id) {
         let mut stderr = self.stderr.lock();
         let mut stack = self.stack.lock().unwrap();
         let spans = self.spans.lock().unwrap();
@@ -212,10 +212,10 @@ impl Subscriber for SloggishSubscriber {
     }
 
     #[inline]
-    fn exit(&self, _span: tokio_trace::span::Id) {}
+    fn exit(&self, _span: tokio_trace::Id) {}
 
     #[inline]
-    fn close(&self, _span: tokio_trace::span::Id) {
+    fn close(&self, _span: tokio_trace::Id) {
         // TODO: it's *probably* safe to remove the span from the cache
         // now...but that doesn't really matter for this example.
     }
