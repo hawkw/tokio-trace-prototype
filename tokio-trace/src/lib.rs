@@ -97,6 +97,7 @@ macro_rules! span {
     ($name:expr) => { span!($name,) };
     ($name:expr, $($k:ident $( = $val:expr )* ) ,*) => {
         {
+            #[allow(unused_imports)]
             use $crate::{callsite, callsite::Callsite, Span,  span::SpanExt, field::{Value, AsKey}};
             let callsite = callsite! { span: $name, $( $k ),* };
             // Depending on how many fields are generated, this may or may
@@ -124,6 +125,7 @@ macro_rules! span {
 macro_rules! event {
     (target: $target:expr, $lvl:expr, { $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => ({
         {
+            #[allow(unused_imports)]
             use $crate::{callsite, Id, Subscriber, Event, span::SpanExt, field::{Value, AsKey}};
             use $crate::callsite::Callsite;
             let callsite = callsite! { event:
