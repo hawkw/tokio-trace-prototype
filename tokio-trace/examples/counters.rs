@@ -47,9 +47,8 @@ impl Subscriber for CounterSubscriber {
         Id::from_u64(id as u64)
     }
 
-    fn add_follows_from(&self, _span: &Id, _follows: Id) -> Result<(), subscriber::FollowsError> {
+    fn add_follows_from(&self, _span: &Id, _follows: Id) {
         // unimplemented
-        Ok(())
     }
 
     fn record_i64(
@@ -57,7 +56,7 @@ impl Subscriber for CounterSubscriber {
         _id: &Id,
         field: &field::Key,
         value: i64,
-    ) -> Result<(), ::subscriber::RecordError> {
+    ) {
         let registry = self.counters.0.read().unwrap();
         if let Some(counter) = field.name().and_then(|name| registry.get(name)) {
             if value > 0 {
@@ -66,7 +65,6 @@ impl Subscriber for CounterSubscriber {
                 counter.fetch_sub(value as usize, Ordering::Release);
             }
         };
-        Ok(())
     }
 
     fn record_u64(
@@ -74,12 +72,11 @@ impl Subscriber for CounterSubscriber {
         _id: &Id,
         field: &field::Key,
         value: u64,
-    ) -> Result<(), ::subscriber::RecordError> {
+    ) {
         let registry = self.counters.0.read().unwrap();
         if let Some(counter) = field.name().and_then(|name| registry.get(name)) {
             counter.fetch_add(value as usize, Ordering::Release);
         };
-        Ok(())
     }
 
     /// Adds a new field to an existing span observed by this `Subscriber`.
@@ -94,9 +91,7 @@ impl Subscriber for CounterSubscriber {
         _id: &Id,
         _field: &field::Key,
         _value: ::std::fmt::Arguments,
-    ) -> Result<(), ::subscriber::RecordError> {
-        Ok(())
-    }
+    ) { }
 
     fn enabled(&self, metadata: &Meta) -> bool {
         if !metadata.is_span() {
