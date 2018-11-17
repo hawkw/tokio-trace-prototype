@@ -15,7 +15,7 @@ extern crate humantime;
 use self::ansi_term::{Color, Style};
 use super::tokio_trace::{
     self,
-    subscriber::{self, Subscriber},
+    subscriber::Subscriber,
     Id, Level, SpanAttributes,
 };
 
@@ -78,13 +78,11 @@ impl Span {
         &mut self,
         key: &tokio_trace::field::Key,
         value: fmt::Arguments,
-    ) -> Result<(), subscriber::RecordError> {
-        // value.record(key, &mut tokio_trace::field::DebugRecorder::new(&mut s))?;
+    ) {
         // TODO: shouldn't have to alloc the key...
         let k = key.name().unwrap_or("???").to_owned();
         let v = fmt::format(value);
         self.kvs.push((k, v));
-        Ok(())
     }
 }
 
@@ -104,17 +102,16 @@ impl Event {
         &mut self,
         key: &tokio_trace::field::Key,
         value: fmt::Arguments,
-    ) -> Result<(), subscriber::RecordError> {
+    ) {
         if key.name() == Some("message") {
             self.message = fmt::format(value);
-            return Ok(());
+            return;
         }
 
         // TODO: shouldn't have to alloc the key...
         let k = key.name().unwrap_or("???").to_owned();
         let v = fmt::format(value);
         self.kvs.push((k, v));
-        Ok(())
     }
 }
 
@@ -195,26 +192,22 @@ impl Subscriber for SloggishSubscriber {
         span: &tokio_trace::Id,
         name: &tokio_trace::field::Key,
         value: fmt::Arguments,
-    ) -> Result<(), subscriber::RecordError> {
-        let mut events = self.events.lock().expect("mutex poisoned!");
-        if let Some(event) = events.get_mut(span) {
+    ) {
+        if let Some(event) = self.events.lock().expect("mutex poisoned!").get_mut(span) {
             return event.record(name, value);
         };
         let mut spans = self.spans.lock().expect("mutex poisoned!");
-        let span = spans
-            .get_mut(span)
-            .ok_or_else(|| subscriber::RecordError::no_span(span.clone()))?;
-        span.record(name, value)?;
-        Ok(())
+        if let Some(span)= spans.get_mut(span) {
+            span.record(name, value)
+        }
     }
 
     fn add_follows_from(
         &self,
         _span: &tokio_trace::Id,
         _follows: tokio_trace::Id,
-    ) -> Result<(), subscriber::FollowsError> {
+    )  {
         // unimplemented
-        Ok(())
     }
 
     #[inline]

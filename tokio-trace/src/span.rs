@@ -203,7 +203,7 @@ pub use tokio_trace_core::span::{mock, MockSpan};
 
 use std::{fmt, sync::Arc};
 use tokio_trace_core::span::Enter;
-use {field, subscriber};
+use field;
 
 /// Trait for converting a `Span` into a cloneable `Shared` span.
 pub trait IntoShared {

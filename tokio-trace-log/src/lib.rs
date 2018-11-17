@@ -34,7 +34,7 @@ use std::{
 };
 use tokio_trace::{
     field, span,
-    subscriber::{self, Subscriber},
+    subscriber::Subscriber,
     Id, Meta,
 };
 
@@ -401,13 +401,13 @@ impl Subscriber for TraceLogger {
     fn record_fmt(&self, span: &Id, key: &field::Key, val: fmt::Arguments) {
         let mut in_progress = self.in_progress.lock().unwrap();
         if let Some(span) = in_progress.spans.get_mut(span) {
-            if let Err(e) = span.record(key, val) {
+            if let Err(_e) = span.record(key, val) {
                 eprintln!("error formatting span");
             }
             return;
         }
         if let Some(event) = in_progress.events.get_mut(span) {
-            if let Err(e) = event.record(key, val) {
+            if let Err(_e) = event.record(key, val) {
                 eprintln!("error formatting event");
             }
         }
