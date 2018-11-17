@@ -133,6 +133,14 @@ fn span_with_fields(b: &mut Bencher) {
 #[bench]
 fn span_with_fields_record(b: &mut Bencher) {
     tokio_trace::Dispatch::new(Record(Mutex::new(None))).as_default(|| {
-        b.iter(|| span!("span", foo = "foo", bar = "bar", baz = 3, quuux = tokio_trace::field::debug(0.99)))
+        b.iter(|| {
+            span!(
+                "span",
+                foo = "foo",
+                bar = "bar",
+                baz = 3,
+                quuux = tokio_trace::field::debug(0.99)
+            )
+        })
     });
 }
