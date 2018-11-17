@@ -201,9 +201,9 @@ pub use tokio_trace_core::span::{Attributes, Event, Id, Span, SpanAttributes};
 #[cfg(any(test, feature = "test-support"))]
 pub use tokio_trace_core::span::{mock, MockSpan};
 
+use field;
 use std::{fmt, sync::Arc};
 use tokio_trace_core::span::Enter;
-use field;
 
 /// Trait for converting a `Span` into a cloneable `Shared` span.
 pub trait IntoShared {

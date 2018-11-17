@@ -51,12 +51,7 @@ impl Subscriber for CounterSubscriber {
         // unimplemented
     }
 
-    fn record_i64(
-        &self,
-        _id: &Id,
-        field: &field::Key,
-        value: i64,
-    ) {
+    fn record_i64(&self, _id: &Id, field: &field::Key, value: i64) {
         let registry = self.counters.0.read().unwrap();
         if let Some(counter) = field.name().and_then(|name| registry.get(name)) {
             if value > 0 {
@@ -67,12 +62,7 @@ impl Subscriber for CounterSubscriber {
         };
     }
 
-    fn record_u64(
-        &self,
-        _id: &Id,
-        field: &field::Key,
-        value: u64,
-    ) {
+    fn record_u64(&self, _id: &Id, field: &field::Key, value: u64) {
         let registry = self.counters.0.read().unwrap();
         if let Some(counter) = field.name().and_then(|name| registry.get(name)) {
             counter.fetch_add(value as usize, Ordering::Release);
@@ -86,12 +76,7 @@ impl Subscriber for CounterSubscriber {
     /// - The span does not have a field with the given name.
     /// - The span has a field with the given name, but the value has already
     ///   been set.
-    fn record_fmt(
-        &self,
-        _id: &Id,
-        _field: &field::Key,
-        _value: ::std::fmt::Arguments,
-    ) { }
+    fn record_fmt(&self, _id: &Id, _field: &field::Key, _value: ::std::fmt::Arguments) {}
 
     fn enabled(&self, metadata: &Meta) -> bool {
         if !metadata.is_span() {

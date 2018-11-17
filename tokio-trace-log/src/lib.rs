@@ -32,11 +32,7 @@ use std::{
         Mutex,
     },
 };
-use tokio_trace::{
-    field, span,
-    subscriber::Subscriber,
-    Id, Meta,
-};
+use tokio_trace::{field, span, subscriber::Subscriber, Id, Meta};
 
 /// Format a log record as a trace event in the current span.
 pub fn format_trace(record: &log::Record) -> io::Result<()> {
