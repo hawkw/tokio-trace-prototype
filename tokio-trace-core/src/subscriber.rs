@@ -141,12 +141,10 @@ pub trait Subscriber {
     /// provide behaviour specific to signed integers may override the default
     /// implementation.
     ///
-    /// This is expected to return an error under the following conditions:
-    /// - The span ID does not correspond to a span which currently exists.
-    /// - The span does not have a field with the given name.
-    /// - The span has a field with the given name, but the value has already
-    ///   been set.
-    fn record_i64(&self, span: &Id, field: &field::Key, value: i64) -> Result<(), RecordError> {
+    /// If recording the field is invalid (i.e. the span ID doesn't exist, the
+    /// field has already been recorded, and so on), the subscriber may silently
+    /// do nothing.
+    fn record_i64(&self, span: &Id, field: &field::Key, value: i64) {
         self.record_fmt(span, field, format_args!("{}", value))
     }
 
@@ -156,12 +154,10 @@ pub trait Subscriber {
     /// provide behaviour specific to unsigned integers may override the default
     /// implementation.
     ///
-    /// This is expected to return an error under the following conditions:
-    /// - The span ID does not correspond to a span which currently exists.
-    /// - The span does not have a field with the given name.
-    /// - The span has a field with the given name, but the value has already
-    ///   been set.
-    fn record_u64(&self, span: &Id, field: &field::Key, value: u64) -> Result<(), RecordError> {
+    /// If recording the field is invalid (i.e. the span ID doesn't exist, the
+    /// field has already been recorded, and so on), the subscriber may silently
+    /// do nothing.
+    fn record_u64(&self, span: &Id, field: &field::Key, value: u64) {
         self.record_fmt(span, field, format_args!("{}", value))
     }
 
@@ -171,12 +167,10 @@ pub trait Subscriber {
     /// provide behaviour specific to booleans may override the default
     /// implementation.
     ///
-    /// This is expected to return an error under the following conditions:
-    /// - The span ID does not correspond to a span which currently exists.
-    /// - The span does not have a field with the given name.
-    /// - The span has a field with the given name, but the value has already
-    ///   been set.
-    fn record_bool(&self, span: &Id, field: &field::Key, value: bool) -> Result<(), RecordError> {
+    /// If recording the field is invalid (i.e. the span ID doesn't exist, the
+    /// field has already been recorded, and so on), the subscriber may silently
+    /// do nothing.
+    fn record_bool(&self, span: &Id, field: &field::Key, value: bool) {
         self.record_fmt(span, field, format_args!("{}", value))
     }
 
@@ -186,28 +180,24 @@ pub trait Subscriber {
     /// provide behaviour specific to strings may override the default
     /// implementation.
     ///
-    /// This is expected to return an error under the following conditions:
-    /// - The span ID does not correspond to a span which currently exists.
-    /// - The span does not have a field with the given name.
-    /// - The span has a field with the given name, but the value has already
-    ///   been set.
-    fn record_str(&self, span: &Id, field: &field::Key, value: &str) -> Result<(), RecordError> {
+    /// If recording the field is invalid (i.e. the span ID doesn't exist, the
+    /// field has already been recorded, and so on), the subscriber may silently
+    /// do nothing.
+    fn record_str(&self, span: &Id, field: &field::Key, value: &str) {
         self.record_fmt(span, field, format_args!("{}", value))
     }
 
-    /// Record a set of pre-compile``d format arguments.
+    /// Record a set of pre-compiled format arguments.
     ///
-    /// This is expected to return an error under the following conditions:
-    /// - The span ID does not correspond to a span which currently exists.
-    /// - The span does not have a field with the given name.
-    /// - The span has a field with the given name, but the value has already
-    ///   been set.
+    /// If recording the field is invalid (i.e. the span ID doesn't exist, the
+    /// field has already been recorded, and so on), the subscriber may silently
+    /// do nothing.
     fn record_fmt(
         &self,
         span: &Id,
         field: &field::Key,
         value: fmt::Arguments,
-    ) -> Result<(), RecordError>;
+    );
 
     /// Adds an indication that `span` follows from the span with the id
     /// `follows`.
@@ -226,10 +216,8 @@ pub trait Subscriber {
     /// if one or both of the given span IDs do not correspond to spans that the
     /// subscriber knows about, or if a cyclical relationship would be created
     /// (i.e., some span _a_ which proceeds some other span _b_ may not also
-    /// follow from _b_), it should return a [`FollowsError`].
-    ///
-    /// [`FollowsError`]: FollowsError
-    fn add_follows_from(&self, span: &Id, follows: Id) -> Result<(), FollowsError>;
+    /// follow from _b_), it may silently do nothing.
+    fn add_follows_from(&self, span: &Id, follows: Id);
 
     // === Filtering methods ==================================================
 
@@ -412,137 +400,6 @@ impl Interest {
     }
 }
 
-// ===== impl RecordError =====
-
-impl RecordError {
-    /// Returns an error indicating that no span exists for the given `id`.
-    pub fn no_span(id: Id) -> Self {
-        Self {
-            kind: RecordErrorKind::NoSpan(id),
-        }
-    }
-
-    /// Returns an error indicating that the span exists, but does not have the
-    /// specified field.
-    pub fn no_field() -> Self {
-        Self {
-            kind: RecordErrorKind::NoField,
-        }
-    }
-
-    /// Return an error indicating that the named field already has a value.
-    pub fn already_exists() -> Self {
-        Self {
-            kind: RecordErrorKind::AlreadyExists,
-        }
-    }
-
-    /// Returns an error indicating that an error occurred recording the field.
-    pub fn record() -> Self {
-        Self {
-            kind: RecordErrorKind::Record,
-        }
-    }
-
-    /// Returns `true` if this error was due to no span existing for the
-    /// specified field.
-    pub fn is_no_span(&self) -> bool {
-        match self.kind {
-            RecordErrorKind::NoSpan(_) => true,
-            _ => false,
-        }
-    }
-
-    /// Returns `true` if this error was due to no field existing with the
-    /// specified name.
-    pub fn is_no_field(&self) -> bool {
-        match self.kind {
-            RecordErrorKind::NoField => true,
-            _ => false,
-        }
-    }
-
-    /// Returns `true` if this error was due to the named field already
-    /// existing.
-    pub fn is_already_exists(&self) -> bool {
-        match self.kind {
-            RecordErrorKind::AlreadyExists => true,
-            _ => false,
-        }
-    }
-
-    /// Returns `true` if this error was due to an error occurring while
-    /// recording the field.
-    pub fn is_record(&self) -> bool {
-        match self.kind {
-            RecordErrorKind::Record => true,
-            _ => false,
-        }
-    }
-}
-
-impl fmt::Display for RecordError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self.kind {
-            RecordErrorKind::NoSpan(ref id) => write!(f, "no span exists with id {:?}", id),
-            RecordErrorKind::NoField => f.pad("no such field exists"),
-            RecordErrorKind::AlreadyExists => f.pad("field already has a value"),
-            RecordErrorKind::Record => f.pad("an error occurred recording the field"),
-        }
-    }
-}
-
-impl Error for RecordError {}
-
-impl From<fmt::Error> for RecordError {
-    fn from(_e: fmt::Error) -> Self {
-        RecordError::record()
-    }
-}
-
-// ===== impl FollowsError =====
-
-impl FollowsError {
-    /// Returns an error indicating that no span exists for the given `id`.
-    pub fn no_following_span(id: Id) -> Self {
-        Self {
-            kind: FollowsErrorKind::NoSpan(id),
-        }
-    }
-
-    /// Returns an error indicating the preceeding span does not exist.
-    pub fn no_preceeding_span() -> Self {
-        Self {
-            kind: FollowsErrorKind::NoPreceedingId,
-        }
-    }
-
-    /// Returns `true` if this error was due to the following span not existing.
-    pub fn is_no_following_span(&self) -> bool {
-        match self.kind {
-            FollowsErrorKind::NoSpan(_) => true,
-            _ => false,
-        }
-    }
-
-    /// Returns `true` if this error was due to the preceeding span not existing.
-    pub fn is_no_preceeding_span(&self) -> bool {
-        match self.kind {
-            FollowsErrorKind::NoPreceedingId => true,
-            _ => false,
-        }
-    }
-}
-
-impl fmt::Display for FollowsError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self.kind {
-            FollowsErrorKind::NoSpan(ref id) => write!(f, "no span exists with id {:?}", id),
-            FollowsErrorKind::NoPreceedingId => f.pad("the preceeding span does not exist"),
-        }
-    }
-}
-
 #[cfg(any(test, feature = "test-support"))]
 pub use self::test_support::*;
 
@@ -668,14 +525,12 @@ mod test_support {
             _id: &Id,
             _field: &field::Key,
             _value: ::std::fmt::Arguments,
-        ) -> Result<(), ::subscriber::RecordError> {
+        ) {
             // TODO: it would be nice to be able to expect field values...
-            Ok(())
         }
 
-        fn add_follows_from(&self, _span: &Id, _follows: Id) -> Result<(), FollowsError> {
+        fn add_follows_from(&self, _span: &Id, _follows: Id) {
             // TODO: it should be possible to expect spans to follow from other spans
-            Ok(())
         }
 
         fn new_id(&self, _span: span::Attributes) -> Id {

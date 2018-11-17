@@ -114,7 +114,6 @@ macro_rules! span {
     };
     (@ record: $span:expr, $k:expr, $i:expr, $val:expr) => (
         $span.record($i, &$val)
-            .expect(concat!("adding value for field '", stringify!($k), "' failed"));
     );
     (@ record: $span:expr, $k:expr, $i:expr,) => (
         // skip
@@ -140,8 +139,7 @@ macro_rules! event {
                 event.message(
                     &keys.next().expect("event metadata should define a key for the message"),
                     format_args!( $($arg)+ )
-                )
-                .expect("adding value for event message failed");
+                );
                 $(
                     let key = keys.next()
                         .expect(concat!("metadata should define a key for '", stringify!($k), "'"));
@@ -154,8 +152,7 @@ macro_rules! event {
         event!(target: module_path!(), $lvl, { $($k $( = $val)* ),* }, $($arg)+)
     );
     (@ record: $ev:expr, $k:expr, $i:expr, $val:expr) => (
-        $ev.record($i, &$val)
-            .expect(concat!("adding value for field '", stringify!($k), "' failed"));
+        $ev.record($i, &$val);
     );
     (@ record: $ev:expr, $k:expr, $i:expr,) => (
         // skip

@@ -111,11 +111,11 @@ where
         _span: &Id,
         _name: &tokio_trace::field::Key,
         _value: ::std::fmt::Arguments,
-    ) -> Result<(), RecordError> {
+    ) {
         unimplemented!()
     }
 
-    fn add_follows_from(&self, span: &Id, follows: Id) -> Result<(), FollowsError> {
+    fn add_follows_from(&self, span: &Id, follows: Id) {
         self.registry.add_follows_from(span, follows)
     }
 

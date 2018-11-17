@@ -6,7 +6,7 @@ extern crate test;
 use test::Bencher;
 
 use std::sync::Mutex;
-use tokio_trace::{field, span, subscriber, Id, Meta};
+use tokio_trace::{field, span, Id, Meta};
 
 /// A subscriber that is enabled but otherwise does nothing.
 struct EnabledSubscriber;
@@ -22,14 +22,12 @@ impl tokio_trace::Subscriber for EnabledSubscriber {
         span: &Id,
         field: &field::Key,
         value: ::std::fmt::Arguments,
-    ) -> Result<(), tokio_trace::subscriber::RecordError> {
+    ) {
         let _ = (span, field, value);
-        Ok(())
     }
 
-    fn add_follows_from(&self, span: &Id, follows: Id) -> Result<(), subscriber::FollowsError> {
+    fn add_follows_from(&self, span: &Id, follows: Id) {
         let _ = (span, follows);
-        Ok(())
     }
 
     fn enabled(&self, metadata: &Meta) -> bool {
@@ -68,14 +66,12 @@ impl tokio_trace::Subscriber for Record {
         _span: &Id,
         _field: &field::Key,
         value: ::std::fmt::Arguments,
-    ) -> Result<(), tokio_trace::subscriber::RecordError> {
+    ) {
         let _ = ::std::fmt::format(value);
-        Ok(())
     }
 
-    fn add_follows_from(&self, span: &Id, follows: Id) -> Result<(), subscriber::FollowsError> {
+    fn add_follows_from(&self, span: &Id, follows: Id) {
         let _ = (span, follows);
-        Ok(())
     }
 
     fn enabled(&self, metadata: &Meta) -> bool {
