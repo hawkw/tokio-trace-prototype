@@ -1,7 +1,7 @@
 pub use tokio_trace_core::field::*;
 
 use std::fmt;
-use {subscriber::RecordError, Meta};
+use Meta;
 
 /// Trait implemented to allow a type to be used as a field key.
 ///

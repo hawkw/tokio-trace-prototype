@@ -1,7 +1,7 @@
 //! Subscribers collect and record trace data.
 use {field, span, Id, Meta};
 
-use std::{error::Error, fmt};
+use std::fmt;
 
 /// Trait representing the functions required to collect trace data.
 ///
@@ -314,40 +314,6 @@ enum InterestKind {
     Never = 0,
     Sometimes = 1,
     Always = 2,
-}
-
-/// Errors which may prevent a value from being successfully added to a span.
-#[derive(Debug)]
-pub struct RecordError {
-    kind: RecordErrorKind,
-}
-
-#[derive(Debug)]
-enum RecordErrorKind {
-    /// The span with the given ID does not exist.
-    NoSpan(Id),
-    /// The span exists, but does not have the specified field.
-    NoField,
-    /// The named field already has a value.
-    AlreadyExists,
-    /// An error occurred recording the field.
-    Record,
-}
-
-/// Errors which may prevent a span from following another span.
-#[derive(Debug)]
-pub struct FollowsError {
-    kind: FollowsErrorKind,
-}
-
-#[derive(Debug)]
-enum FollowsErrorKind {
-    /// The span with the given ID does not exist.
-    /// TODO: can this error type be generalized between `FollowsError` and
-    /// `RecordError`?
-    NoSpan(Id),
-    /// The span that this span follows from does not exist (it has no ID).
-    NoPreceedingId,
 }
 
 impl Interest {

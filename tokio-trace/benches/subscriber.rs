@@ -57,7 +57,7 @@ impl tokio_trace::Subscriber for Record {
         Id::from_u64(0)
     }
 
-    fn new_id(&self, span: span::Attributes) -> Id {
+    fn new_id(&self, _span: span::Attributes) -> Id {
         Id::from_u64(0)
     }
 

@@ -1,6 +1,5 @@
 use tokio_trace::{
     span::{self, Attributes, Id, SpanAttributes},
-    subscriber::FollowsError,
 };
 
 use std::{

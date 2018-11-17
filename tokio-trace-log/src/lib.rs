@@ -406,11 +406,15 @@ impl Subscriber for TraceLogger {
     ) {
         let mut in_progress = self.in_progress.lock().unwrap();
         if let Some(span) = in_progress.spans.get_mut(span) {
-            span.record(key, val);
+            if let Err(e) = span.record(key, val) {
+                eprintln!("error formatting span");
+            }
             return;
         }
         if let Some(event) = in_progress.events.get_mut(span) {
-            event.record(key, val);
+            if let Err(e) = event.record(key, val) {
+                eprintln!("error formatting event");
+            }
         }
     }
 
