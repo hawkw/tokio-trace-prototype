@@ -1,8 +1,4 @@
-use tokio_trace::{
-    span,
-    subscriber::Subscriber,
-    Id, Meta,
-};
+use tokio_trace::{span, subscriber::Subscriber, Id, Meta};
 use {filter::NoFilter, observe::NoObserver, Filter, Observe, RegisterSpan};
 
 #[derive(Debug, Clone)]

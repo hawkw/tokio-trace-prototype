@@ -203,10 +203,7 @@ pub use tokio_trace_core::span::{mock, MockSpan};
 
 use std::{fmt, sync::Arc};
 use tokio_trace_core::span::Enter;
-use {
-    field,
-    subscriber,
-};
+use {field, subscriber};
 
 /// Trait for converting a `Span` into a cloneable `Shared` span.
 pub trait IntoShared {
@@ -217,7 +214,7 @@ pub trait IntoShared {
 }
 
 pub trait SpanExt: field::Record + ::sealed::Sealed {
-    fn record<Q: ?Sized, V: ?Sized>(&mut self, field: &Q, value: &V)-> &mut Self
+    fn record<Q: ?Sized, V: ?Sized>(&mut self, field: &Q, value: &V) -> &mut Self
     where
         Q: field::AsKey,
         V: field::Value;
@@ -335,7 +332,7 @@ impl SpanExt for Span {
             .is_some()
     }
 
-    fn record<Q: ?Sized, V: ?Sized>(&mut self, field: &Q, value: &V)-> &mut Self
+    fn record<Q: ?Sized, V: ?Sized>(&mut self, field: &Q, value: &V) -> &mut Self
     where
         Q: field::AsKey,
         V: field::Value,
@@ -351,10 +348,7 @@ impl field::Record for Span {
     where
         Q: field::AsKey,
     {
-        if let Some(key) = self
-            .metadata()
-            .and_then(|meta| field.as_key(meta))
-        {
+        if let Some(key) = self.metadata().and_then(|meta| field.as_key(meta)) {
             self.record_value_i64(&key, value);
         }
     }
@@ -364,10 +358,7 @@ impl field::Record for Span {
     where
         Q: field::AsKey,
     {
-        if let Some(key) = self
-            .metadata()
-            .and_then(|meta| field.as_key(meta))
-        {
+        if let Some(key) = self.metadata().and_then(|meta| field.as_key(meta)) {
             self.record_value_u64(&key, value);
         }
     }
@@ -377,10 +368,7 @@ impl field::Record for Span {
     where
         Q: field::AsKey,
     {
-        if let Some(key) = self
-            .metadata()
-            .and_then(|meta| field.as_key(meta))
-        {
+        if let Some(key) = self.metadata().and_then(|meta| field.as_key(meta)) {
             self.record_value_bool(&key, value);
         }
     }
@@ -390,10 +378,7 @@ impl field::Record for Span {
     where
         Q: field::AsKey,
     {
-        if let Some(key) = self
-            .metadata()
-            .and_then(|meta| field.as_key(meta))
-        {
+        if let Some(key) = self.metadata().and_then(|meta| field.as_key(meta)) {
             self.record_value_str(&key, value);
         }
     }
@@ -403,10 +388,7 @@ impl field::Record for Span {
     where
         Q: field::AsKey,
     {
-        if let Some(key) = self
-            .metadata()
-            .and_then(|meta| field.as_key(meta))
-        {
+        if let Some(key) = self.metadata().and_then(|meta| field.as_key(meta)) {
             self.record_value_fmt(&key, value);
         }
     }
@@ -418,10 +400,7 @@ impl<'a> field::Record for Event<'a> {
     where
         Q: field::AsKey,
     {
-        if let Some(key) = self
-            .metadata()
-            .and_then(|meta| field.as_key(meta))
-        {
+        if let Some(key) = self.metadata().and_then(|meta| field.as_key(meta)) {
             self.record_value_i64(&key, value);
         }
     }
@@ -431,10 +410,7 @@ impl<'a> field::Record for Event<'a> {
     where
         Q: field::AsKey,
     {
-        if let Some(key) = self
-            .metadata()
-            .and_then(|meta| field.as_key(meta))
-        {
+        if let Some(key) = self.metadata().and_then(|meta| field.as_key(meta)) {
             self.record_value_u64(&key, value);
         }
     }
@@ -444,10 +420,7 @@ impl<'a> field::Record for Event<'a> {
     where
         Q: field::AsKey,
     {
-        if let Some(key) = self
-            .metadata()
-            .and_then(|meta| field.as_key(meta))
-        {
+        if let Some(key) = self.metadata().and_then(|meta| field.as_key(meta)) {
             self.record_value_bool(&key, value);
         }
     }
@@ -457,10 +430,7 @@ impl<'a> field::Record for Event<'a> {
     where
         Q: field::AsKey,
     {
-        if let Some(key) = self
-            .metadata()
-            .and_then(|meta| field.as_key(meta))
-        {
+        if let Some(key) = self.metadata().and_then(|meta| field.as_key(meta)) {
             self.record_value_str(&key, value);
         }
     }
@@ -470,10 +440,7 @@ impl<'a> field::Record for Event<'a> {
     where
         Q: field::AsKey,
     {
-        if let Some(key) = self
-            .metadata()
-            .and_then(|meta| field.as_key(meta))
-        {
+        if let Some(key) = self.metadata().and_then(|meta| field.as_key(meta)) {
             self.record_value_fmt(&key, value);
         }
     }
@@ -491,7 +458,7 @@ impl<'a> SpanExt for Event<'a> {
             .is_some()
     }
 
-    fn record<Q: ?Sized, V: ?Sized>(&mut self, field: &Q, value: &V)-> &mut Self
+    fn record<Q: ?Sized, V: ?Sized>(&mut self, field: &Q, value: &V) -> &mut Self
     where
         Q: field::AsKey,
         V: field::Value,

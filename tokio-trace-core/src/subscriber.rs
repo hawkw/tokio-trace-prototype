@@ -192,12 +192,7 @@ pub trait Subscriber {
     /// If recording the field is invalid (i.e. the span ID doesn't exist, the
     /// field has already been recorded, and so on), the subscriber may silently
     /// do nothing.
-    fn record_fmt(
-        &self,
-        span: &Id,
-        field: &field::Key,
-        value: fmt::Arguments,
-    );
+    fn record_fmt(&self, span: &Id, field: &field::Key, value: fmt::Arguments);
 
     /// Adds an indication that `span` follows from the span with the id
     /// `follows`.
@@ -486,12 +481,7 @@ mod test_support {
             (self.filter)(meta)
         }
 
-        fn record_fmt(
-            &self,
-            _id: &Id,
-            _field: &field::Key,
-            _value: ::std::fmt::Arguments,
-        ) {
+        fn record_fmt(&self, _id: &Id, _field: &field::Key, _value: ::std::fmt::Arguments) {
             // TODO: it would be nice to be able to expect field values...
         }
 

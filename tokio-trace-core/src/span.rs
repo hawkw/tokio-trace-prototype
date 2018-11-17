@@ -250,7 +250,7 @@ impl Span {
             .and_then(|inner| inner.meta.key_for(name))
     }
     /// Record a signed 64-bit integer value.
-    pub fn record_value_i64(&mut self, field: &Key, value: i64) ->  &Self {
+    pub fn record_value_i64(&mut self, field: &Key, value: i64) -> &Self {
         if let Some(ref inner) = self.inner {
             inner.record_value_i64(field, value);
         }
@@ -400,11 +400,7 @@ impl<'a> Event<'a> {
     }
 
     /// Adds a formattable message describing the event that occurred.
-    pub fn message(
-        &mut self,
-        key: &field::Key,
-        message: fmt::Arguments,
-    ) -> &mut Self {
+    pub fn message(&mut self, key: &field::Key, message: fmt::Arguments) -> &mut Self {
         if let Some(ref mut inner) = self.inner {
             inner.subscriber.record_fmt(&inner.id, key, message);
         }
@@ -412,7 +408,7 @@ impl<'a> Event<'a> {
     }
 
     /// Record a signed 64-bit integer value.
-    pub fn record_value_i64(&mut self, field: &Key, value: i64) ->  &Self {
+    pub fn record_value_i64(&mut self, field: &Key, value: i64) -> &Self {
         if let Some(ref inner) = self.inner {
             inner.record_value_i64(field, value);
         }
@@ -613,7 +609,6 @@ impl<'a> Inner<'a> {
         if self.meta.contains_key(field) {
             self.subscriber.record_i64(&self.id, field, value)
         }
-
     }
 
     /// Record an umsigned 64-bit integer value.
@@ -638,11 +633,7 @@ impl<'a> Inner<'a> {
     }
 
     /// Record a precompiled set of format arguments value.
-    pub(crate) fn record_value_fmt(
-        &self,
-        field: &Key,
-        value: fmt::Arguments,
-    ) {
+    pub(crate) fn record_value_fmt(&self, field: &Key, value: fmt::Arguments) {
         if !self.meta.contains_key(field) {
             self.subscriber.record_fmt(&self.id, field, value)
         }

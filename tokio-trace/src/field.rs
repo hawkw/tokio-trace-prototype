@@ -56,11 +56,7 @@ pub trait Record {
         Q: AsKey;
 
     /// Record a set of pre-compiled format arguments.
-    fn record_fmt<Q: ?Sized>(
-        &mut self,
-        field: &Q,
-        value: fmt::Arguments,
-    )
+    fn record_fmt<Q: ?Sized>(&mut self, field: &Q, value: fmt::Arguments)
     where
         Q: AsKey;
 }
@@ -72,11 +68,7 @@ pub trait Record {
 /// should be recorded.
 pub trait Value {
     /// Records this value with the given `Subscriber`.
-    fn record<Q: ?Sized, R>(
-        &self,
-        key: &Q,
-        recorder: &mut R,
-    )
+    fn record<Q: ?Sized, R>(&self, key: &Q, recorder: &mut R)
     where
         Q: AsKey,
         R: Record;
@@ -188,11 +180,7 @@ impl_values! {
 }
 
 impl Value for str {
-    fn record<Q: ?Sized, R>(
-        &self,
-        key: &Q,
-        recorder: &mut R,
-    )
+    fn record<Q: ?Sized, R>(&self, key: &Q, recorder: &mut R)
     where
         Q: AsKey,
         R: Record,
