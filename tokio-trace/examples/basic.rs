@@ -3,7 +3,7 @@ extern crate tokio_trace;
 extern crate env_logger;
 extern crate tokio_trace_log;
 
-use tokio_trace::{field, Level, Span};
+use tokio_trace::{field, Span};
 
 fn main() {
     env_logger::Builder::new().parse("trace").init();
@@ -13,15 +13,14 @@ fn main() {
 
     tokio_trace::Dispatch::new(subscriber).as_default(|| {
         let foo = 3;
-        trace!({ foo = foo, bar = "bar" }, "hello! I'm gonna shave a yak.");
+        info!({ foo = foo, bar = "bar" }, "hello world");
 
         span!("my_great_span", foo = 4, baz = 5).enter(|| {
             Span::current().close();
 
-            event!(Level::Info, { yak_shaved = true }, "hi from inside my span");
+            info!({ yak_shaved = true }, "hi from inside my span");
             span!("my other span", quux = "quuuux").enter(|| {
-                event!(
-                    Level::Debug,
+                debug!(
                     { depth = field::display("very") },
                     "hi from inside both my spans!"
                 );
