@@ -119,8 +119,7 @@ fn main() {
             "serve",
             local_ip = field::debug(addr.ip()),
             local_port = addr.port() as u64
-        )
-        .enter(move || {
+        ).enter(move || {
             let new_svc = tokio_trace_tower_http::InstrumentedMakeService::new(NewSvc);
             let h2 = Server::new(new_svc, Default::default(), reactor.clone());
 
@@ -132,8 +131,7 @@ fn main() {
                         "conn",
                         remote_ip = field::debug(addr.ip()),
                         remote_port = addr.port() as u64
-                    )
-                    .enter(|| {
+                    ).enter(|| {
                         if let Err(e) = sock.set_nodelay(true) {
                             return Err(e);
                         }
@@ -144,21 +142,17 @@ fn main() {
                             .serve(sock)
                             .map_err(|e| {
                                 error!("error {:?}", e);
-                            })
-                            .and_then(|_| {
+                            }).and_then(|_| {
                                 debug!("response finished");
                                 future::ok(())
-                            })
-                            .in_current_span();
+                            }).in_current_span();
                         reactor.spawn(Box::new(serve));
 
                         Ok((h2, reactor))
                     })
-                })
-                .map_err(|e| {
+                }).map_err(|e| {
                     error!("serve error {:?}", e);
-                })
-                .map(|_| {})
+                }).map(|_| {})
                 .in_current_span();
 
             rt.spawn(serve);
