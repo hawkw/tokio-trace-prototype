@@ -3,8 +3,6 @@ extern crate tokio_trace;
 extern crate env_logger;
 extern crate tokio_trace_log;
 
-use tokio_trace::{field, Span};
-
 fn main() {
     env_logger::Builder::new().parse("trace").init();
     let subscriber = tokio_trace_log::TraceLogger::builder()
