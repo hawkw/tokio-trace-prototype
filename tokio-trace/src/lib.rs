@@ -214,6 +214,26 @@ macro_rules! error {
     );
 }
 
+#[macro_export]
+macro_rules! trace {
+    (target: $target:expr, { $($k:ident = $val:expr),* }, $($arg:tt)+ ) => (
+        event!(target: $target, $crate::Level::Info, { $($k = $val),* }, $($arg)+)
+    );
+    ({ $($k:ident = $val:expr),* }, $($arg:tt)+ ) => (
+        event!(target: module_path!(), $crate::Level::Trace, { $($k = $val),* }, $($arg)+)
+    )
+}
+
+#[macro_export]
+macro_rules! error {
+    (target: $target:expr, { $($k:ident = $val:expr),* }, $($arg:tt)+ ) => (
+        event!(target: $target, $crate::Level::Error, { $($k = $val),* }, $($arg)+)
+    );
+    ({ $($k:ident = $val:expr),* }, $($arg:tt)+ ) => (
+        event!(target: module_path!(), $crate::Level::Error, { $($k = $val),* }, $($arg)+)
+    )
+}
+
 mod dispatcher;
 pub mod field;
 pub mod span;

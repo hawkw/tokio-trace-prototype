@@ -13,18 +13,11 @@ fn main() {
 
     tokio_trace::Dispatch::new(subscriber).as_default(|| {
         let foo = 3;
-        info!({ foo = foo, bar = "bar" }, "hello world");
+        trace!({ foo = foo, bar = "bar" }, "hello! I'm gonna shave a yak.");
 
-        span!("my_great_span", foo = 4, baz = 5).enter(|| {
-            Span::current().close();
-
-            info!({ yak_shaved = true }, "hi from inside my span");
-            span!("my other span", quux = "quuuux").enter(|| {
-                debug!(
-                    { depth = field::display("very") },
-                    "hi from inside both my spans!"
-                );
-            })
+        let mut span = span!("my_great_span", foo = &4, baz = &5);
+        span.enter(|| {
+            error!({ yak_shaved = false }, "Huh, no yaks to be found...");
         });
     });
 }
