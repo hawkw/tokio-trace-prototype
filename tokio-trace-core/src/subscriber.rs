@@ -1,5 +1,5 @@
 //! Subscribers collect and record trace data.
-use {field, span, Id, Meta};
+use {field, span::{self, Span}, Id, Meta};
 
 use std::fmt;
 
@@ -237,7 +237,7 @@ pub trait Subscriber {
     /// [`Span`]: ::span::Span
     /// [`Id`]: ::Id
     /// [`State`]: ::span::State
-    fn enter(&self, span: Id);
+    fn enter(&self, span: Span) -> Span;
 
     /// Records that a [`Span`] has been exited.
     ///
@@ -264,6 +264,8 @@ pub trait Subscriber {
     /// [`Span`]: ::span::Span
     /// [`Id`]: ::Id
     fn close(&self, span: Id);
+
+    fn current_span(&self) -> Span;
 
     /// Notifies the subscriber that a [`Span`] handle with the given [`Id`] has
     /// been cloned.
@@ -373,11 +375,13 @@ mod test_support {
     use {field, Id, Meta, SpanAttributes};
 
     use std::{
+        cell::RefCell,
         collections::{HashMap, VecDeque},
         sync::{
             atomic::{AtomicUsize, Ordering},
             Mutex,
         },
+        thread::LocalKey,
     };
 
     struct ExpectEvent {
@@ -401,6 +405,7 @@ mod test_support {
     }
 
     struct Running<F: Fn(&Meta) -> bool> {
+        current_span: &'static LocalKey<RefCell<Span>>,
         spans: Mutex<HashMap<Id, SpanOrEvent>>,
         expected: Mutex<VecDeque<Expect>>,
         ids: AtomicUsize,
@@ -467,7 +472,11 @@ mod test_support {
         }
 
         pub fn run(self) -> impl Subscriber {
+            thread_local! {
+                static CURRENT_SPAN: RefCell<Span> = RefCell::new(Span::new_disabled());
+            }
             Running {
+                current_span: &CURRENT_SPAN,
                 spans: Mutex::new(HashMap::new()),
                 expected: Mutex::new(self.expected),
                 ids: AtomicUsize::new(0),
@@ -509,22 +518,19 @@ mod test_support {
             id
         }
 
-        fn enter(&self, span: Id) {
             println!("enter: {:?}", span);
+        fn enter(&self, span: Span) -> Span {
             let spans = self.spans.lock().unwrap();
-            let span = spans
-                .get(&span)
-                .unwrap_or_else(|| panic!("no span for ID {:?}", span));
-            match (span, self.expected.lock().unwrap().pop_front()) {
-                (_, None) => {}
-                (SpanOrEvent::Event, _) => panic!("events should never be entered!"),
-                (SpanOrEvent::Span(span), Some(Expect::Event(_))) => panic!(
-                    "expected an event, but entered span {:?} instead",
-                    span.name()
-                ),
-                (SpanOrEvent::Span(span), Some(Expect::Enter(ref expected_span))) => {
-                    if let Some(name) = expected_span.name {
-                        assert_eq!(name, span.name());
+            if let Some(span_or_event) = span.id().map(|id| {
+                spans.get(&id)
+                    .map(|span| {
+                        println!("enter: {}; id={:?};", span.name(), id);
+                        span
+                    })
+                    .unwrap_or_else(|| panic!("no span for ID {:?}", span))
+                })
+            {
+                match (span_or_event, self.expected.lock().unwrap().pop_front()) {
                     }
                     // TODO: expect fields
                 }
@@ -552,7 +558,16 @@ mod test_support {
                     "expected nothing else to happen, but entered span {:?}",
                     span.name(),
                 ),
-            }
+            };
+            self.current_span.with(|current| {
+                current.replace(span)
+            })
+        }
+
+        fn current_span(&self) -> Span {
+            self.current_span.with(|current| {
+                current.borrow().clone()
+            })
         }
 
         fn exit(&self, span: Id) {

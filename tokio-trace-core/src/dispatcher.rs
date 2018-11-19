@@ -35,11 +35,13 @@ impl Dispatch {
     where
         F: FnOnce(&Dispatch) -> T,
     {
-        if let Some(c) = Span::current().dispatch() {
-            f(c)
-        } else {
-            CURRENT_DISPATCH.with(|current| f(&*current.borrow()))
-        }
+            CURRENT_DISPATCH.with(|current| {
+                if let Some(c) = current.borrow().current_span().dispatch() {
+                    f(c)
+                } else {
+                    f(&*current.borrow())
+                }
+            })
     }
 
     /// Returns a `Dispatch` to the given [`Subscriber`](::Subscriber).
@@ -137,13 +139,18 @@ impl Subscriber for Dispatch {
     }
 
     #[inline]
-    fn enter(&self, span: Id) {
+    fn enter(&self, span: Span) -> Span {
         self.subscriber.enter(span)
     }
 
     #[inline]
     fn exit(&self, span: Id) {
         self.subscriber.exit(span)
+    }
+
+    #[inline]
+    fn current_span(&self) -> Span {
+        self.subscriber.current_span()
     }
 
     #[inline]
@@ -176,7 +183,14 @@ impl Subscriber for NoSubscriber {
         false
     }
 
-    fn enter(&self, _span: Id) {}
+    fn enter(&self, _span: Span) -> Span {
+        Span::new_disabled()
+    }
+
+    fn current_span(&self) -> Span {
+        Span::new_disabled()
+    }
+
 
     fn exit(&self, _span: Id) {}
 
