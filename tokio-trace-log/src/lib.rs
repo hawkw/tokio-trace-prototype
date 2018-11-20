@@ -32,7 +32,12 @@ use std::{
         Mutex,
     },
 };
-use tokio_trace::{field, span::{self, Span}, subscriber::{self, Subscriber}, Id, Meta};
+use tokio_trace::{
+    field,
+    span::{self, Span},
+    subscriber::{self, Subscriber},
+    Id, Meta,
+};
 
 /// Format a log record as a trace event in the current span.
 pub fn format_trace(record: &log::Record) -> io::Result<()> {
@@ -432,7 +437,8 @@ impl Subscriber for TraceLogger {
                     let name = meta.name.unwrap_or("???");
                     let current_id = self.current.id();
                     let in_progress = self.in_progress.lock().unwrap();
-                    let current_fields = current_id.as_ref()
+                    let current_fields = current_id
+                        .as_ref()
                         .and_then(|id| in_progress.spans.get(&id))
                         .map(|span| span.fields.as_ref())
                         .unwrap_or("");
@@ -445,8 +451,10 @@ impl Subscriber for TraceLogger {
                                 .module_path(meta.module_path)
                                 .file(meta.file)
                                 .line(meta.line)
-                                .args(format_args!("enter {}; id={:?}; in={:?}; {}", name, id, current_id, current_fields))
-                                .build()
+                                .args(format_args!(
+                                    "enter {}; id={:?}; in={:?}; {}",
+                                    name, id, current_id, current_fields
+                                )).build(),
                         );
                     } else {
                         logger.log(
@@ -457,7 +465,7 @@ impl Subscriber for TraceLogger {
                                 .file(meta.file)
                                 .line(meta.line)
                                 .args(format_args!("enter {}; {}", name, current_fields))
-                                .build()
+                                .build(),
                         );
                     }
                 }

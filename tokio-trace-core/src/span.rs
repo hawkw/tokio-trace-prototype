@@ -570,9 +570,7 @@ impl Id {
 
     /// Returns the ID of the currently-executing span.
     pub fn current() -> Option<Self> {
-        Dispatch::with_current(|dispatch| {
-            dispatch.current_span().id()
-        })
+        Dispatch::with_current(|dispatch| dispatch.current_span().id())
     }
 }
 
@@ -741,7 +739,11 @@ impl Enter {
         // The span has now been entered, so it's okay to close it.
         self.has_entered.store(true, Ordering::Release);
         let Span { inner: prior, .. } = self.subscriber.enter(self.duplicate().into_span());
-        Entered { prior, id: self.id.clone(), dispatch: self.subscriber.clone() }
+        Entered {
+            prior,
+            id: self.id.clone(),
+            dispatch: self.subscriber.clone(),
+        }
     }
 
     /// Exits the span entry represented by an `Entered` guard, consuming it,
@@ -801,7 +803,9 @@ impl<'a> Drop for Inner<'a> {
                 // CURRENT_SPAN that it should try to close when it is exited.
                 Some(ref current) if current == self => {
                     current.handles.fetch_sub(1, Ordering::Release);
-                    current.wants_close.store(self.wants_close(), Ordering::Release);
+                    current
+                        .wants_close
+                        .store(self.wants_close(), Ordering::Release);
                 }
                 // If this span is not the current span, then it may close now,
                 // if there are no other handles with the capacity to re-enter it.
@@ -819,25 +823,25 @@ impl Entered {
     /// to re-enter the span, or `None` if the span closed while performing the
     /// exit.
     pub fn exit(self) -> Option<Enter> {
-        let prior = self.prior
+        let prior = self
+            .prior
             .map(Enter::into_span)
             .unwrap_or_else(Span::new_disabled);
-        Enter::from_span(self.dispatch.exit(self.id, prior))
-            .and_then(|inner| {
-                 if inner.should_close() {
-                    // Dropping `inner` will allow it to perform the closure if
-                    // able.
-                    None
-                } else {
-                    // We are returning a new `Enter`. Increment the number of
-                    // handles that may enter the span.
-                    inner.handles.fetch_add(1, Ordering::Release);
-                    // The span will want to close if it is dropped prior to
-                    // being re-entered.
-                    inner.wants_close.store(true, Ordering::Release);
-                    Some(inner)
-                }
-            })
+        Enter::from_span(self.dispatch.exit(self.id, prior)).and_then(|inner| {
+            if inner.should_close() {
+                // Dropping `inner` will allow it to perform the closure if
+                // able.
+                None
+            } else {
+                // We are returning a new `Enter`. Increment the number of
+                // handles that may enter the span.
+                inner.handles.fetch_add(1, Ordering::Release);
+                // The span will want to close if it is dropped prior to
+                // being re-entered.
+                inner.wants_close.store(true, Ordering::Release);
+                Some(inner)
+            }
+        })
     }
 }
 

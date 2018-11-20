@@ -8,8 +8,8 @@ use {
 use std::{
     cell::RefCell,
     fmt,
-    thread,
     sync::{Arc, Weak},
+    thread,
 };
 
 thread_local! {
@@ -45,9 +45,7 @@ impl Dispatch {
             // SIGSEGV.
             return f(&Dispatch::none());
         }
-        CURRENT_DISPATCH.with(|current| {
-            f(&*current.borrow())
-        })
+        CURRENT_DISPATCH.with(|current| f(&*current.borrow()))
     }
 
     /// Returns a `Dispatch` to the given [`Subscriber`](::Subscriber).
@@ -83,7 +81,6 @@ impl Dispatch {
             *current.borrow_mut() = prior;
             result
         })
-
     }
 
     pub(crate) fn registrar(&self) -> Registrar {

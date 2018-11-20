@@ -1,6 +1,6 @@
 use tokio_trace::{
-    subscriber,
     span::{self, Attributes, Id, Span, SpanAttributes},
+    subscriber,
 };
 
 use std::{

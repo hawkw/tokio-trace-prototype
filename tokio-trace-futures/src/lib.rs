@@ -143,7 +143,8 @@ mod tests {
         fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
             self.polls += 1;
             if self.polls == self.finish_at {
-                self.and_return.take()
+                self.and_return
+                    .take()
                     .expect("polled after ready")
                     .map(Async::Ready)
             } else {
@@ -182,10 +183,7 @@ mod tests {
             .done()
             .run_with_handle();
         Dispatch::new(subscriber).as_default(|| {
-            PollN::new_ok(2)
-                .instrument(span!("foo"))
-                .wait()
-                .unwrap();
+            PollN::new_ok(2).instrument(span!("foo")).wait().unwrap();
         });
         handle.assert_finished();
     }
@@ -249,12 +247,12 @@ mod tests {
         let mut runtime = tokio::runtime::Runtime::new().unwrap();
         Dispatch::new(subscriber).as_default(move || {
             span!("a").enter(|| {
-                let future = PollN::new_ok(2)
-                    .instrument(span!("b"))
-                    .map(|_| span!("c").enter(|| {
+                let future = PollN::new_ok(2).instrument(span!("b")).map(|_| {
+                    span!("c").enter(|| {
                         // "c" happens _outside_ of the instrumented future's
                         // spab, so we don't expect it.
-                    }));
+                    })
+                });
                 Span::current().close();
                 runtime.block_on(Box::new(future)).unwrap();
             })
