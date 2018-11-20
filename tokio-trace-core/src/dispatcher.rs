@@ -36,11 +36,7 @@ impl Dispatch {
         F: FnOnce(&Dispatch) -> T,
     {
             CURRENT_DISPATCH.with(|current| {
-                if let Some(c) = current.borrow().current_span().dispatch() {
-                    f(c)
-                } else {
                     f(&*current.borrow())
-                }
             })
     }
 
