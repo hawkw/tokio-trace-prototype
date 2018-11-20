@@ -950,6 +950,7 @@ mod tests {
                 .exit(span::mock().named(Some("bar")))
                 .close(span::mock().named(Some("bar")))
                 .exit(span::mock().named(Some("foo")))
+                .close(span::mock().named(Some("foo")))
                 .done()
                 .run_with_handle();
 
