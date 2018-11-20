@@ -128,7 +128,7 @@ where
         self.registry.current_span()
     }
 
-    fn exit(&self, id: Id, parent: Span) -> Span {
+    fn exit(&self, _id: Id, parent: Span) -> Span {
         let span = self.registry.exit(parent);
         self.observer.exit(&span);
         span

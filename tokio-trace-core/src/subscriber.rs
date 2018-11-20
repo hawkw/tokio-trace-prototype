@@ -720,9 +720,6 @@ mod test_support {
                     "expected nothing else to happen, but closed span {:?}",
                     span.name(),
                 ),
-                (SpanOrEvent::Event, Some(Expect::Nothing)) => {
-                    panic!("expected nothing else to happen, but closed an event")
-                }
             }
         }
 

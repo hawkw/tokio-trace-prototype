@@ -48,7 +48,6 @@ struct Span {
 }
 
 struct Event {
-    id: Id,
     level: tokio_trace::Level,
     target: String,
     message: String,
@@ -86,10 +85,9 @@ impl Span {
 }
 
 impl Event {
-    fn new(attrs: tokio_trace::Attributes, id: Id) -> Self {
+    fn new(attrs: tokio_trace::Attributes) -> Self {
         let meta = attrs.metadata();
         Self {
-            id,
             target: meta.target.to_owned(),
             level: meta.level,
             message: String::new(),
@@ -169,7 +167,7 @@ impl Subscriber for SloggishSubscriber {
         self.events
             .lock()
             .unwrap()
-            .insert(id.clone(), Event::new(span, id.clone()));
+            .insert(id.clone(), Event::new(span));
         id
     }
 
