@@ -212,7 +212,7 @@ impl Subscriber for SloggishSubscriber {
         let parent = data.and_then(|span| span.attrs.parent());
         if stack.iter().any(|id| id == &span_id) {
             // We are already in this span, do nothing.
-            return span;
+            return self.current.set_current(span);
         } else {
             let indent = if let Some(idx) = stack
                 .iter()
