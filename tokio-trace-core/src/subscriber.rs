@@ -507,7 +507,7 @@ mod test_support {
             // TODO: it should be possible to expect spans to follow from other spans
         }
 
-        fn new_id(&self, attrs: span::Attributes) -> Id {
+        fn new_id(&self, _attrs: span::Attributes) -> Id {
             let id = self.ids.fetch_add(1, Ordering::SeqCst);
             let id = Id::from_u64(id as u64);
             println!("new_id: id={:?};", id);

@@ -152,7 +152,7 @@ pub struct Entered {
 // ===== impl Span =====
 
 impl Span {
-    pub const NONE: Span = Span {
+    pub(crate) const NONE: Span = Span {
         inner: None,
         is_closed: false,
     };
@@ -214,12 +214,6 @@ impl Span {
     /// executing.
     pub fn current() -> Self {
         Dispatch::with_current(|dispatch| dispatch.current_span().clone())
-    }
-
-    /// Returns a reference to the dispatcher that tracks this span, or `None`
-    /// if the span is disabled.
-    pub(crate) fn dispatch(&self) -> Option<&Dispatch> {
-        self.inner.as_ref().map(|inner| &inner.subscriber)
     }
 
     /// Executes the given function in the context of this span.
