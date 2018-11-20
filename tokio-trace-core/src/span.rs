@@ -847,7 +847,7 @@ mod test_support {
     ///
     /// This is intended for use with the mock subscriber API in the
     /// `subscriber` module.
-    #[derive(Default)]
+    #[derive(Debug, Default, Eq, PartialEq)]
     pub struct MockSpan {
         pub name: Option<Option<&'static str>>,
         // TODO: more

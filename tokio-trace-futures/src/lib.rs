@@ -232,7 +232,7 @@ mod tests {
 
     #[test]
     fn span_follows_future_onto_threadpool() {
-        let subscriber = subscriber::mock()
+        let (subscriber, handle) = subscriber::mock()
             .enter(span::mock().named(Some("a")))
             .enter(span::mock().named(Some("b")))
             .exit(span::mock().named(Some("b")))
@@ -243,7 +243,7 @@ mod tests {
             .close(span::mock().named(Some("a")))
             .enter(span::mock().named(Some("c")))
             .exit(span::mock().named(Some("c")))
-            .run();
+            .run_with_handle();
         let mut runtime = tokio::runtime::Runtime::new().unwrap();
         Dispatch::new(subscriber).as_default(move || {
             span!("a").enter(|| {
@@ -255,6 +255,7 @@ mod tests {
                 Span::current().close();
                 runtime.block_on(Box::new(future)).unwrap();
             })
-        })
+        });
+        handle.assert_finished();
     }
 }

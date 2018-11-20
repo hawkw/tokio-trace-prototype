@@ -379,15 +379,18 @@ mod test_support {
         collections::{HashMap, VecDeque},
         sync::{
             atomic::{AtomicUsize, Ordering},
+            Arc,
             Mutex,
         },
         thread::LocalKey,
     };
 
+    #[derive(Debug, Eq, PartialEq)]
     struct ExpectEvent {
         // TODO: implement
     }
 
+    #[derive(Debug, Eq, PartialEq)]
     enum Expect {
         #[allow(dead_code)] // TODO: implement!
         Event(ExpectEvent),
@@ -407,7 +410,7 @@ mod test_support {
     struct Running<F: Fn(&Meta) -> bool> {
         current_span: &'static LocalKey<UnsafeCell<Span>>,
         spans: Mutex<HashMap<Id, SpanOrEvent>>,
-        expected: Mutex<VecDeque<Expect>>,
+        expected: Arc<Mutex<VecDeque<Expect>>>,
         ids: AtomicUsize,
         filter: F,
     }
@@ -416,6 +419,8 @@ mod test_support {
         expected: VecDeque<Expect>,
         filter: F,
     }
+
+    pub struct MockHandle(Arc<Mutex<VecDeque<Expect>>>);
 
     pub fn mock() -> MockSubscriber<fn(&Meta) -> bool> {
         MockSubscriber {
@@ -481,16 +486,24 @@ mod test_support {
         }
 
         pub fn run(self) -> impl Subscriber {
+            let (subscriber, _) = self.run_with_handle();
+            subscriber
+        }
+
+        pub fn run_with_handle(self) -> (impl Subscriber, MockHandle) {
             thread_local! {
                 static CURRENT_SPAN: UnsafeCell<Span> = UnsafeCell::new(Span::new_disabled());
             }
-            Running {
+            let expected = Arc::new(Mutex::new(self.expected));
+            let handle = MockHandle(expected.clone());
+            let subscriber = Running {
                 current_span: &CURRENT_SPAN,
                 spans: Mutex::new(HashMap::new()),
-                expected: Mutex::new(self.expected),
+                expected,
                 ids: AtomicUsize::new(0),
                 filter: self.filter,
-            }
+            };
+            (subscriber, handle)
         }
     }
 
@@ -754,6 +767,17 @@ mod test_support {
                 if was_expected {
                     expected.pop_front();
                 }
+            }
+        }
+    }
+
+    impl MockHandle {
+        pub fn assert_finished(&self) {
+            if let Ok(ref expected) = self.0.lock() {
+                assert!(
+                    !expected.iter().any(|thing| thing != &Expect::Nothing),
+                    "more notifications expected: {:?}", **expected)
+                );
             }
         }
     }

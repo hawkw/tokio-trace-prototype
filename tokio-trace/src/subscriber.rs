@@ -58,7 +58,7 @@ mod tests {
         let alice_count2 = alice_count.clone();
         let bob_count2 = bob_count.clone();
 
-        let subscriber = subscriber::mock()
+        let (subscriber, handle) = subscriber::mock()
             .with_filter(move |meta| match meta.name {
                 Some("alice") => {
                     alice_count2.fetch_add(1, Ordering::Relaxed);
@@ -69,7 +69,7 @@ mod tests {
                     true
                 }
                 _ => false,
-            }).run();
+            }).run_with_handle();
 
         Dispatch::new(subscriber).as_default(move || {
             // Enter "alice" and then "bob". The dispatcher expects to see "bob" but
@@ -96,6 +96,7 @@ mod tests {
             assert_eq!(alice_count.load(Ordering::Relaxed), 1);
             assert_eq!(bob_count.load(Ordering::Relaxed), 1);
         });
+        handle.assert_finished();
     }
 
     // This is no longer testing the expected behaviour.
@@ -248,7 +249,7 @@ mod tests {
         let count = Arc::new(AtomicUsize::new(0));
         let count2 = count.clone();
 
-        let subscriber = subscriber::mock()
+        let (subscriber, handle) = subscriber::mock()
             .enter(span::mock().named(Some("emily")))
             .exit(span::mock().named(Some("emily")))
             .enter(span::mock().named(Some("emily")))
@@ -267,7 +268,7 @@ mod tests {
                     true
                 }
                 _ => false,
-            }).run();
+            }).run_with_handle();
 
         Dispatch::new(subscriber).as_default(|| {
             // Call the function once. The filter should be re-evaluated.
@@ -290,5 +291,7 @@ mod tests {
             assert!(my_great_function());
             assert_eq!(count.load(Ordering::Relaxed), 2);
         });
+
+        handle.assert_finished();
     }
 }
