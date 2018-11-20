@@ -2,8 +2,9 @@ pub use tokio_trace_core::subscriber::*;
 
 use {Id, Span};
 use std::{
-    thread,
     cell::UnsafeCell,
+    default::Default,
+    thread,
 };
 
 #[derive(Clone)]
@@ -13,12 +14,7 @@ pub struct CurrentSpanPerThread {
 
 impl CurrentSpanPerThread {
     pub fn new() -> Self {
-        thread_local! {
-            static CURRENT: UnsafeCell<Span> = UnsafeCell::new(Span::new_disabled());
-        };
-        Self {
-            current: &CURRENT,
-        }
+        Self::default()
     }
 
     pub fn id(&self) -> Option<Id> {
@@ -31,6 +27,17 @@ impl CurrentSpanPerThread {
 
     pub fn set_current(&self, span: Span) -> Span {
         self.current.with(|current| unsafe { current.get().replace(span) })
+    }
+}
+
+impl Default for CurrentSpanPerThread {
+    fn default() -> Self {
+        thread_local! {
+            static CURRENT: UnsafeCell<Span> = UnsafeCell::new(Span::new_disabled());
+        };
+        Self {
+            current: &CURRENT,
+        }
     }
 }
 

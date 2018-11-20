@@ -133,6 +133,7 @@ pub struct LogTracer {
 
 /// A `tokio_trace_subscriber::Observe` implementation that logs all recorded
 /// trace events.
+#[derive(Default)]
 pub struct TraceLogger {
     settings: TraceLoggerBuilder,
     in_progress: Mutex<InProgress>,
@@ -148,6 +149,7 @@ pub struct TraceLoggerBuilder {
     parent_fields: bool,
 }
 
+#[derive(Default)]
 struct InProgress {
     spans: HashMap<Id, SpanLineBuilder>,
     events: HashMap<Id, EventLineBuilder>,
