@@ -32,7 +32,7 @@ use std::{
         Mutex,
     },
 };
-use tokio_trace::{field, span, subscriber::Subscriber, Id, Meta};
+use tokio_trace::{field, span::{self, Span}, subscriber::{self, Subscriber}, Id, Meta};
 
 /// Format a log record as a trace event in the current span.
 pub fn format_trace(record: &log::Record) -> io::Result<()> {
@@ -136,6 +136,7 @@ pub struct LogTracer {
 pub struct TraceLogger {
     settings: TraceLoggerBuilder,
     in_progress: Mutex<InProgress>,
+    current: subscriber::CurrentSpanPerThread,
 }
 
 #[derive(Default)]
@@ -191,6 +192,7 @@ impl TraceLogger {
     fn from_builder(settings: TraceLoggerBuilder) -> Self {
         Self {
             settings,
+            current: subscriber::CurrentSpanPerThread::new(),
             in_progress: Mutex::new(InProgress {
                 spans: HashMap::new(),
                 events: HashMap::new(),
@@ -419,19 +421,54 @@ impl Subscriber for TraceLogger {
         );
     }
 
-    fn enter(&self, span: Id) {
+    fn enter(&self, span: Span) -> Span {
         if self.settings.log_enters {
-            let logger = log::logger();
-            logger.log(
-                &log::Record::builder()
-                    .level(log::Level::Trace)
-                    .args(format_args!("enter: span={:?};", span))
-                    .build(),
-            );
+            if let Some(meta) = span.metadata() {
+                let log_meta = meta.as_log();
+                let logger = log::logger();
+                if logger.enabled(&log_meta) {
+                    let name = meta.name.unwrap_or("???");
+                    let current_id = self.current.id();
+                    let in_progress = self.in_progress.lock().unwrap();
+                    let current_fields = current_id.as_ref()
+                        .and_then(|id| in_progress.spans.get(&id))
+                        .map(|span| span.fields.as_ref())
+                        .unwrap_or("");
+                    let id = span.id();
+                    if self.settings.log_ids {
+                        logger.log(
+                            &log::Record::builder()
+                                .metadata(log_meta)
+                                .target(meta.target)
+                                .module_path(meta.module_path)
+                                .file(meta.file)
+                                .line(meta.line)
+                                .args(format_args!("enter {}; id={:?}; in={:?}; {}", name, id, current_id, current_fields))
+                                .build()
+                        );
+                    } else {
+                        logger.log(
+                            &log::Record::builder()
+                                .metadata(log_meta)
+                                .target(meta.target)
+                                .module_path(meta.module_path)
+                                .file(meta.file)
+                                .line(meta.line)
+                                .args(format_args!("enter {}; {}", name, current_fields))
+                                .build()
+                        );
+                    }
+                }
+            }
         }
+        self.current.set_current(span)
     }
 
-    fn exit(&self, span: Id) {
+    fn current_span(&self) -> &Span {
+        self.current.span()
+    }
+
+    fn exit(&self, span: Id, parent: Span) -> Span {
         if self.settings.log_exits {
             let logger = log::logger();
             logger.log(
@@ -441,6 +478,7 @@ impl Subscriber for TraceLogger {
                     .build(),
             );
         }
+        self.current.set_current(parent)
     }
 
     fn close(&self, id: Id) {
@@ -453,7 +491,7 @@ impl Subscriber for TraceLogger {
         };
         let event = in_progress.events.remove(&id);
         if let Some(event) = event {
-            if let Some(id) = Id::current() {
+            if let Some(id) = self.current.id() {
                 if let Some(ref span) = in_progress.spans.get(&id) {
                     return event.finish(&span.fields);
                 }

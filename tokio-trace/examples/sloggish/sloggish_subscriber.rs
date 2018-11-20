@@ -195,15 +195,20 @@ impl Subscriber for SloggishSubscriber {
     }
 
     #[inline]
-    fn enter(&self, span: tokio_trace::Id) {
+    fn enter(&self, span: tokio_trace::Span) -> tokio_trace::Span {
         let mut stderr = self.stderr.lock();
         let mut stack = self.stack.lock().unwrap();
         let spans = self.spans.lock().unwrap();
-        let data = spans.get(&span);
+        let span_id = if let Some(id) = span.id() {
+            id
+        } else {
+            unimplemented!()
+        };
+        let data = spans.get(&span_id);
         let parent = data.and_then(|span| span.attrs.parent());
-        if stack.iter().any(|id| id == &span) {
+        if stack.iter().any(|id| id == &span_id) {
             // We are already in this span, do nothing.
-            return;
+            return span;
         } else {
             let indent = if let Some(idx) = stack
                 .iter()
@@ -217,17 +222,24 @@ impl Subscriber for SloggishSubscriber {
                 0
             };
             self.print_indent(&mut stderr, indent).unwrap();
-            stack.push(span);
+            stack.push(span_id);
             if let Some(data) = data {
                 self.print_kvs(&mut stderr, data.kvs.iter().map(|(k, v)| (k, v)), "")
                     .unwrap();
             }
             write!(&mut stderr, "\n").unwrap();
         }
+        unimplemented!()
     }
 
     #[inline]
-    fn exit(&self, _span: tokio_trace::Id) {}
+    fn exit(&self, _span: tokio_trace::Id, parent: tokio_trace::Span) -> tokio_trace::Span {
+        unimplemented!("TODO: update examples!")
+    }
+
+    fn current_span(&self) -> &tokio_trace::Span {
+        unimplemented!("TODO: update examples!")
+    }
 
     #[inline]
     fn close(&self, id: tokio_trace::Id) {

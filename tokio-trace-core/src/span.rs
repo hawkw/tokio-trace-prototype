@@ -831,10 +831,8 @@ impl Entered {
                  if inner.should_close() {
                     // Dropping `inner` will allow it to perform the closure if
                     // able.
-                    println!("exiting {}, should_close={:?}; handles={:?};", inner.metadata().name.unwrap_or("???"), inner.should_close(), inner.handle_count());
                     None
                 } else {
-                    println!("exiting {}, should_close={:?}; handles={:?};", inner.metadata().name.unwrap_or("???"), inner.should_close(), inner.handle_count());
                     // We are returning a new `Enter`. Increment the number of
                     // handles that may enter the span.
                     inner.handles.fetch_add(1, Ordering::Release);

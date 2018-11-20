@@ -16,7 +16,6 @@ impl CurrentSpanPerThread {
         thread_local! {
             static CURRENT: UnsafeCell<Span> = UnsafeCell::new(Span::new_disabled());
         };
-        println!("current per thread new");
         Self {
             current: &CURRENT,
         }
