@@ -693,9 +693,8 @@ mod tests {
         let (subscriber, handle) = subscriber::mock()
             .enter(span::mock().named(Some("foo")))
             .exit(span::mock().named(Some("foo")))
-            .close(span::mock().named(Some("foo")))
             .drop_span(span::mock().named(Some("foo")))
-            .done()
+            .drop_span(span::mock().named(Some("foo")))
             .run_with_handle();
         Dispatch::new(subscriber).as_default(|| {
             let mut span = span!("foo");
@@ -745,11 +744,10 @@ mod tests {
             .enter(span::mock().named(Some("foo")))
             .exit(span::mock().named(Some("foo")))
             .enter(span::mock().named(Some("foo")))
-            .exit(span::mock().named(Some("foo")))
             .clone_span(span::mock().named(Some("foo")))
+            .exit(span::mock().named(Some("foo")))
             .drop_span(span::mock().named(Some("foo")))
             .drop_span(span::mock().named(Some("foo")))
-            .done()
             .run_with_handle();
         let subscriber1 = Dispatch::new(subscriber1);
         let subscriber2 = Dispatch::new(subscriber::mock().done().run());
@@ -780,8 +778,6 @@ mod tests {
             .enter(span::mock().named(Some("bar")))
             .close(span::mock().named(Some("foo")))
             .exit(span::mock().named(Some("bar")))
-            .close(span::mock().named(Some("bar")))
-            .done()
             .run_with_handle();
         Dispatch::new(subscriber).as_default(|| {
             let mut foo = span!("foo");
@@ -861,9 +857,7 @@ mod tests {
             let (subscriber, handle) = subscriber::mock()
                 .enter(span::mock().named(Some("foo")))
                 .exit(span::mock().named(Some("foo")))
-                .close(span::mock().named(Some("foo")))
                 .drop_span(span::mock().named(Some("foo")))
-                .done()
                 .run_with_handle();
             Dispatch::new(subscriber).as_default(|| {
                 let span = span!("foo").into_shared();
