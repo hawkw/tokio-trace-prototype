@@ -249,26 +249,14 @@ mod tests {
         let count = Arc::new(AtomicUsize::new(0));
         let count2 = count.clone();
 
-        let (subscriber, handle) = subscriber::mock()
-            .enter(span::mock().named(Some("emily")))
-            .exit(span::mock().named(Some("emily")))
-            .enter(span::mock().named(Some("emily")))
-            .exit(span::mock().named(Some("emily")))
-            .enter(span::mock().named(Some("frank")))
-            .exit(span::mock().named(Some("frank")))
-            .enter(span::mock().named(Some("emily")))
-            .exit(span::mock().named(Some("emily")))
-            .enter(span::mock().named(Some("frank")))
-            .exit(span::mock().named(Some("frank")))
-            .enter(span::mock().named(Some("emily")))
-            .exit(span::mock().named(Some("emily")))
+        let subscriber = subscriber::mock()
             .with_filter(move |meta| match meta.name {
                 Some("emily") | Some("frank") => {
                     count2.fetch_add(1, Ordering::Relaxed);
                     true
                 }
                 _ => false,
-            }).run_with_handle();
+            }).run();
 
         Dispatch::new(subscriber).as_default(|| {
             // Call the function once. The filter should be re-evaluated.
@@ -291,7 +279,5 @@ mod tests {
             assert!(my_great_function());
             assert_eq!(count.load(Ordering::Relaxed), 2);
         });
-
-        handle.assert_finished();
     }
 }
