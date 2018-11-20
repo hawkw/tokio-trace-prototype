@@ -173,44 +173,46 @@ mod tests {
 
     #[test]
     fn future_enter_exit_is_reasonable() {
-
-        let subscriber = subscriber::mock()
+        let (subscriber, handle) = subscriber::mock()
             .enter(span::mock().named(Some("foo")))
             .exit(span::mock().named(Some("foo")))
             .enter(span::mock().named(Some("foo")))
             .exit(span::mock().named(Some("foo")))
             .close(span::mock().named(Some("foo")))
             .done()
-            .run();
+            .run_with_handle();
         Dispatch::new(subscriber).as_default(|| {
             PollN::new_ok(2)
                 .instrument(span!("foo"))
                 .wait()
                 .unwrap();
-        })
+        });
+        handle.assert_finished();
     }
 
     #[test]
     fn future_error_ends_span() {
-        let subscriber = subscriber::mock()
+        let (subscriber, handle) = subscriber::mock()
             .enter(span::mock().named(Some("foo")))
             .exit(span::mock().named(Some("foo")))
             .enter(span::mock().named(Some("foo")))
             .exit(span::mock().named(Some("foo")))
             .close(span::mock().named(Some("foo")))
             .done()
-            .run();
+            .run_with_handle();
         Dispatch::new(subscriber).as_default(|| {
             PollN::new_err(2)
                 .instrument(span!("foo"))
                 .wait()
                 .unwrap_err();
-        })
+        });
+
+        handle.assert_finished();
     }
 
     #[test]
     fn stream_enter_exit_is_reasonable() {
-        let subscriber = subscriber::mock()
+        let (subscriber, handle) = subscriber::mock()
             .enter(span::mock().named(Some("foo")))
             .exit(span::mock().named(Some("foo")))
             .enter(span::mock().named(Some("foo")))
@@ -220,14 +222,15 @@ mod tests {
             .enter(span::mock().named(Some("foo")))
             .exit(span::mock().named(Some("foo")))
             .close(span::mock().named(Some("foo")))
-            .run();
+            .run_with_handle();
         Dispatch::new(subscriber).as_default(|| {
             stream::iter_ok::<_, ()>(&[1, 2, 3])
                 .instrument(span!("foo"))
                 .for_each(|_| future::ok(()))
                 .wait()
                 .unwrap();
-        })
+        });
+        handle.assert_finished();
     }
 
     #[test]
@@ -241,8 +244,7 @@ mod tests {
             .close(span::mock().named(Some("b")))
             .exit(span::mock().named(Some("a")))
             .close(span::mock().named(Some("a")))
-            .enter(span::mock().named(Some("c")))
-            .exit(span::mock().named(Some("c")))
+            .done()
             .run_with_handle();
         let mut runtime = tokio::runtime::Runtime::new().unwrap();
         Dispatch::new(subscriber).as_default(move || {
@@ -250,7 +252,8 @@ mod tests {
                 let future = PollN::new_ok(2)
                     .instrument(span!("b"))
                     .map(|_| span!("c").enter(|| {
-
+                        // "c" happens _outside_ of the instrumented future's
+                        // spab, so we don't expect it.
                     }));
                 Span::current().close();
                 runtime.block_on(Box::new(future)).unwrap();
