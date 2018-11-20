@@ -232,13 +232,13 @@ impl Span {
     /// Returns the result of evaluating `f`.
     pub fn enter<F: FnOnce() -> T, T>(&mut self, f: F) -> T {
         match self.inner.take() {
-            Some(inner) => {
+            Some(inner) => inner.subscriber.as_default(|| {
                 let guard = inner.enter();
                 inner.take_close();
                 let result = f();
                 self.inner = guard.exit();
                 result
-            }
+            }),
             None => f(),
         }
     }
