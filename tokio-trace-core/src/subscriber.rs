@@ -593,15 +593,15 @@ mod test_support {
                     ),
                 }
             };
-            self.current_span.with(|current| {
+            self.current_span.try_with(|current| {
                 unsafe { current.get().replace(span) }
-            })
+            }).unwrap_or_else(|_| Span::new_disabled())
         }
 
         fn current_span(&self) -> &Span {
-            self.current_span.with(|current| {
+            self.current_span.try_with(|current| {
                 unsafe { &* (current.get() as *const _) }
-            })
+            }).unwrap_or(&Span::NONE)
         }
 
         fn exit(&self, id: Id, parent: Span) -> Span {
@@ -609,6 +609,7 @@ mod test_support {
             let span = spans
                 .get(&id)
                 .unwrap_or_else(|| panic!("no span for ID {:?}", id));
+            println!("exit: {}; id={:?};", span.name(), id);
             match (span, self.expected.lock().unwrap().pop_front()) {
                 (_, None) => {}
                 (SpanOrEvent::Event, _) => panic!("events should never be exited!"),
@@ -647,9 +648,9 @@ mod test_support {
                     span.name(),
                 ),
             };
-            self.current_span.with(|current| {
+            self.current_span.try_with(|current| {
                 unsafe { current.get().replace(parent) }
-            })
+            }).unwrap_or_else(|_| Span::new_disabled())
         }
 
         fn close(&self, span: Id) {
@@ -680,7 +681,7 @@ mod test_support {
                     span.name()
                 ),
                 (SpanOrEvent::Span { span, refs }, Some(Expect::Close(ref expected_span))) => {
-                    assert_eq!(*refs, 0, "a closed span must have exactly 1 handle");
+                    assert!(*refs <= 1);
                     if let Some(name) = expected_span.name {
                         assert_eq!(name, span.name());
                     }
@@ -735,7 +736,7 @@ mod test_support {
         }
 
         fn drop_span(&self, id: Id) {
-            let name = if let Ok(mut spans) = self.spans.lock() {
+            let name = if let Ok(mut spans) = self.spans.try_lock() {
                 spans.get_mut(&id).map(|span_or_event| {
                     if let SpanOrEvent::Span { ref span, ref mut refs } = span_or_event {
                         let name = span.metadata().name;
@@ -753,7 +754,7 @@ mod test_support {
             if name.is_none() {
                 println!("drop_span: id={:?}", id);
             }
-            if let Ok(mut expected) = self.expected.lock() {
+            if let Ok(mut expected) = self.expected.try_lock() {
                 let was_expected = if let Some(Expect::DropSpan(ref span)) = expected.front() {
                     // Don't assert if this function was called while panicking,
                     // as failing the assertion can cause a double panic.
@@ -776,9 +777,10 @@ mod test_support {
             if let Ok(ref expected) = self.0.lock() {
                 assert!(
                     !expected.iter().any(|thing| thing != &Expect::Nothing),
-                    "more notifications expected: {:?}", **expected)
+                    "more notifications expected: {:?}", **expected
                 );
             }
         }
     }
+
 }
