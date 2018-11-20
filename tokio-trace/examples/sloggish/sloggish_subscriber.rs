@@ -13,7 +13,7 @@
 extern crate ansi_term;
 extern crate humantime;
 use self::ansi_term::{Color, Style};
-use super::tokio_trace::{self, subscriber::Subscriber, Id, Level, SpanAttributes};
+use super::tokio_trace::{self, subscriber::{self, Subscriber}, Id, Level, SpanAttributes};
 
 use std::{
     collections::HashMap,
@@ -27,6 +27,9 @@ use std::{
 };
 
 pub struct SloggishSubscriber {
+    // TODO: this can probably be unified with the "stack" that's used for
+    // printing?
+    current: subscriber::CurrentSpanPerThread,
     indent_amount: usize,
     stderr: io::Stderr,
     stack: Mutex<Vec<Id>>,
@@ -106,6 +109,7 @@ impl Event {
 impl SloggishSubscriber {
     pub fn new(indent_amount: usize) -> Self {
         Self {
+            current: subscriber::CurrentSpanPerThread::new(),
             indent_amount,
             stderr: io::stderr(),
             stack: Mutex::new(vec![]),
@@ -202,7 +206,7 @@ impl Subscriber for SloggishSubscriber {
         let span_id = if let Some(id) = span.id() {
             id
         } else {
-            unimplemented!()
+            return self.current.set_current(span);
         };
         let data = spans.get(&span_id);
         let parent = data.and_then(|span| span.attrs.parent());
@@ -229,16 +233,17 @@ impl Subscriber for SloggishSubscriber {
             }
             write!(&mut stderr, "\n").unwrap();
         }
-        unimplemented!()
+        self.current.set_current(span)
     }
 
     #[inline]
     fn exit(&self, _span: tokio_trace::Id, parent: tokio_trace::Span) -> tokio_trace::Span {
-        unimplemented!("TODO: update examples!")
+        // TODO: unify stack with current span
+        self.current.set_current(parent)
     }
 
     fn current_span(&self) -> &tokio_trace::Span {
-        unimplemented!("TODO: update examples!")
+        self.current.span()
     }
 
     #[inline]
