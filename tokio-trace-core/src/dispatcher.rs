@@ -8,6 +8,7 @@ use {
 use std::{
     cell::RefCell,
     fmt,
+    thread,
     sync::{Arc, Weak},
 };
 
@@ -35,9 +36,18 @@ impl Dispatch {
     where
         F: FnOnce(&Dispatch) -> T,
     {
-            CURRENT_DISPATCH.with(|current| {
-                    f(&*current.borrow())
-            })
+        // If we try to access the current dispatcher while it's being
+        // dropped, `LocalKey::with` would panic, causing a double panic.
+        // However, we can't use `try_with` as we still need to invoke `f`,
+        // which would be captured by the closure.
+        if thread::panicking() {
+            // It's better to fail to collect instrumentation than cause a
+            // SIGSEGV.
+            return f(&Dispatch::none());
+        }
+        CURRENT_DISPATCH.with(|current| {
+            f(&*current.borrow())
+        })
     }
 
     /// Returns a `Dispatch` to the given [`Subscriber`](::Subscriber).
@@ -64,12 +74,16 @@ impl Dispatch {
     /// [`Subscriber`]: ::Subscriber
     /// [`Event`]: ::Event
     pub fn as_default<T>(&self, f: impl FnOnce() -> T) -> T {
+        if thread::panicking() {
+            return f();
+        }
         CURRENT_DISPATCH.with(|current| {
             let prior = current.replace(self.clone());
             let result = f();
             *current.borrow_mut() = prior;
             result
         })
+
     }
 
     pub(crate) fn registrar(&self) -> Registrar {
