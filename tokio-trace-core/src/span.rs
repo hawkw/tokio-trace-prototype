@@ -227,8 +227,10 @@ impl Span {
     pub fn enter<F: FnOnce() -> T, T>(&mut self, f: F) -> T {
         match self.inner.take() {
             Some(inner) => inner.subscriber.as_default(|| {
+                if !self.is_closed() {
+                    inner.take_close();
+                }
                 let guard = inner.enter();
-                inner.take_close();
                 let result = f();
                 self.inner = guard.exit();
                 result
@@ -799,7 +801,7 @@ impl<'a> Drop for Inner<'a> {
                 // CURRENT_SPAN that it should try to close when it is exited.
                 Some(ref current) if current == self => {
                     current.handles.fetch_sub(1, Ordering::Release);
-                    current.wants_close.store(true, Ordering::Release);
+                    current.wants_close.store(self.wants_close(), Ordering::Release);
                 }
                 // If this span is not the current span, then it may close now,
                 // if there are no other handles with the capacity to re-enter it.
@@ -830,6 +832,9 @@ impl Entered {
                     // We are returning a new `Enter`. Increment the number of
                     // handles that may enter the span.
                     inner.handles.fetch_add(1, Ordering::Release);
+                    // The span will want to close if it is dropped prior to
+                    // being re-entered.
+                    inner.wants_close.store(true, Ordering::Release);
                     Some(inner)
                 }
             })
