@@ -1,5 +1,40 @@
 pub use tokio_trace_core::subscriber::*;
 
+use {Id, Span};
+use std::{
+    thread,
+    cell::UnsafeCell,
+};
+
+#[derive(Clone)]
+pub struct CurrentSpanPerThread {
+    current: &'static thread::LocalKey<UnsafeCell<Span>>,
+}
+
+impl CurrentSpanPerThread {
+    pub fn new() -> Self {
+        thread_local! {
+            static CURRENT: UnsafeCell<Span> = UnsafeCell::new(Span::new_disabled());
+        };
+        println!("current per thread new");
+        Self {
+            current: &CURRENT,
+        }
+    }
+
+    pub fn id(&self) -> Option<Id> {
+        self.span().id()
+    }
+
+    pub fn span(&self) -> &Span {
+        self.current.with(|current| unsafe { &*(current.get() as *const _) })
+    }
+
+    pub fn set_current(&self, span: Span) -> Span {
+        self.current.with(|current| unsafe { current.get().replace(span) })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::{
