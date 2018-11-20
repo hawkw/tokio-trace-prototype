@@ -248,7 +248,7 @@ pub trait Subscriber {
     /// Exiting a span does not imply that the span will not be re-entered.
     /// [`Span`]: ::span::Span
     /// [`Id`]: ::Id
-    fn exit(&self, span: Id);
+    fn exit(&self, exited: Id, parent: Span) -> Span;
 
     /// Records that a [`Span`] has been closed.
     ///
@@ -265,7 +265,7 @@ pub trait Subscriber {
     /// [`Id`]: ::Id
     fn close(&self, span: Id);
 
-    fn current_span(&self) -> Span;
+    fn current_span(&self) -> &Span;
 
     /// Notifies the subscriber that a [`Span`] handle with the given [`Id`] has
     /// been cloned.
@@ -375,7 +375,7 @@ mod test_support {
     use {field, Id, Meta, SpanAttributes};
 
     use std::{
-        cell::RefCell,
+        cell::UnsafeCell,
         collections::{HashMap, VecDeque},
         sync::{
             atomic::{AtomicUsize, Ordering},
@@ -400,12 +400,12 @@ mod test_support {
     }
 
     enum SpanOrEvent {
-        Span(SpanAttributes),
+        Span { span: SpanAttributes, refs: usize },
         Event,
     }
 
     struct Running<F: Fn(&Meta) -> bool> {
-        current_span: &'static LocalKey<RefCell<Span>>,
+        current_span: &'static LocalKey<UnsafeCell<Span>>,
         spans: Mutex<HashMap<Id, SpanOrEvent>>,
         expected: Mutex<VecDeque<Expect>>,
         ids: AtomicUsize,
@@ -482,7 +482,7 @@ mod test_support {
 
         pub fn run(self) -> impl Subscriber {
             thread_local! {
-                static CURRENT_SPAN: RefCell<Span> = RefCell::new(Span::new_disabled());
+                static CURRENT_SPAN: UnsafeCell<Span> = UnsafeCell::new(Span::new_disabled());
             }
             Running {
                 current_span: &CURRENT_SPAN,
@@ -581,22 +581,21 @@ mod test_support {
                 }
             };
             self.current_span.with(|current| {
-                current.replace(span)
+                unsafe { current.get().replace(span) }
             })
         }
 
-        fn current_span(&self) -> Span {
+        fn current_span(&self) -> &Span {
             self.current_span.with(|current| {
-                current.borrow().clone()
+                unsafe { &* (current.get() as *const _) }
             })
         }
 
-        fn exit(&self, id: Id) {
+        fn exit(&self, id: Id, parent: Span) -> Span {
             let spans = self.spans.lock().unwrap();
             let span = spans
                 .get(&id)
                 .unwrap_or_else(|| panic!("no span for ID {:?}", id));
-            println!("exit: {}; id={:?}", span.name(), id);
             match (span, self.expected.lock().unwrap().pop_front()) {
                 (_, None) => {}
                 (SpanOrEvent::Event, _) => panic!("events should never be exited!"),
@@ -634,7 +633,10 @@ mod test_support {
                     "expected nothing else to happen, but exited span {:?}",
                     span.name(),
                 ),
-            }
+            };
+            self.current_span.with(|current| {
+                unsafe { current.get().replace(parent) }
+            })
         }
 
         fn close(&self, span: Id) {

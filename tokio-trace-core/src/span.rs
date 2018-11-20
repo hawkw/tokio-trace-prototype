@@ -152,6 +152,11 @@ pub struct Entered {
 // ===== impl Span =====
 
 impl Span {
+    pub const NONE: Span = Span {
+        inner: None,
+        is_closed: false,
+    };
+
     /// Constructs a new `Span` originating from the given [`Callsite`].
     ///
     /// The new span will be constructed by the currently-active [`Subscriber`],
@@ -208,7 +213,7 @@ impl Span {
     /// Returns a reference to the span that this thread is currently
     /// executing.
     pub fn current() -> Self {
-        Dispatch::with_current(|dispatch| dispatch.current_span())
+        Dispatch::with_current(|dispatch| dispatch.current_span().clone())
     }
 
     /// Returns a reference to the dispatcher that tracks this span, or `None`
@@ -346,6 +351,14 @@ impl Span {
     pub fn metadata(&self) -> Option<&'static Meta<'static>> {
         self.inner.as_ref().map(|inner| inner.metadata())
     }
+
+    fn clone(&self) -> Self {
+        let inner = self.inner.as_ref().map(Enter::duplicate_handle);
+        Self {
+            inner,
+            is_closed: self.is_closed,
+        }
+    }
 }
 
 impl fmt::Debug for Span {
@@ -357,16 +370,6 @@ impl fmt::Debug for Span {
         } else {
             span.field("disabled", &true)
         }.finish()
-    }
-}
-
-impl Clone for Span {
-    fn clone(&self) -> Self {
-        let inner = self.inner.as_ref().map(Enter::duplicate_handle);
-        Self {
-            inner,
-            is_closed: self.is_closed,
-        }
     }
 }
 
@@ -795,7 +798,7 @@ impl<'a> Drop for Inner<'a> {
         // closing it now if it is idle, or telling the current span to close
         // when it exits, if it is the current span.
         if self.has_entered() && self.wants_close() {
-            CURRENT_SPAN.with(|c| match *c.borrow() {
+            match self.subscriber.current_span().inner {
                 // If the `enter` being dropped corresponds to the same span as
                 // the current span, then we cannot close it yet. Instead, we
                 // signal to the copy of this span that currently occupies
@@ -810,7 +813,7 @@ impl<'a> Drop for Inner<'a> {
                     self.subscriber.close(self.id());
                 }
                 _ => {}
-            })
+            }
         }
     }
 }
@@ -820,17 +823,18 @@ impl Entered {
     /// to re-enter the span, or `None` if the span closed while performing the
     /// exit.
     pub fn exit(self) -> Option<Enter> {
-        self.dispatch.exit(self.id);
         let prior = self.prior
             .map(Enter::into_span)
             .unwrap_or_else(Span::new_disabled);
-        Enter::from_span(self.dispatch.enter(prior))
+        Enter::from_span(self.dispatch.exit(self.id, prior))
             .and_then(|inner| {
                  if inner.should_close() {
                     // Dropping `inner` will allow it to perform the closure if
                     // able.
+                    println!("exiting {}, should_close={:?}; handles={:?};", inner.metadata().name.unwrap_or("???"), inner.should_close(), inner.handle_count());
                     None
                 } else {
+                    println!("exiting {}, should_close={:?}; handles={:?};", inner.metadata().name.unwrap_or("???"), inner.should_close(), inner.handle_count());
                     // We are returning a new `Enter`. Increment the number of
                     // handles that may enter the span.
                     inner.handles.fetch_add(1, Ordering::Release);

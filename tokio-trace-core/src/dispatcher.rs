@@ -144,12 +144,12 @@ impl Subscriber for Dispatch {
     }
 
     #[inline]
-    fn exit(&self, span: Id) {
-        self.subscriber.exit(span)
+    fn exit(&self, span: Id, parent: Span) -> Span {
+        self.subscriber.exit(span, parent)
     }
 
     #[inline]
-    fn current_span(&self) -> Span {
+    fn current_span(&self) -> &Span {
         self.subscriber.current_span()
     }
 
@@ -187,12 +187,13 @@ impl Subscriber for NoSubscriber {
         Span::new_disabled()
     }
 
-    fn current_span(&self) -> Span {
-        Span::new_disabled()
+    fn current_span(&self) -> &Span {
+        &Span::NONE
     }
 
-
-    fn exit(&self, _span: Id) {}
+    fn exit(&self, _exited: Id, _parent: Span) -> Span {
+        Span::new_disabled()
+    }
 
     fn close(&self, _span: Id) {}
 }
