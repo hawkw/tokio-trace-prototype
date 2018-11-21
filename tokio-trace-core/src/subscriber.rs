@@ -1,7 +1,7 @@
 //! Subscribers collect and record trace data.
 use {
     field,
-    span::{self, Span},
+    span,
     Id, Meta,
 };
 
@@ -241,7 +241,7 @@ pub trait Subscriber {
     /// [`Span`]: ::span::Span
     /// [`Id`]: ::Id
     /// [`State`]: ::span::State
-    fn enter(&self, span: Span) -> Span;
+    fn enter(&self, span: &Id);
 
     /// Records that a [`Span`] has been exited.
     ///
@@ -254,7 +254,7 @@ pub trait Subscriber {
     /// Exiting a span does not imply that the span will not be re-entered.
     /// [`Span`]: ::span::Span
     /// [`Id`]: ::Id
-    fn exit(&self, exited: Id, parent: Span) -> Span;
+    fn exit(&self, span: &Id);
 
     /// Records that a [`Span`] has been closed.
     ///
@@ -270,12 +270,6 @@ pub trait Subscriber {
     /// [`Span`]: ::span::Span
     /// [`Id`]: ::Id
     fn close(&self, span: Id);
-
-    /// Returns a reference to the currently-executing span.
-    ///
-    /// If no span is currently executing, the subscriber may return
-    /// `Span::new_disabled()`.
-    fn current_span(&self) -> &Span;
 
     /// Notifies the subscriber that a [`Span`] handle with the given [`Id`] has
     /// been cloned.

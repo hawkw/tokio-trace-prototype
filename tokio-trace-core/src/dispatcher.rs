@@ -146,18 +146,13 @@ impl Subscriber for Dispatch {
     }
 
     #[inline]
-    fn enter(&self, span: Span) -> Span {
+    fn enter(&self, span: &Id) {
         self.subscriber.enter(span)
     }
 
     #[inline]
-    fn exit(&self, span: Id, parent: Span) -> Span {
-        self.subscriber.exit(span, parent)
-    }
-
-    #[inline]
-    fn current_span(&self) -> &Span {
-        self.subscriber.current_span()
+    fn exit(&self, span: &Id) {
+        self.subscriber.exit(span)
     }
 
     #[inline]
@@ -190,18 +185,8 @@ impl Subscriber for NoSubscriber {
         false
     }
 
-    fn enter(&self, _span: Span) -> Span {
-        Span::new_disabled()
-    }
-
-    fn current_span(&self) -> &Span {
-        &Span::NONE
-    }
-
-    fn exit(&self, _exited: Id, _parent: Span) -> Span {
-        Span::new_disabled()
-    }
-
+    fn enter(&self, _span: &Id) {}
+    fn exit(&self, span: &Id) {}
     fn close(&self, _span: Id) {}
 }
 
