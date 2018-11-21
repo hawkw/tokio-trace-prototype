@@ -107,12 +107,7 @@ where
         self.registry.new_id(new_id)
     }
 
-    fn record_fmt(
-        &self,
-        _span: &Id,
-        _name: &field::Key,
-        _value: ::std::fmt::Arguments,
-    ) {
+    fn record_fmt(&self, _span: &Id, _name: &field::Key, _value: ::std::fmt::Arguments) {
         unimplemented!()
     }
 
