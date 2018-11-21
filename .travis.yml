@@ -6,6 +6,14 @@ jobs:
   - stage: test
     script: cargo test --all
     name: "tests"
+    rust:
+    # This represents the minimum Rust version supported by Tokio. Updating this
+    # should be done in a dedicated PR and cannot be greater than two 0.x
+    # releases prior to the current stable.
+    - 1.26.0
+    - stable
+    - beta
+    - nightly
   - script: cargo fmt --all -- --check
     install: rustup component add rustfmt-preview
     name: "rustfmt"
