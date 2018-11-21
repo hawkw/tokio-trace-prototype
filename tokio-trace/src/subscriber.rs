@@ -3,7 +3,6 @@ pub use tokio_trace_core::subscriber::*;
 use std::{cell::UnsafeCell, default::Default, thread};
 use {Id, Span};
 
-
 /// Tracks the currently executing span on a per-thread basis.
 ///
 /// This is intended for use by `Subscriber` implementations.
