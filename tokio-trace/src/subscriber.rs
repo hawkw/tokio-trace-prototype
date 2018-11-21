@@ -3,6 +3,10 @@ pub use tokio_trace_core::subscriber::*;
 use std::{cell::UnsafeCell, default::Default, thread};
 use {Id, Span};
 
+
+/// Tracks the currently executing span on a per-thread basis.
+///
+/// This is intended for use by `Subscriber` implementations.
 #[derive(Clone)]
 pub struct CurrentSpanPerThread {
     current: &'static thread::LocalKey<UnsafeCell<Span>>,
@@ -13,15 +17,22 @@ impl CurrentSpanPerThread {
         Self::default()
     }
 
+    /// Returns the [`Id`](::Id) of the span in which the current thread is
+    /// executing, or `None` if it is not inside of a span.
     pub fn id(&self) -> Option<Id> {
         self.span().id()
     }
 
+    /// Returns a [`Span`](::span::Span) handle to the span in which the current
+    /// thread is executing. If there is no current span, then a disabled
+    /// `Span` is returned.
     pub fn span(&self) -> &Span {
         self.current
             .with(|current| unsafe { &*(current.get() as *const _) })
     }
 
+    /// Sets the current thread to be inside of the provided span, returning the
+    /// current thread's prior current span.
     pub fn set_current(&self, span: Span) -> Span {
         self.current
             .with(|current| unsafe { current.get().replace(span) })

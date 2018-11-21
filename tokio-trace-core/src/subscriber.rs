@@ -234,9 +234,9 @@ pub trait Subscriber {
     /// Records that a [`Span`] has been entered.
     ///
     /// When entering a span, this method is called to notify the subscriber
-    /// that the span has been entered. The subscriber is provided with the
-    /// [`Id`] that identifies the entered span, and the current [`State`]
-    /// of the span.
+    /// that the span has been entered. The subscriber is provided with a handle
+    /// to the entered span, and should return its handle to the span that was
+    /// currently executing prior to entering the new span.
     ///
     /// [`Span`]: ::span::Span
     /// [`Id`]: ::Id
@@ -247,7 +247,9 @@ pub trait Subscriber {
     ///
     /// When exiting a span, this method is called to notify the subscriber
     /// that the span has been exited. The subscriber is provided with the
-    /// [`Id`] that identifies the exited span.
+    /// [`Id`] that identifies the exited span, and a handle to the
+    /// previously executing span, which should become the new current span. The
+    /// subscriber should return its handle to the exited span.
     ///
     /// Exiting a span does not imply that the span will not be re-entered.
     /// [`Span`]: ::span::Span
@@ -269,6 +271,10 @@ pub trait Subscriber {
     /// [`Id`]: ::Id
     fn close(&self, span: Id);
 
+    /// Returns a reference to the currently-executing span.
+    ///
+    /// If no span is currently executing, the subscriber may return
+    /// `Span::new_disabled()`.
     fn current_span(&self) -> &Span;
 
     /// Notifies the subscriber that a [`Span`] handle with the given [`Id`] has
