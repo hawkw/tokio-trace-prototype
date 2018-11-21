@@ -1,6 +1,6 @@
 use {
     callsite, field,
-    span::{self, Span},
+    span,
     subscriber::{self, Subscriber},
     Id, Meta,
 };

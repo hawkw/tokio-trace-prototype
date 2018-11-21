@@ -215,7 +215,7 @@ use {
     callsite::Callsite,
     field,
     subscriber::{Interest, Subscriber},
-    Dispatch, Meta,
+    dispatcher::{self, Dispatch}, Meta,
 };
 
 /// A handle representing a span, with the capability to enter the span if it
