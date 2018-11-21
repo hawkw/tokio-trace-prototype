@@ -9,14 +9,14 @@ rust:
 - beta
 - nightly
 
-  script:
-  - cargo test --verbose -p tokio-trace
-  - cargo test --verbose -p tokio-trace-futures
-  - cargo test --verbose -p tokio-trace-subscriber
-  - cargo test --verbose -p tokio-trace-tower
-  - cargo test --verbose -p tokio-trace-tower-http
-  - cargo test --verbose -p tokio-trace-log
-  - cargo test --verbose -p tokio-trace-env-logger
+script:
+- cargo test --verbose -p tokio-trace
+- cargo test --verbose -p tokio-trace-futures
+- cargo test --verbose -p tokio-trace-subscriber
+- cargo test --verbose -p tokio-trace-tower
+- cargo test --verbose -p tokio-trace-tower-http
+- cargo test --verbose -p tokio-trace-log
+- cargo test --verbose -p tokio-trace-env-logger
 
 jobs:
   include:
