@@ -12,21 +12,21 @@ rust:
 jobs:
   include:
   - stage: test
-    script: |
-      cargo test -p tokio-trace &&
-      cargo test -p tokio-trace-futures &&
-      cargo test -p tokio-trace-subscriber &&
-      cargo test -p tokio-trace-tower &&
-      cargo test -p tokio-trace-tower-http &&
-      cargo test -p tokio-trace-log &&
-      cargo test -p tokio-trace-env-logger
     name: "tests"
+    script:
+    - cargo test -p tokio-trace
+    - cargo test -p tokio-trace-futures
+    - cargo test -p tokio-trace-subscriber
+    - cargo test -p tokio-trace-tower
+    - cargo test -p tokio-trace-tower-http
+    - cargo test -p tokio-trace-log
+    - cargo test -p tokio-trace-env-logger
   # The proc macros crate does _not_ build on Rust 1.26.0, so it is tested
   # in a separate stage.
   - stage: test
+    name: "test proc-macros"
     script:
     - cargo test -p tokio-trace-macros
-    name: "test proc-macros"
     rust: stable
   - script: cargo fmt --all -- --check
     install: rustup component add rustfmt-preview
