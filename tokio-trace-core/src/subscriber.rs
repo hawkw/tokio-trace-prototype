@@ -116,8 +116,8 @@ pub trait Subscriber {
     ///
     /// [span ID]: ::Id [`Span`]: ::span::Span [`new_id`]:
     /// ::subscriber::Subscriber::new_id [`Attributes`]: ::span::Attributes
-    fn new_span(&self, span: span::SpanAttributes) -> Id {
-        self.new_id(span)
+    fn new_span(&self, metadata: &'static Meta<'static>) -> Id {
+        self.new_id(metadata)
     }
 
     /// Record the construction of a new [`Span`] or [`Event`], returning a new
@@ -137,7 +137,7 @@ pub trait Subscriber {
     /// from all calls to this function, if they so choose.
     ///
     /// [ID]: ::Id [`Span`]: ::span::Span [`Event`]: ::span::Event
-    fn new_id(&self, attrs: span::Attributes) -> Id;
+    fn new_id(&self, metadata: &Meta) -> Id;
 
     /// Record a signed 64-bit integer value.
     ///

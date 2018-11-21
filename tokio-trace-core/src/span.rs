@@ -1,28 +1,4 @@
 //! Spans represent periods of time in the execution of a program.
-use std::borrow::Borrow;
-use {
-    callsite::Callsite,
-    field::Key,
-    Meta,
-};
-
-/// A set of attributes describing a new `Span`.
-///
-/// This may *not* be used to enter the span.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Attributes<'a> {
-    /// The span ID of the parent span, or `None` if that span does not exist.
-    parent: Option<Id>,
-
-    /// Metadata describing this span.
-    metadata: &'a Meta<'a>,
-}
-
-/// Unlike `Event` [`Attributes`], `Span` attributes are always constructed from
-/// metadata which is known to me valid for the `'static` lifetime.
-///
-/// [`Attributes`]: ::span::Attributes
-pub type SpanAttributes = Attributes<'static>;
 
 /// Identifies a span within the context of a process.
 ///
@@ -35,52 +11,6 @@ pub type SpanAttributes = Attributes<'static>;
 /// ID generation.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Id(u64);
-
-// ===== impl Attributes =====
-
-impl SpanAttributes {
-    /// Returns the name of this span, or `None` if it is unnamed.
-    pub fn name(&self) -> Option<&'static str> {
-        self.metadata.name
-    }
-}
-
-impl<'a> Attributes<'a> {
-    fn new(parent: Option<Id>, metadata: &'a Meta<'a>) -> Self {
-        Attributes { parent, metadata }
-    }
-
-    /// Returns the `Id` of the parent of this span, if one exists.
-    pub fn parent(&self) -> Option<&Id> {
-        self.parent.as_ref()
-    }
-
-    /// Borrows this span's metadata.
-    pub fn metadata(&self) -> &'a Meta<'a> {
-        self.metadata
-    }
-
-    /// Returns an iterator over the names of all the fields on this span.
-    pub fn field_keys(&self) -> impl Iterator<Item = Key<'a>> {
-        self.metadata.fields()
-    }
-
-    /// Returns a [`Key`](::field::Key) for the field with the given `name`, if
-    /// one exists,
-    pub fn key_for<Q>(&self, name: &Q) -> Option<Key<'a>>
-    where
-        Q: Borrow<str>,
-    {
-        self.metadata.key_for(name)
-    }
-
-    /// Returns true if a field named 'name' has been declared on this span,
-    /// even if the field does not currently have a value.
-    #[inline]
-    pub fn has_field(&self, key: &Key) -> bool {
-        self.metadata.contains_key(key)
-    }
-}
 
 // ===== impl Id =====
 

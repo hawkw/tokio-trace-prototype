@@ -196,7 +196,7 @@
 //! [`Attributes`]: ::span::Attributes
 //! [shared span]: ::span::Shared
 //! [`IntoShared`]: ::span::IntoShared
-pub use tokio_trace_core::span::{Attributes, Id, SpanAttributes};
+pub use tokio_trace_core::span::Id;
 
 #[cfg(any(test, feature = "test-support"))]
 pub use tokio_trace_core::span::{mock, MockSpan};
@@ -360,9 +360,7 @@ impl Span {
                     is_closed: false,
                 };
             }
-            let parent = Id::current();
-            let attrs = Attributes::new(parent.clone(), meta);
-            let id = dispatch.new_span(attrs);
+            let id = dispatch.new_span(meta);
             let inner = Some(Enter::new(id, parent, dispatch, meta));
             let mut span = Self {
                 inner,
@@ -572,9 +570,7 @@ impl<'a> Event<'a> {
             if interest == Interest::SOMETIMES && !dispatch.enabled(meta) {
                 return Self { inner: None };
             }
-            let parent = Id::current();
-            let attrs = Attributes::new(parent.clone(), meta);
-            let id = dispatch.new_id(attrs);
+            let id = dispatch.new_id(meta);
             let inner = Enter::new(id, parent, dispatch, meta);
             inner.has_entered.store(true, Ordering::Relaxed);
             inner.close();

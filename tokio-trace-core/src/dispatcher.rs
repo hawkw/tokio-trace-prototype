@@ -1,6 +1,5 @@
 use {
     callsite, field,
-    span,
     subscriber::{self, Subscriber},
     Id, Meta,
 };
@@ -57,13 +56,13 @@ impl Subscriber for Dispatch {
     }
 
     #[inline]
-    fn new_span(&self, span: span::SpanAttributes) -> Id {
-        self.subscriber.new_span(span)
+    fn new_span(&self, metadata: &'static Meta<'static>) -> Id {
+        self.subscriber.new_span(metadata)
     }
 
     #[inline]
-    fn new_id(&self, span: span::Attributes) -> Id {
-        self.subscriber.new_id(span)
+    fn new_id(&self, metadata: &Meta) -> Id {
+        self.subscriber.new_id(metadata)
     }
 
     #[inline]
@@ -129,7 +128,7 @@ impl Subscriber for Dispatch {
 
 struct NoSubscriber;
 impl Subscriber for NoSubscriber {
-    fn new_id(&self, _span: span::Attributes) -> Id {
+    fn new_id(&self, _meta: &Meta) -> Id {
         Id::from_u64(0)
     }
 
