@@ -20,8 +20,6 @@ script:
 
 jobs:
   include:
-  - stage: test
-    name: "tests"
   # The proc macros crate does _not_ build on Rust 1.26.0, so it is tested
   # in a separate stage.
   - stage: test
