@@ -278,9 +278,6 @@ pub struct Inner<'a> {
     /// `id`.
     subscriber: Dispatch,
 
-    /// The span ID of this span's parent, if there is one.
-    parent: Option<Id>,
-
     /// A flag indicating that the span has been instructed to close when
     /// possible.
     ///
@@ -292,6 +289,8 @@ pub struct Inner<'a> {
     ///
     /// If this is false, closing the span should do nothing.
     has_entered: AtomicBool,
+
+    is_current: AtomicBool,
 
     /// Incremented when new handles are created, and decremented when they are
     /// dropped if this is the current span.
@@ -315,9 +314,7 @@ type Enter = Inner<'static>;
 #[derive(Debug)]
 #[must_use = "once a span has been entered, it should be exited"]
 struct Entered {
-    id: Id,
-    dispatch: Dispatch,
-    prior: Option<Enter>,
+    inner: Enter,
 }
 
 // ===== impl Span =====
@@ -361,7 +358,7 @@ impl Span {
                 };
             }
             let id = dispatch.new_span(meta);
-            let inner = Some(Enter::new(id, parent, dispatch, meta));
+            let inner = Some(Enter::new(id, dispatch, meta));
             let mut span = Self {
                 inner,
                 is_closed: false,
@@ -407,11 +404,6 @@ impl Span {
             }),
             None => f(),
         }
-    }
-
-    /// Returns the `Id` of the parent of this span, if one exists.
-    pub fn parent(&self) -> Option<Id> {
-        self.inner.as_ref().and_then(Enter::parent)
     }
 
     /// Returns a [`Key`](::field::Key) for the field with the given `name`, if
@@ -532,7 +524,6 @@ impl fmt::Debug for Span {
         let mut span = f.debug_struct("Span");
         if let Some(ref inner) = self.inner {
             span.field("id", &inner.id())
-                .field("parent", &inner.parent())
         } else {
             span.field("disabled", &true)
         }.finish()
@@ -571,7 +562,7 @@ impl<'a> Event<'a> {
                 return Self { inner: None };
             }
             let id = dispatch.new_id(meta);
-            let inner = Enter::new(id, parent, dispatch, meta);
+            let inner = Enter::new(id, dispatch, meta);
             inner.has_entered.store(true, Ordering::Relaxed);
             inner.close();
             let mut event = Self { inner: Some(inner) };
@@ -626,11 +617,6 @@ impl<'a> Event<'a> {
             inner.record_value_fmt(field, value);
         }
         self
-    }
-
-    /// Returns the `Id` of the parent of this span, if one exists.
-    pub fn parent(&self) -> Option<Id> {
-        self.inner.as_ref().and_then(Enter::parent)
     }
 
     /// Returns a [`Key`](::field::Key) for the field with the given `name`, if
@@ -759,11 +745,6 @@ impl Shared {
         }
     }
 
-    /// Returns the `Id` of the parent of this span, if one exists.
-    pub fn parent(&self) -> Option<Id> {
-        self.inner.as_ref().and_then(|inner| inner.parent())
-    }
-
     /// Returns the `Id` of the span, or `None` if it is disabled.
     pub fn id(&self) -> Option<Id> {
         self.inner.as_ref().map(|inner| inner.id())
@@ -831,11 +812,6 @@ impl<'a> Inner<'a> {
         self.id.clone()
     }
 
-    /// Returns the ID of the span's parent, if it has one.
-    pub fn parent(&self) -> Option<Id> {
-        self.parent.clone()
-    }
-
     /// Returns the span's metadata.
     pub fn metadata(&self) -> &'a Meta<'a> {
         self.meta
@@ -876,13 +852,13 @@ impl<'a> Inner<'a> {
         }
     }
 
-    fn new(id: Id, parent: Option<Id>, subscriber: &Dispatch, meta: &'a Meta<'a>) -> Self {
+    fn new(id: Id, subscriber: &Dispatch, meta: &'a Meta<'a>) -> Self {
         Self {
             id,
             subscriber: subscriber.clone(),
-            parent,
             wants_close: AtomicBool::from(false),
             has_entered: AtomicBool::from(false),
+            is_current: AtomicBool::from(false),
             handles: AtomicUsize::from(1),
             meta,
         }
@@ -893,9 +869,9 @@ impl<'a> Inner<'a> {
         Self {
             id,
             subscriber: self.subscriber.clone(),
-            parent: self.parent.clone(),
             wants_close: AtomicBool::from(self.wants_close()),
             has_entered: AtomicBool::from(self.has_entered()),
+            is_current: AtomicBool::from(self.is_current.load(Ordering::Acquire)),
             handles: AtomicUsize::from(self.handle_count()),
             meta: self.meta,
         }
@@ -937,12 +913,12 @@ impl Enter {
     /// However, it is primarily intended for use in libraries custom span
     /// types; the `Span` handle will typically represent a more ergonomic API
     /// for actually _using_ spans.
-    pub fn from_span(span: Span) -> Option<Self> {
+   fn from_span(span: Span) -> Option<Self> {
         span.inner
     }
 
     /// Return a new `Span` handle to the span represented by this `Enter`.
-    pub fn into_span(self) -> Span {
+    fn into_span(self) -> Span {
         Span {
             inner: Some(self),
             is_closed: false,
@@ -955,18 +931,18 @@ impl Enter {
     /// This is used internally to implement `Span::enter`. It may be used for
     /// writing custom span handles, but should generally not be called directly
     /// when entering a span.
-    pub fn enter(&self) -> Entered {
+    fn enter(&self) -> Entered {
         // The current handle will no longer enter the span, since it has just
         // been used to enter. Therefore, it will be safe to close the span if
         // no additional handles exist when the span is exited.
         self.handles.fetch_sub(1, Ordering::Release);
         // The span has now been entered, so it's okay to close it.
         self.has_entered.store(true, Ordering::Release);
-        let Span { inner: prior, .. } = self.subscriber.enter(self.duplicate().into_span());
+        self.subscriber.enter(&self.id);
+        // The span has now been entered, so it's okay to close it.
+        self.is_current.store(true, Ordering::Release);
         Entered {
-            prior,
-            id: self.id.clone(),
-            dispatch: self.subscriber.clone(),
+            inner: self.duplicate(),
         }
     }
 
@@ -985,7 +961,7 @@ impl Enter {
     /// This function is intended to be used by span handle implementations to
     /// ensuring that multiple entering handles are kept consistent. Probably
     /// don't use this unless you know what you're doing.
-    pub fn exit_and_join(&self, other: Entered) {
+    fn exit_and_join(&self, other: Entered) {
         if let Some(other) = other.exit() {
             self.handles.store(other.handle_count(), Ordering::Release);
             self.has_entered
@@ -1019,25 +995,10 @@ impl<'a> Drop for Inner<'a> {
         // If this handle wants to be closed, try to close it --- either by
         // closing it now if it is idle, or telling the current span to close
         // when it exits, if it is the current span.
-        if self.has_entered() && self.wants_close() {
-            match self.subscriber.current_span().inner {
-                // If the `enter` being dropped corresponds to the same span as
-                // the current span, then we cannot close it yet. Instead, we
-                // signal to the copy of this span that currently occupies
-                // CURRENT_SPAN that it should try to close when it is exited.
-                Some(ref current) if current == self => {
-                    current.handles.fetch_sub(1, Ordering::Release);
-                    current
-                        .wants_close
-                        .store(self.wants_close(), Ordering::Release);
-                }
-                // If this span is not the current span, then it may close now,
-                // if there are no other handles with the capacity to re-enter it.
-                _ if self.handle_count() <= 1 => {
-                    self.subscriber.close(self.id());
-                }
-                _ => {}
-            }
+        if self.has_entered() && self.wants_close() && !self.is_current.load(Ordering::Acquire) && self.handle_count() <= 1 {
+            // If this span is not the current span, then it may close now,
+            // if there are no other handles with the capacity to re-enter it.
+            self.subscriber.close(self.id());
         }
     }
 }
@@ -1046,26 +1007,22 @@ impl Entered {
     /// Exit the `Entered` guard, returning an `Enter` handle that may be used
     /// to re-enter the span, or `None` if the span closed while performing the
     /// exit.
-    pub fn exit(self) -> Option<Enter> {
-        let prior = self
-            .prior
-            .map(Enter::into_span)
-            .unwrap_or_else(Span::new_disabled);
-        Enter::from_span(self.dispatch.exit(self.id, prior)).and_then(|inner| {
-            if inner.should_close() {
-                // Dropping `inner` will allow it to perform the closure if
-                // able.
-                None
-            } else {
-                // We are returning a new `Enter`. Increment the number of
-                // handles that may enter the span.
-                inner.handles.fetch_add(1, Ordering::Release);
-                // The span will want to close if it is dropped prior to
-                // being re-entered.
-                inner.wants_close.store(true, Ordering::Release);
-                Some(inner)
-            }
-        })
+    fn exit(self) -> Option<Enter> {
+        self.inner.subscriber.exit(&self.inner.id);
+        if self.inner.should_close() {
+            // Dropping `inner` will allow it to perform the closure if
+            // able.
+            None
+        } else {
+            // We are returning a new `Enter`. Increment the number of
+            // handles that may enter the span.
+            self.inner.handles.fetch_add(1, Ordering::Release);
+            // The span will want to close if it is dropped prior to
+            // being re-entered.
+            self.inner.wants_close.store(true, Ordering::Release);
+            self.inner.is_current.store(false, Ordering::Release);
+            Some(self.inner)
+        }
     }
 }
 

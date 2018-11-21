@@ -222,7 +222,7 @@ pub mod subscriber;
 pub use self::{
     dispatcher::Dispatch,
     field::Value,
-    span::{Attributes, Event, Id, Span, SpanAttributes},
+    span::{Event, Id, Span},
     subscriber::Subscriber,
     tokio_trace_core::{
         callsite::{self, Callsite},
