@@ -205,7 +205,11 @@ use std::{
     borrow::Borrow,
     cmp, fmt,
     hash::{Hash, Hasher},
-    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+    sync::{
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+        Arc,
+        Weak,
+    }
 };
 use {
     callsite::Callsite,
@@ -348,7 +352,7 @@ impl Span {
         if interest == Interest::NEVER {
             return Span::new_disabled();
         }
-        Dispatch::with_current(|dispatch| {
+        dispatcher::with_current(|dispatch| {
             let meta = callsite.metadata();
             if interest == Interest::SOMETIMES && !dispatch.enabled(meta) {
                 return Span {
@@ -380,7 +384,8 @@ impl Span {
     /// Returns a reference to the span that this thread is currently
     /// executing.
     pub fn current() -> Self {
-        Dispatch::with_current(|dispatch| dispatch.current_span().clone())
+        // dispatcher::with_current(|dispatch| dispatch.current_span().clone())
+        unimplemented!()
     }
 
     /// Executes the given function in the context of this span.
@@ -393,7 +398,7 @@ impl Span {
     /// Returns the result of evaluating `f`.
     pub fn enter<F: FnOnce() -> T, T>(&mut self, f: F) -> T {
         match self.inner.take() {
-            Some(inner) => inner.subscriber.as_default(|| {
+            Some(inner) => dispatcher::with_default(inner.subscriber.clone(), || {
                 if !self.is_closed() {
                     inner.take_close();
                 }
@@ -562,7 +567,7 @@ impl<'a> Event<'a> {
         if interest == Interest::NEVER {
             return Self { inner: None };
         }
-        Dispatch::with_current(|dispatch| {
+        dispatcher::with_current(|dispatch| {
             let meta = callsite.metadata();
             if interest == Interest::SOMETIMES && !dispatch.enabled(meta) {
                 return Self { inner: None };
