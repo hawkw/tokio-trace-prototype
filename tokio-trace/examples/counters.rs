@@ -43,7 +43,7 @@ impl Subscriber for CounterSubscriber {
         interest
     }
 
-    fn new_id(&self, _new_span: span::Attributes) -> Id {
+    fn new_id(&self, _new_span: &Meta) -> Id {
         let id = self.ids.fetch_add(1, Ordering::SeqCst);
         Id::from_u64(id as u64)
     }
@@ -88,10 +88,8 @@ impl Subscriber for CounterSubscriber {
             .any(|f| f.name().map(|name| name.contains("count")).unwrap_or(false))
     }
 
-    fn enter(&self, _span: &Id) -> tokio_trace::Span {}
-
+    fn enter(&self, _span: &Id) {}
     fn exit(&self, _span: &Id) {}
-
     fn close(&self, _span: &Id) {}
 }
 
@@ -116,7 +114,7 @@ impl Counters {
 fn main() {
     let (counters, subscriber) = Counters::new();
 
-    tokio_trace::Dispatch::new(subscriber).as_default(|| {
+    tokio_trace::subscriber::with_default(subscriber, || {
         let mut foo: u64 = 2;
         span!("my_great_span", foo_count = &foo).enter(|| {
             foo += 1;

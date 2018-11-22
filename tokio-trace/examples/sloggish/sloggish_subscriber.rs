@@ -16,7 +16,7 @@ use self::ansi_term::{Color, Style};
 use super::tokio_trace::{
     self,
     subscriber::{self, Subscriber},
-    Id, Level, SpanAttributes,
+    Id, Level,
 };
 
 use std::{
@@ -43,7 +43,7 @@ pub struct SloggishSubscriber {
 }
 
 struct Span {
-    meta: &'static Meta<'static>,
+    meta: &'static tokio_trace::Meta<'static>,
     parent: Option<Id>,
     kvs: Vec<(String, String)>,
 }
@@ -70,12 +70,13 @@ impl fmt::Display for ColorLevel {
 }
 
 impl Span {
-    fn new(meta: &'static Meta<'static>) -> Self {
-        Self {
-            meta
-            // attrs,
-            kvs: Vec::new(),
-        }
+    fn new(meta: &'static tokio_trace::Meta<'static>) -> Self {
+        unimplemented!()
+        // Self {
+        //     meta
+        //     // attrs,
+        //     kvs: Vec::new(),
+        // }
     }
 
     fn record(&mut self, key: &tokio_trace::field::Key, value: fmt::Arguments) {
@@ -87,7 +88,7 @@ impl Span {
 }
 
 impl Event {
-    fn new(attrs: &Meta) -> Self {
+    fn new(meta: &tokio_trace::Meta) -> Self {
         Self {
             target: meta.target.to_owned(),
             level: meta.level,
@@ -162,7 +163,7 @@ impl Subscriber for SloggishSubscriber {
         true
     }
 
-    fn new_id(&self, span: &Meta) -> tokio_trace::Id {
+    fn new_id(&self, span: &tokio_trace::Meta) -> tokio_trace::Id {
         let next = self.ids.fetch_add(1, Ordering::SeqCst) as u64;
         let id = tokio_trace::Id::from_u64(next);
         self.events
@@ -172,7 +173,7 @@ impl Subscriber for SloggishSubscriber {
         id
     }
 
-    fn new_span(&self, span: &'static Meta<'static>) -> tokio_trace::Id {
+    fn new_span(&self, span: &'static tokio_trace::Meta<'static>) -> tokio_trace::Id {
         let next = self.ids.fetch_add(1, Ordering::SeqCst) as u64;
         let id = tokio_trace::Id::from_u64(next);
         self.spans
@@ -203,34 +204,35 @@ impl Subscriber for SloggishSubscriber {
 
     #[inline]
     fn enter(&self, span_id: &tokio_trace::Id) {
-        let mut stderr = self.stderr.lock();
-        let mut stack = self.stack.lock().unwrap();
-        let spans = self.spans.lock().unwrap();
-        let data = spans.get(span_id);
-        let parent = data.and_then(|span| span.attrs.parent());
-        if stack.iter().any(|id| id == span_id) {
-            // We are already in this span, do nothing.
-            return;
-        } else {
-            let indent = if let Some(idx) = stack
-                .iter()
-                .position(|id| parent.map(|p| id == p).unwrap_or(false))
-            {
-                let idx = idx + 1;
-                stack.truncate(idx);
-                idx
-            } else {
-                stack.clear();
-                0
-            };
-            self.print_indent(&mut stderr, indent).unwrap();
-            stack.push(span_id.clone());
-            if let Some(data) = data {
-                self.print_kvs(&mut stderr, data.kvs.iter().map(|(k, v)| (k, v)), "")
-                    .unwrap();
-            }
-            write!(&mut stderr, "\n").unwrap();
-        }
+        unimplemented!()
+        // let mut stderr = self.stderr.lock();
+        // let mut stack = self.stack.lock().unwrap();
+        // let spans = self.spans.lock().unwrap();
+        // let data = spans.get(span_id);
+        // let parent = data.and_then(|span| span.attrs.parent());
+        // if stack.iter().any(|id| id == span_id) {
+        //     // We are already in this span, do nothing.
+        //     return;
+        // } else {
+        //     let indent = if let Some(idx) = stack
+        //         .iter()
+        //         .position(|id| parent.map(|p| id == p).unwrap_or(false))
+        //     {
+        //         let idx = idx + 1;
+        //         stack.truncate(idx);
+        //         idx
+        //     } else {
+        //         stack.clear();
+        //         0
+        //     };
+        //     self.print_indent(&mut stderr, indent).unwrap();
+        //     stack.push(span_id.clone());
+        //     if let Some(data) = data {
+        //         self.print_kvs(&mut stderr, data.kvs.iter().map(|(k, v)| (k, v)), "")
+        //             .unwrap();
+        //     }
+        //     write!(&mut stderr, "\n").unwrap();
+        // }
     }
 
     #[inline]

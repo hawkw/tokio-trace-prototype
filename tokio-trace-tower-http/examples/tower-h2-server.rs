@@ -108,7 +108,7 @@ fn main() {
         .with_parent_fields(true)
         .finish();
 
-    tokio_trace::Dispatch::new(subscriber).as_default(|| {
+    tokio_trace::subscriber::with_default(subscriber, || {
         let mut rt = Runtime::new().unwrap();
         let reactor = rt.executor();
 
