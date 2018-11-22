@@ -88,19 +88,11 @@ impl Subscriber for CounterSubscriber {
             .any(|f| f.name().map(|name| name.contains("count")).unwrap_or(false))
     }
 
-    fn enter(&self, span: tokio_trace::Span) -> tokio_trace::Span {
-        self.current.set_current(span)
-    }
+    fn enter(&self, _span: &Id) -> tokio_trace::Span {}
 
-    fn current_span(&self) -> &tokio_trace::Span {
-        self.current.span()
-    }
+    fn exit(&self, _span: &Id) {}
 
-    fn exit(&self, _span: Id, parent: tokio_trace::Span) -> tokio_trace::Span {
-        self.current.set_current(parent)
-    }
-
-    fn close(&self, _span: Id) {}
+    fn close(&self, _span: &Id) {}
 }
 
 impl Counters {

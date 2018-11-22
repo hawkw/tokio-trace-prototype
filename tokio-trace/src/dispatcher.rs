@@ -51,7 +51,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use {span, subscriber};
+    use {span, subscriber, dispatcher};
 
     #[test]
     fn dispatcher_is_sticky() {
@@ -68,13 +68,12 @@ mod tests {
             .close(span::mock().named(Some("foo")))
             .done()
             .run_with_handle();
-        let mut foo = Dispatch::new(subscriber1).as_default(|| {
+        let mut foo = dispatcher::with_default(Dispatch::new(subscriber1), || {
             let mut foo = span!("foo");
             foo.enter(|| {});
             foo
         });
-        Dispatch::new(subscriber::mock().done().run())
-            .as_default(move || foo.enter(|| span!("bar").enter(|| {})));
+        dispatcher::with_default(Dispatch::new(subscriber::mock().done().run()), move || foo.enter(|| span!("bar").enter(|| {})));
 
         handle1.assert_finished();
     }
@@ -104,13 +103,13 @@ mod tests {
             .done()
             .run_with_handle();
 
-        let mut foo = Dispatch::new(subscriber1).as_default(|| {
+        let mut foo = dispatcher::with_default(Dispatch::new(subscriber1), || {
             let mut foo = span!("foo");
             foo.enter(|| {});
             foo
         });
-        let mut baz = Dispatch::new(subscriber2).as_default(|| span!("baz"));
-        Dispatch::new(subscriber::mock().done().run()).as_default(move || {
+        let mut baz = dispatcher::with_default(Dispatch::new(subscriber2), || span!("baz"));
+        dispatcher::with_default(Dispatch::new(subscriber::mock().done().run()), move || {
             foo.enter(|| span!("bar").enter(|| {}));
             baz.enter(|| span!("quux").enter(|| {}))
         });

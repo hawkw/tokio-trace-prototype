@@ -1,6 +1,7 @@
 use tokio_trace::{
-    span::{self, Attributes, Id, Span, SpanAttributes},
+    span::{self, Id, Span},
     subscriber,
+    Meta,
 };
 
 use std::{
@@ -37,11 +38,11 @@ pub trait RegisterSpan {
     /// from all calls to this function, if they so choose.
     ///
     /// [span ID]: ../span/struct.Id.html
-    fn new_span(&self, new_span: SpanAttributes) -> Id {
+    fn new_span(&self, new_span: &'static Meta<'static>) -> Id {
         self.new_id(new_span)
     }
 
-    fn new_id(&self, new_id: Attributes) -> Id;
+    fn new_id(&self, new_id: &Meta) -> Id;
 
     /// Adds an indication that `span` follows from the span with the id
     /// `follows`.
@@ -71,11 +72,7 @@ pub trait RegisterSpan {
     where
         F: for<'a> Fn(&'a SpanRef<'a>);
 
-    fn enter(&self, span: Span) -> Span;
-
-    fn exit(&self, span: Span) -> Span;
-
-    fn current_span(&self) -> &Span;
+    fn close(&self, id: &Id);
 
     /// Notifies the subscriber that a [`Span`] handle with the given [`Id`] has
     /// been cloned.
@@ -115,7 +112,7 @@ pub trait RegisterSpan {
 #[derive(Debug)]
 pub struct SpanRef<'a> {
     pub id: &'a Id,
-    pub data: Option<&'a SpanAttributes>,
+    pub data: Option<&'a Meta<'a>>,
     // TODO: the registry can still have a concept of span states...
 }
 
@@ -156,7 +153,7 @@ impl<'a> cmp::Eq for SpanRef<'a> {}
 
 pub struct IncreasingCounter {
     next_id: AtomicUsize,
-    spans: Mutex<HashMap<Id, SpanAttributes>>,
+    spans: Mutex<HashMap<Id, &'static Meta<'static>>>,
     current: subscriber::CurrentSpanPerThread,
 }
 
@@ -177,7 +174,7 @@ impl Default for IncreasingCounter {
 impl RegisterSpan for IncreasingCounter {
     type PriorSpans = iter::Empty<Id>;
 
-    fn new_span(&self, new_span: SpanAttributes) -> Id {
+    fn new_span(&self, new_span: &'static Meta<'static>) -> Id {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
         let id = Id::from_u64(id as u64);
         if let Ok(mut spans) = self.spans.lock() {
@@ -186,7 +183,7 @@ impl RegisterSpan for IncreasingCounter {
         id
     }
 
-    fn new_id(&self, _new_id: span::Attributes) -> Id {
+    fn new_id(&self, _new: &Meta) -> Id {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
         let id = Id::from_u64(id as u64);
         id
@@ -200,24 +197,17 @@ impl RegisterSpan for IncreasingCounter {
         unimplemented!();
     }
 
-    fn enter(&self, span: Span) -> Span {
-        self.current.set_current(span)
+    fn close(&self, _span: &Id) {
+        unimplemented!();
     }
 
-    fn exit(&self, span: Span) -> Span {
-        self.current.set_current(span)
-    }
-
-    fn current_span(&self) -> &Span {
-        self.current.span()
-    }
 
     fn with_span<F>(&self, id: &Id, f: F)
     where
         F: for<'a> Fn(&'a SpanRef<'a>),
     {
         let spans = self.spans.lock().expect("mutex poisoned!");
-        let data = spans.get(id);
+        let data = spans.get(id).as_ref().map(|&&m| m);
         let span = SpanRef { id, data };
         f(&span);
     }

@@ -998,7 +998,7 @@ impl<'a> Drop for Inner<'a> {
         if self.has_entered() && self.wants_close() && !self.is_current.load(Ordering::Acquire) && self.handle_count() <= 1 {
             // If this span is not the current span, then it may close now,
             // if there are no other handles with the capacity to re-enter it.
-            self.subscriber.close(self.id());
+            self.subscriber.close(&self.id());
         }
     }
 }
@@ -1199,7 +1199,7 @@ mod tests {
             .exit(span::mock().named(Some("foo")))
             .run();
 
-        Dispatch::new(subscriber).as_default(|| {
+        dispatcher::with_default(Dispatch::new(subscriber), || {
             span!("foo").enter(|| {
                 let mut bar = span!("bar",);
                 let another_bar = bar.enter(|| {
@@ -1226,7 +1226,7 @@ mod tests {
         // `Subscriber::enabled`, so that the spans will be constructed. We
         // won't enter any spans in this test, so the subscriber won't actually
         // expect to see any spans.
-        Dispatch::new(subscriber::mock().run()).as_default(|| {
+        dispatcher::with_default(Dispatch::new(subscriber::mock().run()), || {
             span!("foo").enter(|| {
                 let foo1 = Span::current();
                 let foo2 = Span::current();
@@ -1238,7 +1238,7 @@ mod tests {
 
     #[test]
     fn handles_to_different_spans_are_not_equal() {
-        Dispatch::new(subscriber::mock().run()).as_default(|| {
+        dispatcher::with_default(Dispatch::new(subscriber::mock().run()), || {
             // Even though these spans have the same name and fields, they will have
             // differing metadata, since they were created on different lines.
             let foo1 = span!("foo", bar = 1u64, baz = false);
@@ -1257,7 +1257,7 @@ mod tests {
             span!("foo", bar = 1u64, baz = false)
         }
 
-        Dispatch::new(subscriber::mock().run()).as_default(|| {
+        dispatcher::with_default(Dispatch::new(subscriber::mock().run()), || {
             let foo1 = make_span();
             let foo2 = make_span();
 
@@ -1278,14 +1278,14 @@ mod tests {
         let subscriber1 = Dispatch::new(subscriber1.run());
         let subscriber2 = Dispatch::new(subscriber::mock().run());
 
-        let mut foo = subscriber1.as_default(|| {
+        let mut foo = dispatcher::with_default(subscriber1, || {
             let mut foo = span!("foo");
             foo.enter(|| {});
             foo
         });
         // Even though we enter subscriber 2's context, the subscriber that
         // tagged the span should see the enter/exit.
-        subscriber2.as_default(move || foo.enter(|| {}));
+        dispatcher::with_default(subscriber2, move || foo.enter(|| {}));
     }
 
     #[test]
@@ -1298,7 +1298,7 @@ mod tests {
             .close(span::mock().named(Some("foo")))
             .done();
         let subscriber1 = Dispatch::new(subscriber1.run());
-        let mut foo = subscriber1.as_default(|| {
+        let mut foo = dispatcher::with_default(subscriber1, || {
             let mut foo = span!("foo");
             foo.enter(|| {});
             foo
@@ -1307,7 +1307,7 @@ mod tests {
         // Even though we enter subscriber 2's context, the subscriber that
         // tagged the span should see the enter/exit.
         thread::spawn(move || {
-            Dispatch::new(subscriber::mock().run()).as_default(|| {
+            dispatcher::with_default(Dispatch::new(subscriber::mock().run()), || {
                 foo.enter(|| {});
             })
         }).join()
@@ -1322,7 +1322,7 @@ mod tests {
             .close(span::mock().named(Some("foo")))
             .done()
             .run_with_handle();
-        Dispatch::new(subscriber).as_default(|| {
+        dispatcher::with_default(Dispatch::new(subscriber), || {
             let mut span = span!("foo");
             span.enter(|| {});
             drop(span);
@@ -1340,7 +1340,7 @@ mod tests {
             .close(span::mock().named(Some("foo")))
             .done()
             .run_with_handle();
-        Dispatch::new(subscriber).as_default(|| {
+        dispatcher::with_default(Dispatch::new(subscriber), || {
             span!("foo").enter(|| {
                 Span::current().close();
                 event!(::Level::Debug, {}, "my event!");
@@ -1362,7 +1362,7 @@ mod tests {
             .close(span::mock().named(Some("bar")))
             .done()
             .run_with_handle();
-        Dispatch::new(subscriber).as_default(|| {
+        dispatcher::with_default(Dispatch::new(subscriber), || {
             span!("foo").enter(|| {
                 Span::current().close();
                 event!(::Level::Debug, {}, "my event!");
@@ -1384,7 +1384,7 @@ mod tests {
             .close(span::mock().named(Some("foo")))
             .done()
             .run_with_handle();
-        Dispatch::new(subscriber).as_default(|| {
+        dispatcher::with_default(Dispatch::new(subscriber), || {
             debug!("my event!");
             span!("foo").enter(|| {
                 Span::current().close();
@@ -1402,7 +1402,7 @@ mod tests {
             .drop_span(span::mock().named(Some("foo")))
             .drop_span(span::mock().named(Some("foo")))
             .run_with_handle();
-        Dispatch::new(subscriber).as_default(|| {
+        dispatcher::with_default(Dispatch::new(subscriber), || {
             let mut span = span!("foo");
             span.enter(|| {});
             drop(span);
@@ -1418,7 +1418,7 @@ mod tests {
             .clone_span(span::mock().named(Some("foo")))
             .exit(span::mock().named(Some("foo")))
             .run_with_handle();
-        Dispatch::new(subscriber).as_default(|| {
+        dispatcher::with_default(Dispatch::new(subscriber), || {
             let mut span = span!("foo");
             let _span2 = span.enter(|| Span::current());
         });
@@ -1435,7 +1435,7 @@ mod tests {
             .drop_span(span::mock().named(Some("foo")))
             .drop_span(span::mock().named(Some("foo")))
             .run_with_handle();
-        Dispatch::new(subscriber).as_default(|| {
+        dispatcher::with_default(Dispatch::new(subscriber), || {
             let mut span = span!("foo");
             let _span2 = span.enter(|| Span::current());
             drop(span);
@@ -1458,14 +1458,14 @@ mod tests {
         let subscriber1 = Dispatch::new(subscriber1);
         let subscriber2 = Dispatch::new(subscriber::mock().done().run());
 
-        let mut foo = subscriber1.as_default(|| {
+        let mut foo = dispatcher::with_default(subscriber1, || {
             let mut foo = span!("foo");
             foo.enter(|| {});
             foo
         });
         // Even though we enter subscriber 2's context, the subscriber that
         // tagged the span should see the enter/exit.
-        subscriber2.as_default(move || {
+        dispatcher::with_default(subscriber2, move || {
             let foo2 = foo.enter(|| Span::current());
             drop(foo);
             drop(foo2);
@@ -1485,7 +1485,7 @@ mod tests {
             .close(span::mock().named(Some("foo")))
             .exit(span::mock().named(Some("bar")))
             .run_with_handle();
-        Dispatch::new(subscriber).as_default(|| {
+        dispatcher::with_default(Dispatch::new(subscriber), || {
             let mut foo = span!("foo");
             foo.enter(|| {});
 
@@ -1508,7 +1508,7 @@ mod tests {
             .close(span::mock().named(Some("foo")))
             .done()
             .run_with_handle();
-        Dispatch::new(subscriber).as_default(|| {
+        dispatcher::with_default(Dispatch::new(subscriber), || {
             let mut foo = span!("foo");
             foo.enter(|| {});
 
@@ -1527,7 +1527,7 @@ mod tests {
     #[test]
     fn span_doesnt_close_if_it_never_opened() {
         let subscriber = subscriber::mock().done().run();
-        Dispatch::new(subscriber).as_default(|| {
+        dispatcher::with_default(Dispatch::new(subscriber), || {
             let span = span!("foo");
             drop(span);
         })
@@ -1544,7 +1544,7 @@ mod tests {
                 .close(span::mock().named(Some("foo")))
                 .done()
                 .run_with_handle();
-            Dispatch::new(subscriber).as_default(|| span!("foo").into_shared().enter(|| {}));
+            dispatcher::with_default(Dispatch::new(subscriber), || span!("foo").into_shared().enter(|| {}));
 
             handle.assert_finished();
         }
@@ -1552,7 +1552,7 @@ mod tests {
         #[test]
         fn span_doesnt_close_if_it_never_opened() {
             let subscriber = subscriber::mock().done().run();
-            Dispatch::new(subscriber).as_default(|| {
+            dispatcher::with_default(Dispatch::new(subscriber), || {
                 let span = span!("foo").into_shared();
                 drop(span);
             })
@@ -1565,7 +1565,7 @@ mod tests {
                 .exit(span::mock().named(Some("foo")))
                 .drop_span(span::mock().named(Some("foo")))
                 .run_with_handle();
-            Dispatch::new(subscriber).as_default(|| {
+            dispatcher::with_default(Dispatch::new(subscriber), || {
                 let span = span!("foo").into_shared();
                 let foo1 = span.clone();
                 let foo2 = span.clone();
@@ -1603,7 +1603,7 @@ mod tests {
                 .done()
                 .run_with_handle();
 
-            Dispatch::new(subscriber).as_default(|| {
+            dispatcher::with_default(Dispatch::new(subscriber), || {
                 let barrier1 = Arc::new(Barrier::new(2));
                 let barrier2 = Arc::new(Barrier::new(2));
                 // Make copies of the barriers for thread 2 to wait on.
@@ -1660,7 +1660,7 @@ mod tests {
                 .done()
                 .run_with_handle();
 
-            Dispatch::new(subscriber).as_default(|| {
+            dispatcher::with_default(Dispatch::new(subscriber), || {
                 span!("foo").enter(|| {
                     let bar = span!("bar").into_shared();
                     bar.clone().enter(|| {

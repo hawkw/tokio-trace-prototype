@@ -3,7 +3,7 @@ extern crate futures;
 extern crate tokio_trace;
 
 use futures::{Async, Future, Poll, Sink, StartSend, Stream};
-use tokio_trace::{Dispatch, Span, Subscriber};
+use tokio_trace::{dispatcher, Dispatch, Span, Subscriber, Meta};
 
 pub mod executor;
 
@@ -109,9 +109,8 @@ impl<T: Future> Future for WithDispatch<T> {
     type Error = T::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        let dispatch = &self.dispatch;
-        let inner = &mut self.inner;
-        dispatch.as_default(|| inner.poll())
+        let dispatch = self.dispatch.clone();
+        dispatcher::with_default(dispatch, || self.inner.poll())
     }
 }
 
@@ -130,7 +129,7 @@ mod tests {
 
     use super::*;
     use futures::{future, stream, task};
-    use tokio_trace::{span, subscriber, Dispatch};
+    use tokio_trace::{span, subscriber, dispatcher, Dispatch};
 
     struct PollN<T, E> {
         and_return: Option<Result<T, E>>,
@@ -183,7 +182,7 @@ mod tests {
             .close(span::mock().named(Some("foo")))
             .done()
             .run_with_handle();
-        Dispatch::new(subscriber).as_default(|| {
+        dispatcher::with_default(Dispatch::new(subscriber), || {
             PollN::new_ok(2).instrument(span!("foo")).wait().unwrap();
         });
         handle.assert_finished();
@@ -199,7 +198,7 @@ mod tests {
             .close(span::mock().named(Some("foo")))
             .done()
             .run_with_handle();
-        Dispatch::new(subscriber).as_default(|| {
+        dispatcher::with_default(Dispatch::new(subscriber), || {
             PollN::new_err(2)
                 .instrument(span!("foo"))
                 .wait()
@@ -222,7 +221,7 @@ mod tests {
             .exit(span::mock().named(Some("foo")))
             .close(span::mock().named(Some("foo")))
             .run_with_handle();
-        Dispatch::new(subscriber).as_default(|| {
+        dispatcher::with_default(Dispatch::new(subscriber), || {
             stream::iter_ok::<_, ()>(&[1, 2, 3])
                 .instrument(span!("foo"))
                 .for_each(|_| future::ok(()))
@@ -246,7 +245,7 @@ mod tests {
             .done()
             .run_with_handle();
         let mut runtime = tokio::runtime::Runtime::new().unwrap();
-        Dispatch::new(subscriber).as_default(move || {
+        dispatcher::with_default(Dispatch::new(subscriber), || {
             span!("a").enter(|| {
                 let future = PollN::new_ok(2).instrument(span!("b")).map(|_| {
                     span!("c").enter(|| {

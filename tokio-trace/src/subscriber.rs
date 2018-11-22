@@ -53,7 +53,7 @@ mod tests {
         atomic::{AtomicUsize, Ordering},
         Arc,
     };
-    use {span, subscriber, Dispatch};
+    use {span, subscriber, dispatcher, Dispatch};
 
     #[test]
     fn filters_are_not_reevaluated_for_the_same_span() {
@@ -77,7 +77,7 @@ mod tests {
                 _ => false,
             }).run_with_handle();
 
-        Dispatch::new(subscriber).as_default(move || {
+        dispatcher::with_default(Dispatch::new(subscriber), move || {
             // Enter "alice" and then "bob". The dispatcher expects to see "bob" but
             // not "alice."
             let mut alice = span!("alice");
@@ -206,7 +206,7 @@ mod tests {
                 }
             }).run();
 
-        Dispatch::new(subscriber).as_default(move || {
+        dispatcher::with_default(Dispatch::new(subscriber), move || {
             // Enter "charlie" and then "dave". The dispatcher expects to see "dave" but
             // not "charlie."
             let mut charlie = span!("charlie");
@@ -264,7 +264,7 @@ mod tests {
                 _ => false,
             }).run();
 
-        Dispatch::new(subscriber).as_default(|| {
+        dispatcher::with_default(Dispatch::new(subscriber), || {
             // Call the function once. The filter should be re-evaluated.
             assert!(my_great_function());
             assert_eq!(count.load(Ordering::Relaxed), 1);

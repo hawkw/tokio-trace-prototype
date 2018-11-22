@@ -269,7 +269,7 @@ pub trait Subscriber {
     ///
     /// [`Span`]: ::span::Span
     /// [`Id`]: ::Id
-    fn close(&self, span: Id);
+    fn close(&self, span: &Id);
 
     /// Notifies the subscriber that a [`Span`] handle with the given [`Id`] has
     /// been cloned.
@@ -643,7 +643,7 @@ mod test_support {
             };
         }
 
-        fn close(&self, span: Id) {
+        fn close(&self, span: &Id) {
             let spans = self.spans.lock().unwrap();
             let span = spans
                 .get(&span)

@@ -43,7 +43,8 @@ pub struct SloggishSubscriber {
 }
 
 struct Span {
-    attrs: SpanAttributes,
+    meta: &'static Meta<'static>,
+    parent: Option<Id>,
     kvs: Vec<(String, String)>,
 }
 
@@ -69,9 +70,10 @@ impl fmt::Display for ColorLevel {
 }
 
 impl Span {
-    fn new(attrs: SpanAttributes) -> Self {
+    fn new(meta: &'static Meta<'static>) -> Self {
         Self {
-            attrs,
+            meta
+            // attrs,
             kvs: Vec::new(),
         }
     }
@@ -85,8 +87,7 @@ impl Span {
 }
 
 impl Event {
-    fn new(attrs: tokio_trace::Attributes) -> Self {
-        let meta = attrs.metadata();
+    fn new(attrs: &Meta) -> Self {
         Self {
             target: meta.target.to_owned(),
             level: meta.level,
@@ -161,7 +162,7 @@ impl Subscriber for SloggishSubscriber {
         true
     }
 
-    fn new_id(&self, span: tokio_trace::span::Attributes) -> tokio_trace::Id {
+    fn new_id(&self, span: &Meta) -> tokio_trace::Id {
         let next = self.ids.fetch_add(1, Ordering::SeqCst) as u64;
         let id = tokio_trace::Id::from_u64(next);
         self.events
@@ -171,7 +172,7 @@ impl Subscriber for SloggishSubscriber {
         id
     }
 
-    fn new_span(&self, span: tokio_trace::span::SpanAttributes) -> tokio_trace::Id {
+    fn new_span(&self, span: &'static Meta<'static>) -> tokio_trace::Id {
         let next = self.ids.fetch_add(1, Ordering::SeqCst) as u64;
         let id = tokio_trace::Id::from_u64(next);
         self.spans
@@ -201,20 +202,15 @@ impl Subscriber for SloggishSubscriber {
     }
 
     #[inline]
-    fn enter(&self, span: tokio_trace::Span) -> tokio_trace::Span {
+    fn enter(&self, span_id: &tokio_trace::Id) {
         let mut stderr = self.stderr.lock();
         let mut stack = self.stack.lock().unwrap();
         let spans = self.spans.lock().unwrap();
-        let span_id = if let Some(id) = span.id() {
-            id
-        } else {
-            return self.current.set_current(span);
-        };
-        let data = spans.get(&span_id);
+        let data = spans.get(span_id);
         let parent = data.and_then(|span| span.attrs.parent());
-        if stack.iter().any(|id| id == &span_id) {
+        if stack.iter().any(|id| id == span_id) {
             // We are already in this span, do nothing.
-            return self.current.set_current(span);
+            return;
         } else {
             let indent = if let Some(idx) = stack
                 .iter()
@@ -228,28 +224,23 @@ impl Subscriber for SloggishSubscriber {
                 0
             };
             self.print_indent(&mut stderr, indent).unwrap();
-            stack.push(span_id);
+            stack.push(span_id.clone());
             if let Some(data) = data {
                 self.print_kvs(&mut stderr, data.kvs.iter().map(|(k, v)| (k, v)), "")
                     .unwrap();
             }
             write!(&mut stderr, "\n").unwrap();
         }
-        self.current.set_current(span)
     }
 
     #[inline]
-    fn exit(&self, _span: tokio_trace::Id, parent: tokio_trace::Span) -> tokio_trace::Span {
+    fn exit(&self, _span: &tokio_trace::Id) {
         // TODO: unify stack with current span
-        self.current.set_current(parent)
-    }
-
-    fn current_span(&self) -> &tokio_trace::Span {
-        self.current.span()
+        // self.current.set_current(parent)
     }
 
     #[inline]
-    fn close(&self, id: tokio_trace::Id) {
+    fn close(&self, id: &tokio_trace::Id) {
         if let Some(event) = self.events.lock().expect("mutex poisoned").remove(&id) {
             let mut stderr = self.stderr.lock();
             let indent = self.stack.lock().unwrap().len();

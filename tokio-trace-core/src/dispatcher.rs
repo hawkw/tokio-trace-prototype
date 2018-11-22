@@ -111,7 +111,7 @@ impl Subscriber for Dispatch {
     }
 
     #[inline]
-    fn close(&self, span: Id) {
+    fn close(&self, span: &Id) {
         self.subscriber.close(span)
     }
 
@@ -142,7 +142,7 @@ impl Subscriber for NoSubscriber {
 
     fn enter(&self, _span: &Id) {}
     fn exit(&self, span: &Id) {}
-    fn close(&self, _span: Id) {}
+    fn close(&self, _span: &Id) {}
 }
 
 impl Registrar {

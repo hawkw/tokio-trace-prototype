@@ -214,7 +214,7 @@ macro_rules! error {
     );
 }
 
-mod dispatcher;
+pub mod dispatcher;
 pub mod field;
 pub mod span;
 pub mod subscriber;
