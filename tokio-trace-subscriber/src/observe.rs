@@ -3,7 +3,7 @@ use {
     registry::SpanRef,
 };
 
-use tokio_trace::{Event, Meta, Span};
+use tokio_trace::{Event, Meta};
 
 /// The notification processing portion of the [`Subscriber`] trait.
 ///

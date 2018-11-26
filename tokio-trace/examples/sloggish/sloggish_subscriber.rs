@@ -43,7 +43,6 @@ pub struct SloggishSubscriber {
 }
 
 struct Span {
-    meta: &'static tokio_trace::Meta<'static>,
     parent: Option<Id>,
     kvs: Vec<(String, String)>,
 }
@@ -70,9 +69,8 @@ impl fmt::Display for ColorLevel {
 }
 
 impl Span {
-    fn new(parent: Option<Id>, meta: &'static tokio_trace::Meta<'static>) -> Self {
+    fn new(parent: Option<Id>, _meta: &'static tokio_trace::Meta<'static>) -> Self {
         Self {
-            meta,
             parent,
             kvs: Vec::new(),
         }

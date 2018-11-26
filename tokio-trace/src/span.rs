@@ -240,11 +240,6 @@ struct Entered {
 // ===== impl Span =====
 
 impl Span {
-    pub(crate) const NONE: Span = Span {
-        inner: None,
-        is_closed: false,
-    };
-
     /// Constructs a new `Span` originating from the given [`Callsite`].
     ///
     /// The new span will be constructed by the currently-active [`Subscriber`],
@@ -891,7 +886,7 @@ mod tests {
 
         dispatcher::with_default(Dispatch::new(subscriber), || {
             span!("foo").enter(|| {
-                let mut bar = span!("bar");
+                let bar = span!("bar");
                 let mut another_bar = bar.clone();
                 drop(bar);
 

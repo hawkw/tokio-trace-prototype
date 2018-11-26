@@ -19,7 +19,6 @@ use std::{
 struct Counters(Arc<RwLock<HashMap<String, AtomicUsize>>>);
 
 struct CounterSubscriber {
-    current: subscriber::CurrentSpanPerThread,
     ids: AtomicUsize,
     counters: Counters,
 }
@@ -102,7 +101,6 @@ impl Counters {
     fn new() -> (Self, CounterSubscriber) {
         let counters = Counters(Arc::new(RwLock::new(HashMap::new())));
         let subscriber = CounterSubscriber {
-            current: subscriber::CurrentSpanPerThread::new(),
             ids: AtomicUsize::new(0),
             counters: counters.clone(),
         };

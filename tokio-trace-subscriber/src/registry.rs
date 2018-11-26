@@ -1,6 +1,5 @@
 use tokio_trace::{
-    span::{self, Id, Span},
-    subscriber,
+    span::Id,
     Meta,
 };
 
@@ -152,7 +151,6 @@ impl<'a> cmp::Eq for SpanRef<'a> {}
 pub struct IncreasingCounter {
     next_id: AtomicUsize,
     spans: Mutex<HashMap<Id, &'static Meta<'static>>>,
-    current: subscriber::CurrentSpanPerThread,
 }
 
 pub fn increasing_counter() -> IncreasingCounter {
@@ -164,7 +162,6 @@ impl Default for IncreasingCounter {
         Self {
             next_id: AtomicUsize::new(0),
             spans: Mutex::new(HashMap::new()),
-            current: subscriber::CurrentSpanPerThread::new(),
         }
     }
 }

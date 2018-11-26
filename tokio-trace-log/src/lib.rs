@@ -34,7 +34,6 @@ use std::{
 };
 use tokio_trace::{
     field,
-    span::{self, Span},
     subscriber::{self, Subscriber},
     Id, Meta,
 };
