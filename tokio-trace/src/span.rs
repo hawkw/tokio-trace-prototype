@@ -147,9 +147,10 @@ use std::{
 };
 use {
     callsite::Callsite,
+    dispatcher::{self, Dispatch},
     field,
     subscriber::{Interest, Subscriber},
-    dispatcher::{self, Dispatch}, Meta,
+    Meta,
 };
 
 /// A handle representing a span, with the capability to enter the span if it
@@ -194,7 +195,6 @@ pub struct Event<'a> {
     /// If this is `None`, then the span has either closed or was never enabled.
     inner: Option<Inner<'a>>,
 }
-
 
 /// A handle representing the capacity to enter a span which is known to exist.
 ///
@@ -571,7 +571,6 @@ pub trait SpanExt: field::Record + ::sealed::Sealed {
         Q: field::AsKey;
 }
 
-
 // ===== impl Enter =====
 
 impl<'a> Inner<'a> {
@@ -666,9 +665,7 @@ impl Enter {
     /// when entering a span.
     fn enter(self) -> Entered {
         self.subscriber.enter(&self.id);
-        Entered {
-            inner: self,
-        }
+        Entered { inner: self }
     }
 }
 
@@ -891,10 +888,10 @@ mod tests {
                 drop(bar);
 
                 another_bar.close();
-                another_bar.enter(|| { });
+                another_bar.enter(|| {});
                 // After we exit `another_bar`, it should close and not be
                 // re-entered.
-                another_bar.enter(|| { });
+                another_bar.enter(|| {});
             });
         });
     }
@@ -1041,7 +1038,7 @@ mod tests {
             span!("foo").enter(|| {
                 event!(::Level::Debug, {}, "my event!");
             });
-            span!("bar").enter(|| { });
+            span!("bar").enter(|| {});
         });
 
         handle.assert_finished();
@@ -1058,7 +1055,7 @@ mod tests {
             .run_with_handle();
         dispatcher::with_default(Dispatch::new(subscriber), || {
             debug!("my event!");
-            span!("foo").enter(|| { });
+            span!("foo").enter(|| {});
         });
 
         handle.assert_finished();
@@ -1145,7 +1142,7 @@ mod tests {
             assert!(foo.is_closed());
 
             // Now that `foo` has closed, entering it should do nothing.
-            foo.enter(|| { });
+            foo.enter(|| {});
             assert!(foo.is_closed());
         });
 

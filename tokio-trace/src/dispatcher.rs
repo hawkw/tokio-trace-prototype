@@ -1,14 +1,10 @@
 pub use tokio_trace_core::dispatcher::*;
 
-use std::{
-    cell::RefCell,
-    thread,
-};
+use std::{cell::RefCell, thread};
 
 thread_local! {
     static CURRENT_DISPATCH: RefCell<Dispatch> = RefCell::new(Dispatch::none());
 }
-
 
 /// Sets this dispatch as the default for the duration of a closure.
 ///
@@ -51,7 +47,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use {span, subscriber, dispatcher};
+    use {dispatcher, span, subscriber};
 
     #[test]
     fn dispatcher_is_sticky() {
@@ -73,7 +69,9 @@ mod tests {
             foo.enter(|| {});
             foo
         });
-        dispatcher::with_default(Dispatch::new(subscriber::mock().done().run()), move || foo.enter(|| span!("bar").enter(|| {})));
+        dispatcher::with_default(Dispatch::new(subscriber::mock().done().run()), move || {
+            foo.enter(|| span!("bar").enter(|| {}))
+        });
 
         handle1.assert_finished();
     }

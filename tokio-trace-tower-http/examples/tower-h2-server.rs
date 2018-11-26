@@ -120,7 +120,8 @@ fn main() {
             local_ip = field::debug(addr.ip()),
             local_port = addr.port() as u64
         );
-        let new_svc = tokio_trace_tower_http::InstrumentedMakeService::new(NewSvc, serve_span.clone());
+        let new_svc =
+            tokio_trace_tower_http::InstrumentedMakeService::new(NewSvc, serve_span.clone());
         let serve_span2 = serve_span.clone();
         serve_span.enter(move || {
             let h2 = Server::new(new_svc, Default::default(), reactor.clone());

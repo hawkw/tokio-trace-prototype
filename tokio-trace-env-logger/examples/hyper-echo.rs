@@ -140,12 +140,10 @@ fn main() {
                         }).instrument(span),
                 );
                 Ok::<_, ::std::io::Error>(http)
-            })
-            .map(|_| ())
+            }).map(|_| ())
             .map_err(|e| {
                 error!({ error = field::display(e) }, "server error");
-            })
-            .instrument(server_span.clone());
+            }).instrument(server_span.clone());
         server_span.enter(|| {
             info!("listening...");
             hyper::rt::run(server);

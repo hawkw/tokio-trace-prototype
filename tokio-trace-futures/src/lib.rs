@@ -125,7 +125,7 @@ mod tests {
 
     use super::*;
     use futures::{future, stream, task};
-    use tokio_trace::{span, subscriber, dispatcher, Dispatch};
+    use tokio_trace::{dispatcher, span, subscriber, Dispatch};
 
     struct PollN<T, E> {
         and_return: Option<Result<T, E>>,

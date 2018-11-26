@@ -322,11 +322,7 @@ impl EventLineBuilder {
     fn new(meta: &Meta, id: Id, settings: &TraceLoggerBuilder) -> Self {
         let mut log_line = String::new();
         if settings.log_ids {
-            write!(
-                &mut log_line,
-                "event={:?}; ",
-                id,
-            ).expect("write to string shouldn't fail");
+            write!(&mut log_line, "event={:?}; ", id,).expect("write to string shouldn't fail");
         }
         Self {
             ref_count: 1,
@@ -357,11 +353,7 @@ impl EventLineBuilder {
             .target(self.target.as_ref())
             .build();
         if logger.enabled(&log_meta) {
-            let before_current = if current_span != "" {
-                "; "
-            } else {
-                ""
-            };
+            let before_current = if current_span != "" { "; " } else { "" };
             logger.log(
                 &log::Record::builder()
                     .metadata(log_meta)
@@ -502,7 +494,7 @@ impl Subscriber for TraceLogger {
             return id.clone();
         }
 
-        if let Some(event) = in_progress.events.get_mut(id)  {
+        if let Some(event) = in_progress.events.get_mut(id) {
             event.ref_count += 1;
         }
         id.clone()
@@ -522,7 +514,12 @@ impl Subscriber for TraceLogger {
             return;
         }
 
-        if in_progress.events.get(&id).map(|event| event.ref_count == 1).unwrap_or(false) {
+        if in_progress
+            .events
+            .get(&id)
+            .map(|event| event.ref_count == 1)
+            .unwrap_or(false)
+        {
             let event = in_progress.events.remove(&id).unwrap();
             if let Some(ref span) = self.current.id().and_then(|id| in_progress.spans.get(&id)) {
                 event.finish(&span.fields);

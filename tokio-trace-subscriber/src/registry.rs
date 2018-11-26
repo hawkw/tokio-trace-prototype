@@ -1,7 +1,4 @@
-use tokio_trace::{
-    span::Id,
-    Meta,
-};
+use tokio_trace::{span::Id, Meta};
 
 use std::{
     cmp,

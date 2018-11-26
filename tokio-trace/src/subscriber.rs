@@ -1,7 +1,7 @@
 pub use tokio_trace_core::subscriber::*;
 
 use std::{cell::RefCell, default::Default, thread};
-use {Id};
+use Id;
 
 /// Tracks the currently executing span on a per-thread basis.
 ///
@@ -20,17 +20,19 @@ impl CurrentSpanPerThread {
     /// executing, or `None` if it is not inside of a span.
     pub fn id(&self) -> Option<Id> {
         self.current
-            .with(|current| { current.borrow().last().cloned() })
+            .with(|current| current.borrow().last().cloned())
     }
 
     pub fn enter(&self, span: Id) {
-        self.current
-            .with(|current| { current.borrow_mut().push(span); })
+        self.current.with(|current| {
+            current.borrow_mut().push(span);
+        })
     }
 
     pub fn exit(&self) {
-        self.current
-            .with(|current| { let _ = current.borrow_mut().pop(); })
+        self.current.with(|current| {
+            let _ = current.borrow_mut().pop();
+        })
     }
 }
 
@@ -42,7 +44,6 @@ impl Default for CurrentSpanPerThread {
         Self { current: &CURRENT }
     }
 }
-
 
 /// Sets this dispatch as the default for the duration of a closure.
 ///
@@ -67,7 +68,7 @@ mod tests {
         atomic::{AtomicUsize, Ordering},
         Arc,
     };
-    use {span, subscriber, dispatcher, Dispatch};
+    use {dispatcher, span, subscriber, Dispatch};
 
     #[test]
     fn filters_are_not_reevaluated_for_the_same_span() {
