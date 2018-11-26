@@ -8,7 +8,7 @@ extern crate tokio_trace_futures;
 use std::marker::PhantomData;
 
 use futures::{Future, Poll};
-use tokio_trace::field;
+use tokio_trace::{field, Span};
 use tokio_trace_futures::{Instrument, Instrumented};
 use tower_service::{MakeService, Service};
 
@@ -22,25 +22,23 @@ impl<T> InstrumentedHttpService<T> {
     pub fn new(inner: T, span: tokio_trace::Span) -> Self {
         Self { inner, span }
     }
-
-    pub fn in_current(inner: T) -> Self {
-        Self::new(inner, tokio_trace::Span::current())
-    }
 }
 
 #[derive(Debug)]
 pub struct InstrumentedMakeService<T, B> {
     inner: T,
+    span: Span,
     _p: PhantomData<fn() -> B>,
 }
 
 impl<T, B> InstrumentedMakeService<T, B> {
-    pub fn new<Target>(inner: T) -> Self
+    pub fn new<Target>(inner: T, span: Span) -> Self
     where
         T: MakeService<Target, http::Request<B>>,
     {
         Self {
             inner,
+            span,
             _p: PhantomData,
         }
     }
@@ -59,7 +57,7 @@ where
     }
 
     fn call(&mut self, req: Target) -> Self::Future {
-        let span = tokio_trace::Span::current();
+        let span = self.span.close();
         let inner = self.inner.make_service(req);
         InstrumentedMakeServiceFuture { inner, span }
     }

@@ -376,13 +376,6 @@ impl Span {
         }
     }
 
-    /// Returns a reference to the span that this thread is currently
-    /// executing.
-    pub fn current() -> Self {
-        // dispatcher::with_current(|dispatch| dispatch.current_span().clone())
-        unimplemented!()
-    }
-
     /// Executes the given function in the context of this span.
     ///
     /// If this span is enabled, then this function enters the span, invokes
@@ -509,14 +502,6 @@ impl Span {
     pub fn metadata(&self) -> Option<&'static Meta<'static>> {
         self.inner.as_ref().map(|inner| inner.metadata())
     }
-
-    fn clone(&self) -> Self {
-        let inner = self.inner.as_ref().map(Enter::duplicate_handle);
-        Self {
-            inner,
-            is_closed: self.is_closed,
-        }
-    }
 }
 
 impl fmt::Debug for Span {
@@ -527,6 +512,16 @@ impl fmt::Debug for Span {
         } else {
             span.field("disabled", &true)
         }.finish()
+    }
+}
+
+impl Clone for Span {
+    fn clone(&self) -> Self {
+        let inner = self.inner.as_ref().map(Enter::duplicate_handle);
+        Self {
+            inner,
+            is_closed: self.is_closed,
+        }
     }
 }
 
@@ -1201,13 +1196,10 @@ mod tests {
 
         dispatcher::with_default(Dispatch::new(subscriber), || {
             span!("foo").enter(|| {
-                let mut bar = span!("bar",);
-                let another_bar = bar.enter(|| {
-                    // do nothing. exiting "bar" should leave it idle, since it can
-                    // be re-entered.
-                    let mut another_bar = Span::current();
+                let mut bar = span!("bar");
+                let mut another_bar = bar.clone();
+                bar.enter(|| {
                     another_bar.close();
-                    another_bar
                 });
                 // Enter "bar" again. This time, the previously-requested
                 // closure should be honored.
@@ -1227,12 +1219,10 @@ mod tests {
         // won't enter any spans in this test, so the subscriber won't actually
         // expect to see any spans.
         dispatcher::with_default(Dispatch::new(subscriber::mock().run()), || {
-            span!("foo").enter(|| {
-                let foo1 = Span::current();
-                let foo2 = Span::current();
-                // Two handles that point to the same span are equal.
-                assert_eq!(foo1, foo2);
-            })
+            let foo1 = span!("foo");
+            let foo2 = foo1.clone();
+            // Two handles that point to the same span are equal.
+            assert_eq!(foo1, foo2);
         });
     }
 
@@ -1245,7 +1235,6 @@ mod tests {
             let foo2 = span!("foo", bar = 1u64, baz = false);
 
             assert_ne!(foo1, foo2);
-            // assert_ne!(foo1.data(), foo2.data());
         });
     }
 
@@ -1342,7 +1331,6 @@ mod tests {
             .run_with_handle();
         dispatcher::with_default(Dispatch::new(subscriber), || {
             span!("foo").enter(|| {
-                Span::current().close();
                 event!(::Level::Debug, {}, "my event!");
             });
         });
@@ -1364,12 +1352,9 @@ mod tests {
             .run_with_handle();
         dispatcher::with_default(Dispatch::new(subscriber), || {
             span!("foo").enter(|| {
-                Span::current().close();
                 event!(::Level::Debug, {}, "my event!");
             });
-            span!("bar").enter(|| {
-                Span::current().close();
-            });
+            span!("bar").enter(|| { });
         });
 
         handle.assert_finished();
@@ -1386,9 +1371,7 @@ mod tests {
             .run_with_handle();
         dispatcher::with_default(Dispatch::new(subscriber), || {
             debug!("my event!");
-            span!("foo").enter(|| {
-                Span::current().close();
-            });
+            span!("foo").enter(|| { });
         });
 
         handle.assert_finished();
@@ -1412,15 +1395,13 @@ mod tests {
     }
 
     #[test]
-    fn span_current_calls_clone_span() {
+    fn cloning_a_span_calls_clone_span() {
         let (subscriber, handle) = subscriber::mock()
-            .enter(span::mock().named(Some("foo")))
             .clone_span(span::mock().named(Some("foo")))
-            .exit(span::mock().named(Some("foo")))
             .run_with_handle();
         dispatcher::with_default(Dispatch::new(subscriber), || {
-            let mut span = span!("foo");
-            let _span2 = span.enter(|| Span::current());
+            let span = span!("foo");
+            let _span2 = span.clone();
         });
 
         handle.assert_finished();
@@ -1429,15 +1410,13 @@ mod tests {
     #[test]
     fn drop_span_when_exiting_dispatchers_context() {
         let (subscriber, handle) = subscriber::mock()
-            .enter(span::mock().named(Some("foo")))
             .clone_span(span::mock().named(Some("foo")))
-            .exit(span::mock().named(Some("foo")))
             .drop_span(span::mock().named(Some("foo")))
             .drop_span(span::mock().named(Some("foo")))
             .run_with_handle();
         dispatcher::with_default(Dispatch::new(subscriber), || {
-            let mut span = span!("foo");
-            let _span2 = span.enter(|| Span::current());
+            let span = span!("foo");
+            let _span2 = span.clone();
             drop(span);
         });
 
@@ -1466,7 +1445,8 @@ mod tests {
         // Even though we enter subscriber 2's context, the subscriber that
         // tagged the span should see the enter/exit.
         dispatcher::with_default(subscriber2, move || {
-            let foo2 = foo.enter(|| Span::current());
+            let foo2 = foo.clone();
+            foo.enter(|| {});
             drop(foo);
             drop(foo2);
         });

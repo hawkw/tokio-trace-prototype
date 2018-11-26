@@ -14,10 +14,6 @@ pub trait Instrument: Sized {
     fn instrument(self, span: Span) -> Instrumented<Self> {
         Instrumented { inner: self, span }
     }
-
-    fn in_current_span(self) -> Instrumented<Self> {
-        self.instrument(Span::current())
-    }
 }
 
 pub trait WithSubscriber: Sized {
@@ -53,15 +49,15 @@ impl<T: Future> Future for Instrumented<T> {
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         let span = &mut self.span;
         let inner = &mut self.inner;
-        span.enter(|| match inner.poll() {
+        match span.enter(|| inner.poll()) {
             Ok(Async::NotReady) => Ok(Async::NotReady),
             done => {
                 // The future finished, either successfully or with an error.
                 // The span should now close.
-                Span::current().close();
+                span.close();
                 done
             }
-        })
+        }
     }
 }
 
@@ -72,16 +68,16 @@ impl<T: Stream> Stream for Instrumented<T> {
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         let span = &mut self.span;
         let inner = &mut self.inner;
-        span.enter(|| match inner.poll() {
+        match span.enter(|| inner.poll()) {
             Ok(Async::NotReady) => Ok(Async::NotReady),
             Ok(Async::Ready(Some(thing))) => Ok(Async::Ready(Some(thing))),
             done => {
                 // The stream finished, either with `Ready(None)` or with an error.
                 // The span should now close.
-                Span::current().close();
+                span.close();
                 done
             }
-        })
+        }
     }
 }
 
@@ -253,7 +249,6 @@ mod tests {
                         // spab, so we don't expect it.
                     })
                 });
-                Span::current().close();
                 runtime.block_on(Box::new(future)).unwrap();
             })
         });
