@@ -256,7 +256,7 @@ impl Span {
     /// [field values]: ::span::Span::record
     /// [`follows_from` annotations]: ::span::Span::follows_from
     #[inline]
-    pub fn new<F>(callsite: &'static dyn Callsite, if_enabled: F) -> Span
+    pub fn new<F>(callsite: &'static Callsite, if_enabled: F) -> Span
     where
         F: FnOnce(&mut Span),
     {
@@ -442,7 +442,7 @@ impl<'a> Event<'a> {
     /// [field values]: ::span::Span::record
     /// [`follows_from` annotations]: ::span::Span::follows_from
     #[inline]
-    pub fn new<F>(callsite: &'a dyn Callsite, if_enabled: F) -> Self
+    pub fn new<F>(callsite: &'a Callsite, if_enabled: F) -> Self
     where
         F: FnOnce(&mut Self),
     {
