@@ -70,13 +70,12 @@ impl fmt::Display for ColorLevel {
 }
 
 impl Span {
-    fn new(meta: &'static tokio_trace::Meta<'static>) -> Self {
-        unimplemented!()
-        // Self {
-        //     meta
-        //     // attrs,
-        //     kvs: Vec::new(),
-        // }
+    fn new(parent: Option<Id>, meta: &'static tokio_trace::Meta<'static>) -> Self {
+        Self {
+            meta,
+            parent,
+            kvs: Vec::new(),
+        }
     }
 
     fn record(&mut self, key: &tokio_trace::field::Key, value: fmt::Arguments) {
@@ -179,7 +178,7 @@ impl Subscriber for SloggishSubscriber {
         self.spans
             .lock()
             .unwrap()
-            .insert(id.clone(), Span::new(span));
+            .insert(id.clone(), Span::new(self.current.id(), span));
         id
     }
 
@@ -202,67 +201,64 @@ impl Subscriber for SloggishSubscriber {
         // unimplemented
     }
 
-    #[inline]
     fn enter(&self, span_id: &tokio_trace::Id) {
-        unimplemented!()
-        // let mut stderr = self.stderr.lock();
-        // let mut stack = self.stack.lock().unwrap();
-        // let spans = self.spans.lock().unwrap();
-        // let data = spans.get(span_id);
-        // let parent = data.and_then(|span| span.attrs.parent());
-        // if stack.iter().any(|id| id == span_id) {
-        //     // We are already in this span, do nothing.
-        //     return;
-        // } else {
-        //     let indent = if let Some(idx) = stack
-        //         .iter()
-        //         .position(|id| parent.map(|p| id == p).unwrap_or(false))
-        //     {
-        //         let idx = idx + 1;
-        //         stack.truncate(idx);
-        //         idx
-        //     } else {
-        //         stack.clear();
-        //         0
-        //     };
-        //     self.print_indent(&mut stderr, indent).unwrap();
-        //     stack.push(span_id.clone());
-        //     if let Some(data) = data {
-        //         self.print_kvs(&mut stderr, data.kvs.iter().map(|(k, v)| (k, v)), "")
-        //             .unwrap();
-        //     }
-        //     write!(&mut stderr, "\n").unwrap();
-        // }
+        self.current.enter(span_id.clone());
+        let mut stderr = self.stderr.lock();
+        let mut stack = self.stack.lock().unwrap();
+        let spans = self.spans.lock().unwrap();
+        let data = spans.get(span_id);
+        let parent = data.and_then(|span| span.parent.as_ref());
+        if stack.iter().any(|id| id == span_id) {
+            // We are already in this span, do nothing.
+            return;
+        } else {
+            let indent = if let Some(idx) = stack
+                .iter()
+                .position(|id| parent.map(|p| id == p).unwrap_or(false))
+            {
+                let idx = idx + 1;
+                stack.truncate(idx);
+                idx
+            } else {
+                stack.clear();
+                0
+            };
+            self.print_indent(&mut stderr, indent).unwrap();
+            stack.push(span_id.clone());
+            if let Some(data) = data {
+                self.print_kvs(&mut stderr, data.kvs.iter().map(|(k, v)| (k, v)), "")
+                    .unwrap();
+            }
+            write!(&mut stderr, "\n").unwrap();
+        }
     }
 
     #[inline]
     fn exit(&self, _span: &tokio_trace::Id) {
         // TODO: unify stack with current span
-        // self.current.set_current(parent)
+        self.current.exit();
     }
 
-    // #[inline]
-    // fn close(&self, id: &tokio_trace::Id) {
-    //     if let Some(event) = self.events.lock().expect("mutex poisoned").remove(&id) {
-    //         let mut stderr = self.stderr.lock();
-    //         let indent = self.stack.lock().unwrap().len();
-    //         self.print_indent(&mut stderr, indent).unwrap();
-    //         write!(
-    //             &mut stderr,
-    //             "{timestamp} {level} {target} {message}",
-    //             timestamp = humantime::format_rfc3339_seconds(SystemTime::now()),
-    //             level = ColorLevel(event.level),
-    //             target = &event.target,
-    //             message = Style::new().bold().paint(event.message),
-    //         ).unwrap();
-    //         self.print_kvs(
-    //             &mut stderr,
-    //             event.kvs.iter().map(|&(ref k, ref v)| (k, v)),
-    //             ", ",
-    //         ).unwrap();
-    //         write!(&mut stderr, "\n").unwrap();
-    //     }
-    //     // TODO: it's *probably* safe to remove the span from the cache
-    //     // now...but that doesn't really matter for this example.
-    // }
+    fn drop_span(&self, id: tokio_trace::Id) {
+        if let Some(event) = self.events.lock().expect("mutex poisoned").remove(&id) {
+            let mut stderr = self.stderr.lock();
+            let indent = self.stack.lock().unwrap().len();
+            self.print_indent(&mut stderr, indent).unwrap();
+            write!(
+                &mut stderr,
+                "{timestamp} {level} {target} {message}",
+                timestamp = humantime::format_rfc3339_seconds(SystemTime::now()),
+                level = ColorLevel(event.level),
+                target = &event.target,
+                message = Style::new().bold().paint(event.message),
+            ).unwrap();
+            self.print_kvs(
+                &mut stderr,
+                event.kvs.iter().map(|&(ref k, ref v)| (k, v)),
+                ", ",
+            ).unwrap();
+            write!(&mut stderr, "\n").unwrap();
+        }
+        // TODO: GC unneeded spans.
+    }
 }
