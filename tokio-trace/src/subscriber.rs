@@ -1,14 +1,14 @@
 pub use tokio_trace_core::subscriber::*;
 
-use std::{cell::UnsafeCell, default::Default, thread};
-use {Id, Span};
+use std::{cell::RefCell, default::Default, thread};
+use {Id};
 
 /// Tracks the currently executing span on a per-thread basis.
 ///
 /// This is intended for use by `Subscriber` implementations.
 #[derive(Clone)]
 pub struct CurrentSpanPerThread {
-    current: &'static thread::LocalKey<UnsafeCell<Span>>,
+    current: &'static thread::LocalKey<RefCell<Vec<Id>>>,
 }
 
 impl CurrentSpanPerThread {
@@ -19,29 +19,25 @@ impl CurrentSpanPerThread {
     /// Returns the [`Id`](::Id) of the span in which the current thread is
     /// executing, or `None` if it is not inside of a span.
     pub fn id(&self) -> Option<Id> {
-        self.span().id()
+        self.current
+            .with(|current| { current.borrow().last().cloned() })
     }
 
-    /// Returns a [`Span`](::span::Span) handle to the span in which the current
-    /// thread is executing. If there is no current span, then a disabled
-    /// `Span` is returned.
-    pub fn span(&self) -> &Span {
+    pub fn enter(&self, span: Id) {
         self.current
-            .with(|current| unsafe { &*(current.get() as *const _) })
+            .with(|current| { current.borrow_mut().push(span); })
     }
 
-    /// Sets the current thread to be inside of the provided span, returning the
-    /// current thread's prior current span.
-    pub fn set_current(&self, span: Span) -> Span {
+    pub fn exit(&self) {
         self.current
-            .with(|current| unsafe { current.get().replace(span) })
+            .with(|current| { let _ = current.borrow_mut().pop(); })
     }
 }
 
 impl Default for CurrentSpanPerThread {
     fn default() -> Self {
         thread_local! {
-            static CURRENT: UnsafeCell<Span> = UnsafeCell::new(Span::new_disabled());
+            static CURRENT: RefCell<Vec<Id>> = RefCell::new(vec![]);
         };
         Self { current: &CURRENT }
     }

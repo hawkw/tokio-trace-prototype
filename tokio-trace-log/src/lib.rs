@@ -248,6 +248,7 @@ impl TraceLoggerBuilder {
 }
 
 struct SpanLineBuilder {
+    parent: Option<Id>,
     ref_count: usize,
     meta: &'static Meta<'static>,
     log_line: String,
@@ -256,6 +257,7 @@ struct SpanLineBuilder {
 
 impl SpanLineBuilder {
     fn new(
+        parent: Option<Id>,
         meta: &'static Meta<'static>,
         fields: String,
         id: Id,
@@ -273,6 +275,7 @@ impl SpanLineBuilder {
             ).expect("write to string shouldn't fail");
         }
         Self {
+            parent,
             ref_count: 1,
             meta,
             log_line,
@@ -355,6 +358,11 @@ impl EventLineBuilder {
             .target(self.target.as_ref())
             .build();
         if logger.enabled(&log_meta) {
+            let before_current = if current_span != "" {
+                "; "
+            } else {
+                ""
+            };
             logger.log(
                 &log::Record::builder()
                     .metadata(log_meta)
@@ -363,8 +371,8 @@ impl EventLineBuilder {
                     .file(self.file.as_ref().map(String::as_ref))
                     .line(self.line)
                     .args(format_args!(
-                        "{}; {}{}",
-                        self.message, current_span, self.log_line
+                        "{}{}{}{}",
+                        self.message, before_current, current_span, self.log_line
                     )).build(),
             );
         }
@@ -379,18 +387,18 @@ impl Subscriber for TraceLogger {
     fn new_span(&self, new_span: &'static Meta<'static>) -> Id {
         let id = self.next_id();
         let mut in_progress = self.in_progress.lock().unwrap();
-        let fields = String::new();
+        let mut fields = String::new();
+        let parent = self.current.id();
         if self.settings.parent_fields {
-            unimplemented!()
-            // let mut next_parent = new_span.parent();
-            // while let Some(ref parent) = next_parent.and_then(|p| in_progress.spans.get(&p)) {
-            //     write!(&mut fields, "{}", parent.fields).expect("write to string cannot fail");
-            //     next_parent = parent.attrs.parent();
-            // }
+            let mut next_parent = parent.as_ref();
+            while let Some(ref parent) = next_parent.and_then(|p| in_progress.spans.get(&p)) {
+                write!(&mut fields, "{}", parent.fields).expect("write to string cannot fail");
+                next_parent = parent.parent.as_ref();
+            }
         }
         in_progress.spans.insert(
             id.clone(),
-            SpanLineBuilder::new(new_span, fields, id.clone(), &self.settings),
+            SpanLineBuilder::new(parent, new_span, fields, id.clone(), &self.settings),
         );
         id
     }
@@ -430,6 +438,7 @@ impl Subscriber for TraceLogger {
     }
 
     fn enter(&self, id: &Id) {
+        self.current.enter(id.clone());
         let in_progress = self.in_progress.lock().unwrap();
         if self.settings.log_enters {
             if let Some(span) = in_progress.spans.get(id) {
@@ -475,6 +484,7 @@ impl Subscriber for TraceLogger {
     }
 
     fn exit(&self, span: &Id) {
+        self.current.exit();
         if self.settings.log_exits {
             let logger = log::logger();
             logger.log(
