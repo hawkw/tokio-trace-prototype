@@ -136,7 +136,7 @@ impl Subscriber for NoSubscriber {
     }
 
     fn enter(&self, _span: &Id) {}
-    fn exit(&self, span: &Id) {}
+    fn exit(&self, _span: &Id) {}
 }
 
 impl Registrar {

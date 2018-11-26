@@ -1,7 +1,6 @@
 //! Subscribers collect and record trace data.
 use {
     field,
-    span,
     Id, Meta,
 };
 
@@ -378,7 +377,7 @@ mod test_support {
     #![allow(missing_docs)]
 
     use super::*;
-    use span::{self, MockSpan};
+    use span::MockSpan;
     use {field, Id, Meta};
 
     use std::{

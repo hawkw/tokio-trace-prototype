@@ -144,11 +144,6 @@ use std::{
     borrow::Borrow,
     cmp, fmt,
     hash::{Hash, Hasher},
-    sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
-        Arc,
-        Weak,
-    }
 };
 use {
     callsite::Callsite,
