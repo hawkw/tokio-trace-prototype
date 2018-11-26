@@ -72,8 +72,6 @@ pub trait RegisterSpan {
     where
         F: for<'a> Fn(&'a SpanRef<'a>);
 
-    fn close(&self, id: &Id);
-
     /// Notifies the subscriber that a [`Span`] handle with the given [`Id`] has
     /// been cloned.
     ///
@@ -84,8 +82,8 @@ pub trait RegisterSpan {
     /// the identifier. For more unsafe situations, however, if `id` is itself a
     /// pointer of some kind this can be used as a hook to "clone" the pointer,
     /// depending on what that means for the specified pointer.
-    fn clone_span(&self, id: Id) -> Id {
-        id
+    fn clone_span(&self, id: &Id) -> Id {
+        id.clone()
     }
 
     /// Notifies the subscriber that a [`Span`] handle with the given [`Id`] has
@@ -196,11 +194,6 @@ impl RegisterSpan for IncreasingCounter {
     fn prior_spans(&self, _span: &Id) -> Self::PriorSpans {
         unimplemented!();
     }
-
-    fn close(&self, _span: &Id) {
-        unimplemented!();
-    }
-
 
     fn with_span<F>(&self, id: &Id, f: F)
     where

@@ -224,7 +224,7 @@ use {
 /// If the span was rejected by the current `Subscriber`'s filter, entering the
 /// span will silently do nothing. Thus, the handle can be used in the same
 /// manner regardless of whether or not the trace is currently being collected.
-#[derive(PartialEq, Hash)]
+#[derive(Clone, PartialEq, Hash)]
 pub struct Span {
     /// A handle used to enter the span when it is not executing.
     ///
@@ -268,7 +268,7 @@ pub struct Event<'a> {
 /// enabled by the current filter. This type is primarily used for implementing
 /// span handles; users should typically not need to interact with it directly.
 #[derive(Debug)]
-pub struct Inner<'a> {
+pub(crate) struct Inner<'a> {
     /// The span's ID, as provided by `subscriber`.
     id: Id,
 
@@ -280,21 +280,7 @@ pub struct Inner<'a> {
 
     /// A flag indicating that the span has been instructed to close when
     /// possible.
-    ///
-    /// This does _not_ indicate that it is _currently_ okay to close the span,
-    /// only that it _should_ close when it is safe to do so.
-    wants_close: AtomicBool,
-
-    /// A flag that is set when the span is entered for the first time.
-    ///
-    /// If this is false, closing the span should do nothing.
-    has_entered: AtomicBool,
-
-    is_current: AtomicBool,
-
-    /// Incremented when new handles are created, and decremented when they are
-    /// dropped if this is the current span.
-    handles: AtomicUsize,
+    closed: bool,
 
     meta: &'a Meta<'a>,
 }
@@ -387,9 +373,6 @@ impl Span {
     pub fn enter<F: FnOnce() -> T, T>(&mut self, f: F) -> T {
         match self.inner.take() {
             Some(inner) => dispatcher::with_default(inner.subscriber.clone(), || {
-                if !self.is_closed() {
-                    inner.take_close();
-                }
                 let guard = inner.enter();
                 let result = f();
                 self.inner = guard.exit();
@@ -452,18 +435,15 @@ impl Span {
     /// Signals that this span should close the next time it is exited, or when
     /// it is dropped.
     pub fn close(&mut self) {
+        if let Some(ref mut inner) = self.inner {
+            inner.close();
+        }
         self.is_closed = true;
-        // Take the span's `Enter` handle and try to close it. If the span is
-        // idle, then the `Enter` will close it immediately when it is dropped.
-        // Otherwise, if corresponds to the same span as the currently-executing
-        // one, it will tell the current span to try to close when it exits.
-        // Taking the `Enter` will prevent this handle from re-entering the span.
-        self.inner.take().as_ref().map(Enter::close);
     }
 
     /// Returns `true` if this span is closed.
     pub fn is_closed(&self) -> bool {
-        self.inner.is_none() && self.is_closed
+        self.is_closed
     }
 
     /// Returns `true` if this span was disabled by the subscriber and does not
@@ -515,16 +495,6 @@ impl fmt::Debug for Span {
     }
 }
 
-impl Clone for Span {
-    fn clone(&self) -> Self {
-        let inner = self.inner.as_ref().map(Enter::duplicate_handle);
-        Self {
-            inner,
-            is_closed: self.is_closed,
-        }
-    }
-}
-
 // ===== impl Event =====
 impl<'a> Event<'a> {
     /// Constructs a new `Span` originating from the given [`Callsite`].
@@ -557,9 +527,7 @@ impl<'a> Event<'a> {
                 return Self { inner: None };
             }
             let id = dispatch.new_id(meta);
-            let inner = Enter::new(id, dispatch, meta);
-            inner.has_entered.store(true, Ordering::Relaxed);
-            inner.close();
+            let inner = Inner::new(id, dispatch, meta);
             let mut event = Self { inner: Some(inner) };
             if_enabled(&mut event);
             event
@@ -663,14 +631,6 @@ impl<'a> Event<'a> {
     }
 }
 
-/// Trait for converting a `Span` into a cloneable `Shared` span.
-pub trait IntoShared {
-    /// Returns a `Shared` span handle that can be cloned.
-    ///
-    /// This will allocate memory to store the span if the span is enabled.
-    fn into_shared(self) -> Shared;
-}
-
 pub trait SpanExt: field::Record + ::sealed::Sealed {
     fn record<Q: ?Sized, V: ?Sized>(&mut self, field: &Q, value: &V) -> &mut Self
     where
@@ -682,107 +642,10 @@ pub trait SpanExt: field::Record + ::sealed::Sealed {
         Q: field::AsKey;
 }
 
-impl IntoShared for Span {
-    fn into_shared(self) -> Shared {
-        Shared::from_span(self)
-    }
-}
-
-/// A shared, heap-allocated span handle, which may be cloned.
-///
-/// Unlike a `Span` handle, entering a `Shared` span handle consumes the handle.
-/// This is used to determine when the span may be closed. Thus, each `Shared`
-/// handle may be thought of as representing a *single* attempt to enter the
-/// span.
-///
-/// However, they may be cloned inexpensively (as they are internally
-/// reference-counted).
-// NOTE: It may also be worthwhile to provide an `UnsyncShared` type, that uses
-// `Rc` rather than `Arc` for performance reasons? I'm not sure what the
-// use-case for that would be, though.
-#[derive(Clone, Debug)]
-pub struct Shared {
-    inner: Option<Arc<Enter>>,
-}
-
-impl Shared {
-    /// Returns a `Shared` span handle that can be cloned.
-    ///
-    /// This function allocates memory to store the shared span, if the span is
-    /// enabled.
-    pub fn from_span(span: Span) -> Self {
-        Self {
-            inner: Enter::from_span(span).map(Arc::new),
-        }
-    }
-
-    /// Executes the given function in the context of this span.
-    ///
-    /// Unlike `Span::enter`, this *consumes* the shared span handle.
-    ///
-    /// If this span is enabled, then this function enters the span, invokes
-    /// and then exits the span. If the span is disabled, `f` will still be
-    /// invoked, but in the context of the currently-executing span (if there is
-    /// one).
-    ///
-    /// Returns the result of evaluating `f`.
-    pub fn enter<F: FnOnce() -> T, T>(self, f: F) -> T {
-        if let Some(inner) = self.inner {
-            let guard = inner.enter();
-            let result = f();
-            inner.exit_and_join(guard);
-            if Arc::strong_count(&inner) == 1 {
-                inner.close();
-            }
-            result
-        } else {
-            f()
-        }
-    }
-
-    /// Returns the `Id` of the span, or `None` if it is disabled.
-    pub fn id(&self) -> Option<Id> {
-        self.inner.as_ref().map(|inner| inner.id())
-    }
-
-    /// Returns `true` if this span is enabled.
-    pub fn is_enabled(&self) -> bool {
-        self.inner.is_some()
-    }
-
-    /// Indicates that the span with the given ID has an indirect causal
-    /// relationship with this span.
-    ///
-    /// This relationship differs somewhat from the parent-child relationship: a
-    /// span may have any number of prior spans, rather than a single one; and
-    /// spans are not considered to be executing _inside_ of the spans they
-    /// follow from. This means that a span may close even if subsequent spans
-    /// that follow from it are still open, and time spent inside of a
-    /// subsequent span should not be included in the time its precedents were
-    /// executing. This is used to model causal relationships such as when a
-    /// single future spawns several related background tasks, et cetera.
-    ///
-    /// If this span is disabled, this function will do nothing. Otherwise, it
-    /// returns `Ok(())` if the other span was added as a precedent of this
-    /// span, or an error if this was not possible.
-    pub fn follows_from(&self, from: Id) -> &Self {
-        if let Some(ref inner) = self.inner {
-            inner.follows_from(from);
-        }
-        self
-    }
-}
-
 
 // ===== impl Enter =====
 
 impl<'a> Inner<'a> {
-    /// Indicates the span _should_ be closed the next time it exits or this
-    /// handle is dropped.
-    pub fn close(&self) {
-        self.wants_close.store(true, Ordering::Release);
-    }
-
     /// Indicates that the span with the given ID has an indirect causal
     /// relationship with this span.
     ///
@@ -798,17 +661,17 @@ impl<'a> Inner<'a> {
     /// If this span is disabled, this function will do nothing. Otherwise, it
     /// returns `Ok(())` if the other span was added as a precedent of this
     /// span, or an error if this was not possible.
-    pub fn follows_from(&self, from: Id) {
+    fn follows_from(&self, from: Id) {
         self.subscriber.add_follows_from(&self.id, from)
     }
 
     /// Returns the span's ID.
-    pub fn id(&self) -> Id {
+    fn id(&self) -> Id {
         self.id.clone()
     }
 
     /// Returns the span's metadata.
-    pub fn metadata(&self) -> &'a Meta<'a> {
+    fn metadata(&self) -> &'a Meta<'a> {
         self.meta
     }
 
@@ -851,73 +714,19 @@ impl<'a> Inner<'a> {
         Self {
             id,
             subscriber: subscriber.clone(),
-            wants_close: AtomicBool::from(false),
-            has_entered: AtomicBool::from(false),
-            is_current: AtomicBool::from(false),
-            handles: AtomicUsize::from(1),
+            closed: false,
             meta,
         }
-    }
-
-    fn duplicate(&self) -> Self {
-        let id = self.subscriber.clone_span(self.id.clone());
-        Self {
-            id,
-            subscriber: self.subscriber.clone(),
-            wants_close: AtomicBool::from(self.wants_close()),
-            has_entered: AtomicBool::from(self.has_entered()),
-            is_current: AtomicBool::from(self.is_current.load(Ordering::Acquire)),
-            handles: AtomicUsize::from(self.handle_count()),
-            meta: self.meta,
-        }
-    }
-
-    /// Returns `true` if this span _should_ close itself.
-    ///
-    /// This is true IFF:
-    /// - the span has been told to close,
-    /// - the span has been entered already (we don't want to close spans that
-    ///   have never been entered),
-    /// - there aren't multiple handles capable of entering the span.
-    fn should_close(&self) -> bool {
-        self.wants_close() && self.has_entered() && self.handle_count() == 1
-    }
-
-    fn has_entered(&self) -> bool {
-        self.has_entered.load(Ordering::Acquire)
-    }
-
-    fn wants_close(&self) -> bool {
-        self.wants_close.load(Ordering::Acquire)
-    }
-
-    fn take_close(&self) -> bool {
-        self.wants_close.swap(false, Ordering::Release)
-    }
-
-    fn handle_count(&self) -> usize {
-        self.handles.load(Ordering::Acquire)
     }
 }
 
 impl Enter {
-    /// Consumes `span` and returns the inner entering handle, if the span is
-    /// enabled.
+    /// Indicates that this handle will not be reused to enter the span again.
     ///
-    /// The returned `Enter` has approximately the same behaviour to a `Span`.
-    /// However, it is primarily intended for use in libraries custom span
-    /// types; the `Span` handle will typically represent a more ergonomic API
-    /// for actually _using_ spans.
-   fn from_span(span: Span) -> Option<Self> {
-        span.inner
-    }
-
-    /// Return a new `Span` handle to the span represented by this `Enter`.
-    fn into_span(self) -> Span {
-        Span {
-            inner: Some(self),
-            is_closed: false,
-        }
+    /// After calling `close`, the `Entered` guard returned by `self.enter()`
+    /// will _drop_ this handle when it is exited.
+    fn close(&mut self) {
+        self.closed = true;
     }
 
     /// Enters the span, returning a guard that may be used to exit the span and
@@ -926,49 +735,11 @@ impl Enter {
     /// This is used internally to implement `Span::enter`. It may be used for
     /// writing custom span handles, but should generally not be called directly
     /// when entering a span.
-    fn enter(&self) -> Entered {
-        // The current handle will no longer enter the span, since it has just
-        // been used to enter. Therefore, it will be safe to close the span if
-        // no additional handles exist when the span is exited.
-        self.handles.fetch_sub(1, Ordering::Release);
-        // The span has now been entered, so it's okay to close it.
-        self.has_entered.store(true, Ordering::Release);
+    fn enter(self) -> Entered {
         self.subscriber.enter(&self.id);
-        // The span has now been entered, so it's okay to close it.
-        self.is_current.store(true, Ordering::Release);
         Entered {
-            inner: self.duplicate(),
+            inner: self,
         }
-    }
-
-    /// Exits the span entry represented by an `Entered` guard, consuming it,
-    /// and updates `self` to canonically represent the referenced span's state
-    /// after the other entry has exited.
-    ///
-    /// If the other handle to the span wanted to close the span on exit, it
-    /// will not do so. Instead, the responsibility for performing the `close`
-    /// will be transferred to `self` --- if `self` did not previously want to
-    /// close, but `other` did, `self` will now want to close.
-    ///
-    /// This means that dropping `other` will no longer close the span, even if
-    /// it previously would have.
-    ///
-    /// This function is intended to be used by span handle implementations to
-    /// ensuring that multiple entering handles are kept consistent. Probably
-    /// don't use this unless you know what you're doing.
-    fn exit_and_join(&self, other: Entered) {
-        if let Some(other) = other.exit() {
-            self.handles.store(other.handle_count(), Ordering::Release);
-            self.has_entered
-                .store(other.has_entered(), Ordering::Release);
-            self.wants_close
-                .store(other.take_close(), Ordering::Release);
-        }
-    }
-
-    fn duplicate_handle(&self) -> Self {
-        self.handles.fetch_add(1, Ordering::Release);
-        self.duplicate()
     }
 }
 
@@ -987,13 +758,16 @@ impl<'a> Hash for Inner<'a> {
 impl<'a> Drop for Inner<'a> {
     fn drop(&mut self) {
         self.subscriber.drop_span(self.id.clone());
-        // If this handle wants to be closed, try to close it --- either by
-        // closing it now if it is idle, or telling the current span to close
-        // when it exits, if it is the current span.
-        if self.has_entered() && self.wants_close() && !self.is_current.load(Ordering::Acquire) && self.handle_count() <= 1 {
-            // If this span is not the current span, then it may close now,
-            // if there are no other handles with the capacity to re-enter it.
-            self.subscriber.close(&self.id());
+    }
+}
+
+impl<'a> Clone for Inner<'a> {
+    fn clone(&self) -> Self {
+        Self {
+            id: self.subscriber.clone_span(&self.id),
+            subscriber: self.subscriber.clone(),
+            closed: self.closed,
+            meta: self.meta,
         }
     }
 }
@@ -1004,18 +778,11 @@ impl Entered {
     /// exit.
     fn exit(self) -> Option<Enter> {
         self.inner.subscriber.exit(&self.inner.id);
-        if self.inner.should_close() {
+        if self.inner.closed {
             // Dropping `inner` will allow it to perform the closure if
             // able.
             None
         } else {
-            // We are returning a new `Enter`. Increment the number of
-            // handles that may enter the span.
-            self.inner.handles.fetch_add(1, Ordering::Release);
-            // The span will want to close if it is dropped prior to
-            // being re-entered.
-            self.inner.wants_close.store(true, Ordering::Release);
-            self.inner.is_current.store(false, Ordering::Release);
             Some(self.inner)
         }
     }
@@ -1176,21 +943,15 @@ mod tests {
     use {span, subscriber, Dispatch};
 
     #[test]
-    fn exit_doesnt_finish_while_handles_still_exist() {
+    fn closed_handle_dropped_when_used() {
         // Test that exiting a span only marks it as "done" when no handles
         // that can re-enter the span exist.
         let subscriber = subscriber::mock()
             .enter(span::mock().named(Some("foo")))
+            .drop_span(span::mock().named(Some("bar")))
             .enter(span::mock().named(Some("bar")))
-            // The first time we exit "bar", there will be another handle with
-            // which we could potentially re-enter bar.
             .exit(span::mock().named(Some("bar")))
-            // Re-enter "bar", using the cloned handle.
-            .enter(span::mock().named(Some("bar")))
-            // Now, when we exit "bar", there is no handle to re-enter it, so
-            // it should become "done".
-            .exit(span::mock().named(Some("bar")))
-            .close(span::mock().named(Some("bar")))
+            .drop_span(span::mock().named(Some("bar")))
             .exit(span::mock().named(Some("foo")))
             .run();
 
@@ -1198,16 +959,13 @@ mod tests {
             span!("foo").enter(|| {
                 let mut bar = span!("bar");
                 let mut another_bar = bar.clone();
-                bar.enter(|| {
-                    another_bar.close();
-                });
-                // Enter "bar" again. This time, the previously-requested
-                // closure should be honored.
-                bar.enter(move || {
-                    // Drop the other handle to bar. Now, the span should be allowed
-                    // to close.
-                    drop(another_bar);
-                });
+                drop(bar);
+
+                another_bar.close();
+                another_bar.enter(|| { });
+                // After we exit `another_bar`, it should close and not be
+                // re-entered.
+                another_bar.enter(|| { });
             });
         });
     }
@@ -1262,7 +1020,7 @@ mod tests {
             .exit(span::mock().named(Some("foo")))
             .enter(span::mock().named(Some("foo")))
             .exit(span::mock().named(Some("foo")))
-            .close(span::mock().named(Some("foo")))
+            .drop_span(span::mock().named(Some("foo")))
             .done();
         let subscriber1 = Dispatch::new(subscriber1.run());
         let subscriber2 = Dispatch::new(subscriber::mock().run());
@@ -1284,7 +1042,7 @@ mod tests {
             .exit(span::mock().named(Some("foo")))
             .enter(span::mock().named(Some("foo")))
             .exit(span::mock().named(Some("foo")))
-            .close(span::mock().named(Some("foo")))
+            .drop_span(span::mock().named(Some("foo")))
             .done();
         let subscriber1 = Dispatch::new(subscriber1.run());
         let mut foo = dispatcher::with_default(subscriber1, || {
@@ -1304,11 +1062,11 @@ mod tests {
     }
 
     #[test]
-    fn span_closes_on_drop() {
+    fn dropping_a_span_calls_drop_span() {
         let (subscriber, handle) = subscriber::mock()
             .enter(span::mock().named(Some("foo")))
             .exit(span::mock().named(Some("foo")))
-            .close(span::mock().named(Some("foo")))
+            .drop_span(span::mock().named(Some("foo")))
             .done()
             .run_with_handle();
         dispatcher::with_default(Dispatch::new(subscriber), || {
@@ -1326,7 +1084,7 @@ mod tests {
             .enter(span::mock().named(Some("foo")))
             .event()
             .exit(span::mock().named(Some("foo")))
-            .close(span::mock().named(Some("foo")))
+            .drop_span(span::mock().named(Some("foo")))
             .done()
             .run_with_handle();
         dispatcher::with_default(Dispatch::new(subscriber), || {
@@ -1344,10 +1102,10 @@ mod tests {
             .enter(span::mock().named(Some("foo")))
             .event()
             .exit(span::mock().named(Some("foo")))
-            .close(span::mock().named(Some("foo")))
+            .drop_span(span::mock().named(Some("foo")))
             .enter(span::mock().named(Some("bar")))
             .exit(span::mock().named(Some("bar")))
-            .close(span::mock().named(Some("bar")))
+            .drop_span(span::mock().named(Some("bar")))
             .done()
             .run_with_handle();
         dispatcher::with_default(Dispatch::new(subscriber), || {
@@ -1366,29 +1124,12 @@ mod tests {
             .event()
             .enter(span::mock().named(Some("foo")))
             .exit(span::mock().named(Some("foo")))
-            .close(span::mock().named(Some("foo")))
+            .drop_span(span::mock().named(Some("foo")))
             .done()
             .run_with_handle();
         dispatcher::with_default(Dispatch::new(subscriber), || {
             debug!("my event!");
             span!("foo").enter(|| { });
-        });
-
-        handle.assert_finished();
-    }
-
-    #[test]
-    fn dropping_a_span_calls_drop_span() {
-        let (subscriber, handle) = subscriber::mock()
-            .enter(span::mock().named(Some("foo")))
-            .exit(span::mock().named(Some("foo")))
-            .drop_span(span::mock().named(Some("foo")))
-            .drop_span(span::mock().named(Some("foo")))
-            .run_with_handle();
-        dispatcher::with_default(Dispatch::new(subscriber), || {
-            let mut span = span!("foo");
-            span.enter(|| {});
-            drop(span);
         });
 
         handle.assert_finished();
@@ -1428,8 +1169,8 @@ mod tests {
         let (subscriber1, handle1) = subscriber::mock()
             .enter(span::mock().named(Some("foo")))
             .exit(span::mock().named(Some("foo")))
-            .enter(span::mock().named(Some("foo")))
             .clone_span(span::mock().named(Some("foo")))
+            .enter(span::mock().named(Some("foo")))
             .exit(span::mock().named(Some("foo")))
             .drop_span(span::mock().named(Some("foo")))
             .drop_span(span::mock().named(Some("foo")))
@@ -1455,25 +1196,27 @@ mod tests {
     }
 
     #[test]
-    fn span_closes_when_idle() {
+    fn span_closes_when_exited() {
         let (subscriber, handle) = subscriber::mock()
             .enter(span::mock().named(Some("foo")))
             .exit(span::mock().named(Some("foo")))
-            // A second span is entered so that the mock subscriber will
-            // expect "foo" at a separate point in time from when it is exited.
-            .enter(span::mock().named(Some("bar")))
-            .close(span::mock().named(Some("foo")))
-            .exit(span::mock().named(Some("bar")))
+            .enter(span::mock().named(Some("foo")))
+            .exit(span::mock().named(Some("foo")))
+            .drop_span(span::mock().named(Some("foo")))
+            .done()
             .run_with_handle();
         dispatcher::with_default(Dispatch::new(subscriber), || {
             let mut foo = span!("foo");
+            assert!(!foo.is_closed());
+
             foo.enter(|| {});
+            assert!(!foo.is_closed());
 
-            span!("bar").enter(|| {
-                // Since `foo` is not executing, it should close immediately.
-                foo.close();
-            });
+            foo.close();
+            assert!(foo.is_closed());
 
+            // Now that `foo` has closed, entering it should do nothing.
+            foo.enter(|| { });
             assert!(foo.is_closed());
         });
 
@@ -1481,18 +1224,21 @@ mod tests {
     }
 
     #[test]
-    fn entering_a_closed_span_is_a_no_op() {
+    fn entering_a_closed_span_again_is_a_no_op() {
         let (subscriber, handle) = subscriber::mock()
             .enter(span::mock().named(Some("foo")))
             .exit(span::mock().named(Some("foo")))
-            .close(span::mock().named(Some("foo")))
+            .drop_span(span::mock().named(Some("foo")))
             .done()
             .run_with_handle();
         dispatcher::with_default(Dispatch::new(subscriber), || {
             let mut foo = span!("foo");
-            foo.enter(|| {});
-
             foo.close();
+
+            foo.enter(|| {
+                // When we exit `foo` this time, it will close, and entering it
+                // again will do nothing.
+            });
 
             foo.enter(|| {
                 // The subscriber expects nothing else to happen after the first
@@ -1502,158 +1248,5 @@ mod tests {
         });
 
         handle.assert_finished();
-    }
-
-    #[test]
-    fn span_doesnt_close_if_it_never_opened() {
-        let subscriber = subscriber::mock().done().run();
-        dispatcher::with_default(Dispatch::new(subscriber), || {
-            let span = span!("foo");
-            drop(span);
-        })
-    }
-
-    mod shared {
-        use super::*;
-
-        #[test]
-        fn span_closes_on_drop() {
-            let (subscriber, handle) = subscriber::mock()
-                .enter(span::mock().named(Some("foo")))
-                .exit(span::mock().named(Some("foo")))
-                .close(span::mock().named(Some("foo")))
-                .done()
-                .run_with_handle();
-            dispatcher::with_default(Dispatch::new(subscriber), || span!("foo").into_shared().enter(|| {}));
-
-            handle.assert_finished();
-        }
-
-        #[test]
-        fn span_doesnt_close_if_it_never_opened() {
-            let subscriber = subscriber::mock().done().run();
-            dispatcher::with_default(Dispatch::new(subscriber), || {
-                let span = span!("foo").into_shared();
-                drop(span);
-            })
-        }
-
-        #[test]
-        fn shared_only_calls_drop_span_when_the_last_handle_is_dropped() {
-            let (subscriber, handle) = subscriber::mock()
-                .enter(span::mock().named(Some("foo")))
-                .exit(span::mock().named(Some("foo")))
-                .drop_span(span::mock().named(Some("foo")))
-                .run_with_handle();
-            dispatcher::with_default(Dispatch::new(subscriber), || {
-                let span = span!("foo").into_shared();
-                let foo1 = span.clone();
-                let foo2 = span.clone();
-                drop(foo1);
-                drop(span);
-                foo2.enter(|| {})
-            });
-
-            handle.assert_finished();
-        }
-
-        #[test]
-        fn exit_doesnt_finish_concurrently_executing_spans() {
-            // Test that exiting a span only marks it as "done" when no other
-            // threads are still executing inside that span.
-            use std::sync::{Arc, Barrier};
-
-            let (subscriber, handle) = subscriber::mock()
-                .enter(span::mock().named(Some("baz")))
-                // Main thread enters "quux".
-                .enter(span::mock().named(Some("quux")))
-                // Spawned thread also enters "quux".
-                .enter(span::mock().named(Some("quux")))
-                // When the main thread exits "quux", it will still be running in the
-                // spawned thread.
-                .exit(span::mock().named(Some("quux")))
-                // Now, when this thread exits "quux", there is no handle to re-enter it, so
-                // it should become "done".
-                .exit(span::mock().named(Some("quux")))
-                .close(span::mock().named(Some("quux")))
-                // "baz" never had more than one handle, so it should also become
-                // "done" when we exit it.
-                .exit(span::mock().named(Some("baz")))
-                .close(span::mock().named(Some("baz")))
-                .done()
-                .run_with_handle();
-
-            dispatcher::with_default(Dispatch::new(subscriber), || {
-                let barrier1 = Arc::new(Barrier::new(2));
-                let barrier2 = Arc::new(Barrier::new(2));
-                // Make copies of the barriers for thread 2 to wait on.
-                let t2_barrier1 = barrier1.clone();
-                let t2_barrier2 = barrier2.clone();
-
-                span!("baz",).enter(move || {
-                    let quux = span!("quux",).into_shared();
-                    let quux2 = quux.clone();
-                    let handle = thread::Builder::new()
-                        .name("thread-2".to_string())
-                        .spawn(move || {
-                            quux2.enter(|| {
-                                // Once this thread has entered "quux", allow thread 1
-                                // to exit.
-                                t2_barrier1.wait();
-                                // Wait for the main thread to allow us to exit.
-                                t2_barrier2.wait();
-                            })
-                        }).expect("spawn test thread");
-                    quux.enter(|| {
-                        // Wait for thread 2 to enter "quux". When we exit "quux", it
-                        // should stay running, since it's running in the other thread.
-                        barrier1.wait();
-                    });
-                    // After we exit "quux", wait for the second barrier, so the other
-                    // thread unblocks and exits "quux".
-                    barrier2.wait();
-                    handle.join().unwrap();
-                });
-            });
-
-            handle.assert_finished();
-        }
-
-        #[test]
-        fn exit_doesnt_finish_while_handles_still_exist() {
-            // Test that exiting a span only marks it as "done" when no handles
-            // that can re-enter the span exist.
-            let (subscriber, handle) = subscriber::mock()
-                .enter(span::mock().named(Some("foo")))
-                .enter(span::mock().named(Some("bar")))
-                // The first time we exit "bar", there will be another handle with
-                // which we could potentially re-enter bar.
-                .exit(span::mock().named(Some("bar")))
-                // Re-enter "bar", using the cloned handle.
-                .enter(span::mock().named(Some("bar")))
-                // Now, when we exit "bar", there is no handle to re-enter it, so
-                // it should become "done".
-                .exit(span::mock().named(Some("bar")))
-                .close(span::mock().named(Some("bar")))
-                .exit(span::mock().named(Some("foo")))
-                .close(span::mock().named(Some("foo")))
-                .done()
-                .run_with_handle();
-
-            dispatcher::with_default(Dispatch::new(subscriber), || {
-                span!("foo").enter(|| {
-                    let bar = span!("bar").into_shared();
-                    bar.clone().enter(|| {
-                        // do nothing. exiting "bar" should leave it idle, since it can
-                        // be re-entered.
-                    });
-                    // Enter "bar" again. consuming the last handle to `bar`
-                    // close the span automatically.
-                    bar.enter(|| {});
-                });
-            });
-
-            handle.assert_finished();
-        }
     }
 }

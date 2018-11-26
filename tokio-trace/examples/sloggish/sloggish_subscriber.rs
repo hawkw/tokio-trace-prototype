@@ -241,28 +241,28 @@ impl Subscriber for SloggishSubscriber {
         // self.current.set_current(parent)
     }
 
-    #[inline]
-    fn close(&self, id: &tokio_trace::Id) {
-        if let Some(event) = self.events.lock().expect("mutex poisoned").remove(&id) {
-            let mut stderr = self.stderr.lock();
-            let indent = self.stack.lock().unwrap().len();
-            self.print_indent(&mut stderr, indent).unwrap();
-            write!(
-                &mut stderr,
-                "{timestamp} {level} {target} {message}",
-                timestamp = humantime::format_rfc3339_seconds(SystemTime::now()),
-                level = ColorLevel(event.level),
-                target = &event.target,
-                message = Style::new().bold().paint(event.message),
-            ).unwrap();
-            self.print_kvs(
-                &mut stderr,
-                event.kvs.iter().map(|&(ref k, ref v)| (k, v)),
-                ", ",
-            ).unwrap();
-            write!(&mut stderr, "\n").unwrap();
-        }
-        // TODO: it's *probably* safe to remove the span from the cache
-        // now...but that doesn't really matter for this example.
-    }
+    // #[inline]
+    // fn close(&self, id: &tokio_trace::Id) {
+    //     if let Some(event) = self.events.lock().expect("mutex poisoned").remove(&id) {
+    //         let mut stderr = self.stderr.lock();
+    //         let indent = self.stack.lock().unwrap().len();
+    //         self.print_indent(&mut stderr, indent).unwrap();
+    //         write!(
+    //             &mut stderr,
+    //             "{timestamp} {level} {target} {message}",
+    //             timestamp = humantime::format_rfc3339_seconds(SystemTime::now()),
+    //             level = ColorLevel(event.level),
+    //             target = &event.target,
+    //             message = Style::new().bold().paint(event.message),
+    //         ).unwrap();
+    //         self.print_kvs(
+    //             &mut stderr,
+    //             event.kvs.iter().map(|&(ref k, ref v)| (k, v)),
+    //             ", ",
+    //         ).unwrap();
+    //         write!(&mut stderr, "\n").unwrap();
+    //     }
+    //     // TODO: it's *probably* safe to remove the span from the cache
+    //     // now...but that doesn't really matter for this example.
+    // }
 }

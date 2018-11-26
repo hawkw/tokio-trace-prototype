@@ -248,6 +248,7 @@ impl TraceLoggerBuilder {
 }
 
 struct SpanLineBuilder {
+    ref_count: usize,
     meta: &'static Meta<'static>,
     log_line: String,
     fields: String,
@@ -272,6 +273,7 @@ impl SpanLineBuilder {
             ).expect("write to string shouldn't fail");
         }
         Self {
+            ref_count: 1,
             meta,
             log_line,
             fields,
@@ -304,6 +306,7 @@ impl SpanLineBuilder {
 }
 
 struct EventLineBuilder {
+    ref_count: usize,
     level: tokio_trace::Level,
     file: Option<String>,
     line: Option<u32>,
@@ -324,6 +327,7 @@ impl EventLineBuilder {
             ).expect("write to string shouldn't fail");
         }
         Self {
+            ref_count: 1,
             level: meta.level,
             file: meta.file.map(|s| s.to_owned()),
             line: meta.line,
@@ -482,22 +486,39 @@ impl Subscriber for TraceLogger {
         }
     }
 
-    fn close(&self, id: &Id) {
+    fn clone_span(&self, id: &Id) -> Id {
         let mut in_progress = self.in_progress.lock().unwrap();
-        if let Some(span) = in_progress.spans.remove(id) {
-            if self.settings.log_span_closes {
-                span.finish();
+        if let Some(span) = in_progress.spans.get_mut(id) {
+            span.ref_count += 1;
+            return id.clone();
+        }
+
+        if let Some(event) = in_progress.events.get_mut(id)  {
+            event.ref_count += 1;
+        }
+        id.clone()
+    }
+
+    fn drop_span(&self, id: Id) {
+        let mut in_progress = self.in_progress.lock().unwrap();
+        if in_progress.spans.contains_key(&id) {
+            if in_progress.spans.get(&id).unwrap().ref_count == 1 {
+                in_progress.spans.remove(&id).unwrap().finish();
+            } else {
+                in_progress.spans.get_mut(&id).unwrap().ref_count -= 1;
             }
             return;
-        };
-        let event = in_progress.events.remove(id);
-        if let Some(event) = event {
-            if let Some(id) = self.current.id() {
-                if let Some(ref span) = in_progress.spans.get(&id) {
-                    return event.finish(&span.fields);
-                }
+        }
+
+        if in_progress.events.get(&id).map(|event| event.ref_count == 1).unwrap_or(false) {
+            let event = in_progress.events.remove(&id).unwrap();
+            if let Some(ref span) = self.current.id().and_then(|id| in_progress.spans.get(&id)) {
+                event.finish(&span.fields);
+            } else {
+                event.finish("");
             }
-            event.finish("")
+        } else if let Some(ref mut event) = in_progress.events.get_mut(&id) {
+            event.ref_count -= 1;
         }
     }
 }

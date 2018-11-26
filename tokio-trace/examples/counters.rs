@@ -90,7 +90,6 @@ impl Subscriber for CounterSubscriber {
 
     fn enter(&self, _span: &Id) {}
     fn exit(&self, _span: &Id) {}
-    fn close(&self, _span: &Id) {}
 }
 
 impl Counters {

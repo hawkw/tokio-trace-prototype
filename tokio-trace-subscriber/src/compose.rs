@@ -127,14 +127,7 @@ where
         });
     }
 
-    fn close(&self, id: &Id) {
-        self.registry.with_span(id, |span| {
-            self.observer.close(span);
-        });
-        self.registry.close(id);
-    }
-
-    fn clone_span(&self, id: Id) -> Id {
+    fn clone_span(&self, id: &Id) -> Id {
         self.registry.clone_span(id)
     }
 

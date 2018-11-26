@@ -63,9 +63,9 @@ mod tests {
             .enter(span::mock().named(Some("foo")))
             .enter(span::mock().named(Some("bar")))
             .exit(span::mock().named(Some("bar")))
-            .close(span::mock().named(Some("bar")))
+            .drop_span(span::mock().named(Some("bar")))
             .exit(span::mock().named(Some("foo")))
-            .close(span::mock().named(Some("foo")))
+            .drop_span(span::mock().named(Some("foo")))
             .done()
             .run_with_handle();
         let mut foo = dispatcher::with_default(Dispatch::new(subscriber1), || {
@@ -88,18 +88,18 @@ mod tests {
             .enter(span::mock().named(Some("foo")))
             .enter(span::mock().named(Some("bar")))
             .exit(span::mock().named(Some("bar")))
-            .close(span::mock().named(Some("bar")))
+            .drop_span(span::mock().named(Some("bar")))
             .exit(span::mock().named(Some("foo")))
-            .close(span::mock().named(Some("foo")))
+            .drop_span(span::mock().named(Some("foo")))
             .done()
             .run_with_handle();
         let (subscriber2, handle2) = subscriber::mock()
             .enter(span::mock().named(Some("baz")))
             .enter(span::mock().named(Some("quux")))
             .exit(span::mock().named(Some("quux")))
-            .close(span::mock().named(Some("quux")))
+            .drop_span(span::mock().named(Some("quux")))
             .exit(span::mock().named(Some("baz")))
-            .close(span::mock().named(Some("baz")))
+            .drop_span(span::mock().named(Some("baz")))
             .done()
             .run_with_handle();
 

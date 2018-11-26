@@ -111,13 +111,8 @@ impl Subscriber for Dispatch {
     }
 
     #[inline]
-    fn close(&self, span: &Id) {
-        self.subscriber.close(span)
-    }
-
-    #[inline]
-    fn clone_span(&self, id: Id) -> Id {
-        self.subscriber.clone_span(id)
+    fn clone_span(&self, id: &Id) -> Id {
+        self.subscriber.clone_span(&id)
     }
 
     #[inline]
@@ -142,7 +137,6 @@ impl Subscriber for NoSubscriber {
 
     fn enter(&self, _span: &Id) {}
     fn exit(&self, span: &Id) {}
-    fn close(&self, _span: &Id) {}
 }
 
 impl Registrar {
