@@ -66,17 +66,16 @@
 //!
 //! Because spans may be entered and exited multiple times before they close,
 //! [`Subscriber`]s have separate trait methods which are called to notify them
-//! of span exits and span closures. When execution exits a span,
-//! [`exit`](::Subscriber::exit) will always be called with that span's ID to
-//! notify the subscriber that the span has been exited. If the span has been
-//! exited for the final time, the `exit` will be followed by a call to
-//! [`close`](::Subscriber::close), signalling that the span has been closed.
-//! Subscribers may expect that a span which has closed will not be entered
-//! again.
+//! of span exits and when span handles are dropped. When execution exits a
+//! span, [`exit`](::Subscriber::exit) will always be called with that span's ID
+//! to notify the subscriber that the span has been exited. When span handles
+//! are dropped, the [`drop_span`](::Subscriber::drop_span) method is called
+//! with that span's ID. The subscriber may use this to determine whether or not
+//! the span will be entered again.
 //!
 //! If there is only a single handle with the capacity to exit a span, dropping
-//! that handle will automatically close the span, since the capacity to enter
-//! it no longer exists. For example:
+//! that handle "close" the span, since the capacity to enter it no longer
+//! exists. For example:
 //! ```
 //! # #[macro_use] extern crate tokio_trace;
 //! # fn main() {
@@ -92,19 +91,20 @@
 //! # }
 //! ```
 //!
-//! If one or more handles to a span exist, the span will be kept open until
-//! that handle drops. However, a span may be explicitly asked to close by
-//! calling the [`Span::close`] method. For example:
+//! A span may be explicitly closed before when the span handle is dropped by
+//! calling the [`Span::close`] method. Doing so will drop that handle the next
+//! time it is exited. For example:
 //! ```
 //! # #[macro_use] extern crate tokio_trace;
 //! # fn main() {
 //! use tokio_trace::Span;
 //!
 //! let mut my_span = span!("my_span");
+//! // Signal to my_span that it should close when it exits
+//! my_span.close();
 //! my_span.enter(|| {
-//!     // Signal to my_span that it should close when it exits
-//!     Span::current().close();
-//! }); // --> Subscriber::exit(my_span); Subscriber::close(my_span)
+//!    // ...
+//! }); // --> Subscriber::exit(my_span); Subscriber::drop_span(my_span)
 //!
 //! // The handle to `my_span` still exists, but it now knows that the span was
 //! // closed while it was executing.
@@ -116,71 +116,14 @@
 //! });
 //! # }
 //! ```
-//!
-//! When a span is asked to close by explicitly calling `Span::close`, if it is
-//! executing, it will wait until it exits to signal that it has been closed. If
-//! it is not currently executing, it will signal closure immediately.
-//!
-//! Calls to `Span::close()` are *not* guaranteed to close the span immediately.
-//! If multiple handles to the span exist, the span will not be closed until all
-//! but the one which opened the span have been dropped. This is to ensure that
-//! a subscriber never observes an inconsistant state; namely, a span being
-//! entered after it has closed.
-//!
-//! ## Shared spans
-//!
-//! In general, it is rarely necessary to create multiple handles to a span that
-//! persist outside of the period during which that span is executing. Users who
-//! wish to have multiple handles capable of entering a span, or enter the same
-//! span from multiple threads, may wish to use the [shared span] type instead.
-//!
-//! A `Shared` handle behaves similarly to a `Span` handle, but may be cloned
-//! freely. Any `Shared` handle may be used to enter the span it corresponds to,
-//! and (since `Shared` handles are `Send + Sync`) they may be used to allow
-//! multiple threads to enter the same span.
-//!
-//! Shared handles may be created from a span using the [`IntoShared`] trait:
-//! ```
-//! # #[macro_use] extern crate tokio_trace;
-//! # fn main() {
-//! use tokio_trace::span::IntoShared;
-//! // Convert a regular `Span` handle into a cloneable `Shared` handle.
-//! let span = span!("foo").into_shared();
-//!
-//! // Entering a `Shared` span handle *consumes* the handle:
-//! span.clone().enter(|| {
-//!     // ...
-//! });
-//!
-//! // When all `Shared` handles to the span have been consumed, it will close.
-//! span.enter(|| {
-//!     // ...
-//! }) // --> Subscriber::close(span)
-//! # }
-//! ```
-//!
-//! Unlike `Span` handles, `Shared` spans are represented by `Arc` pointers, so
-//! constructing them will allocate memory, if the span is enabled.
-//!
-//! **Note**: When _not_ using shared spans, it is possible to cause a span to
-//! _never_ be dropped, by entering it, creating a second handle using
-//! `Span::current`, and returning that handle from the closure which executes
-//! inside the span, and then dropping that handle while the span is not
-//! currently executing. Since the span is not currently executing, it has no
-//! way to observe the second handle being dropped, and it cannot determine if
-//! it is safe to close.  However, if all such handles are dropped while the
-//! span is executing, the span will still be able to close normally. Spans will
-//! only  fail to close in situations where the second handle is dropped while
-//! the span is _not_ executing.
-//!
-//! This is possible because the logic for determining if a span can close is
-//! intentionally cautious. Spans will only close if they _know_ they cannot be
-//! entered; although a span failing to close does result in potentially
-//! incorrect trace data, this is less serious of a problem than the
-//! inconsistant state that arises when a span is closed and then re-entered.
-//! The latter violates the assumptions that a reasonable subscriber
-//! implementation could be expected to make.
-//!
+//! However, if multiple handles exist, the span can still be re-entered even if
+//! one or more is dropped. For determining when _all_ handles to a span have
+//! been dropped, `Subscriber`s have a [`clone_span`](::Subscriber::clone_span)
+//! method, which is called every time a span handle is cloned. Combined with
+//! `drop_span`, this may be used to track the number of handles to a given span
+//! --- if `drop_span` has been called one more time than the number of calls to
+//! `clone_span` for a given ID, then no more handles to the span with that ID
+//! exist. The subscriber may then treat it as closed.
 //!
 //! # Accessing a Span's Attributes
 //!
@@ -192,10 +135,6 @@
 //! the data for future use, record it in some manner, or discard it completely.
 //!
 //! [`Subscriber`]: ::Subscriber
-//! [`State`]: ::span::State
-//! [`Attributes`]: ::span::Attributes
-//! [shared span]: ::span::Shared
-//! [`IntoShared`]: ::span::IntoShared
 pub use tokio_trace_core::span::Id;
 
 #[cfg(any(test, feature = "test-support"))]
