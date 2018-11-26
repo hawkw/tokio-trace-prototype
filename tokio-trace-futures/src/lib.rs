@@ -3,7 +3,7 @@ extern crate futures;
 extern crate tokio_trace;
 
 use futures::{Async, Future, Poll, Sink, StartSend, Stream};
-use tokio_trace::{dispatcher, Dispatch, Span, Subscriber, Meta};
+use tokio_trace::{dispatcher, Dispatch, Span, Subscriber};
 
 pub mod executor;
 
@@ -175,7 +175,7 @@ mod tests {
             .exit(span::mock().named(Some("foo")))
             .enter(span::mock().named(Some("foo")))
             .exit(span::mock().named(Some("foo")))
-            .close(span::mock().named(Some("foo")))
+            .drop_span(span::mock().named(Some("foo")))
             .done()
             .run_with_handle();
         dispatcher::with_default(Dispatch::new(subscriber), || {
@@ -191,7 +191,7 @@ mod tests {
             .exit(span::mock().named(Some("foo")))
             .enter(span::mock().named(Some("foo")))
             .exit(span::mock().named(Some("foo")))
-            .close(span::mock().named(Some("foo")))
+            .drop_span(span::mock().named(Some("foo")))
             .done()
             .run_with_handle();
         dispatcher::with_default(Dispatch::new(subscriber), || {
@@ -215,7 +215,7 @@ mod tests {
             .exit(span::mock().named(Some("foo")))
             .enter(span::mock().named(Some("foo")))
             .exit(span::mock().named(Some("foo")))
-            .close(span::mock().named(Some("foo")))
+            .drop_span(span::mock().named(Some("foo")))
             .run_with_handle();
         dispatcher::with_default(Dispatch::new(subscriber), || {
             stream::iter_ok::<_, ()>(&[1, 2, 3])
@@ -235,9 +235,9 @@ mod tests {
             .exit(span::mock().named(Some("b")))
             .enter(span::mock().named(Some("b")))
             .exit(span::mock().named(Some("b")))
-            .close(span::mock().named(Some("b")))
+            .drop_span(span::mock().named(Some("b")))
             .exit(span::mock().named(Some("a")))
-            .close(span::mock().named(Some("a")))
+            .drop_span(span::mock().named(Some("a")))
             .done()
             .run_with_handle();
         let mut runtime = tokio::runtime::Runtime::new().unwrap();

@@ -57,7 +57,7 @@ where
     }
 
     fn call(&mut self, req: Target) -> Self::Future {
-        let span = self.span.close();
+        let span = self.span.clone();
         let inner = self.inner.make_service(req);
         InstrumentedMakeServiceFuture { inner, span }
     }
@@ -75,12 +75,13 @@ where
     type Item = InstrumentedHttpService<T::Item>;
     type Error = T::Error;
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        let span2 = self.span.clone();
         let span = &mut self.span;
         let inner = &mut self.inner;
         span.enter(move || {
             inner
                 .poll()
-                .map(|ready| ready.map(|svc| InstrumentedHttpService::in_current(svc)))
+                .map(|ready| ready.map(|svc| InstrumentedHttpService::new(svc, span2)))
         })
     }
 }
@@ -100,6 +101,7 @@ where
     }
 
     fn call(&mut self, request: http::Request<B>) -> Self::Future {
+        let span2 = self.span.clone();
         let span = &mut self.span;
         let inner = &mut self.inner;
         span.enter(move || {
@@ -111,7 +113,7 @@ where
                 version = &field::debug(request.version()),
                 uri = &field::debug(request.uri()),
                 headers = &field::debug(request.headers())
-            ).enter(move || inner.call(request).in_current_span())
+            ).enter(move || inner.call(request).instrument(span2))
         })
     }
 }

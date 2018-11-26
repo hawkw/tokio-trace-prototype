@@ -379,7 +379,7 @@ impl Subscriber for TraceLogger {
     fn new_span(&self, new_span: &'static Meta<'static>) -> Id {
         let id = self.next_id();
         let mut in_progress = self.in_progress.lock().unwrap();
-        let mut fields = String::new();
+        let fields = String::new();
         if self.settings.parent_fields {
             unimplemented!()
             // let mut next_parent = new_span.parent();
@@ -503,7 +503,10 @@ impl Subscriber for TraceLogger {
         let mut in_progress = self.in_progress.lock().unwrap();
         if in_progress.spans.contains_key(&id) {
             if in_progress.spans.get(&id).unwrap().ref_count == 1 {
-                in_progress.spans.remove(&id).unwrap().finish();
+                let span = in_progress.spans.remove(&id).unwrap();
+                if self.settings.log_span_closes {
+                    span.finish();
+                }
             } else {
                 in_progress.spans.get_mut(&id).unwrap().ref_count -= 1;
             }
