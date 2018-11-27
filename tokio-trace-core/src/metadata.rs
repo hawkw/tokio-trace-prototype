@@ -1,6 +1,8 @@
-use super::{callsite, field, Level};
+use super::{callsite::Callsite, field, Level};
 use std::{
     borrow::Borrow,
+    fmt,
+    ptr,
 };
 
 /// Metadata describing a [`Span`] or [`Event`].
@@ -119,9 +121,7 @@ pub struct Meta<'a> {
     #[doc(hidden)]
     pub field_names: &'static [&'static str],
 
-    /// A reference to the callsite that produced this metadata.
-    ///
-    /// This is used for implementing meta equality.
+    /// The callsite from which this metadata originates.
     ///
     /// **Warning**: The fields on this type are currently `pub` because it must be able
     /// to be constructed statically by macros. However, when `const fn`s are
@@ -131,7 +131,7 @@ pub struct Meta<'a> {
     /// `Meta`s, use the `metadata!` macro or the `Meta::new_span` and
     /// `Meta::new_event` constructors instead!
     #[doc(hidden)]
-    pub callsite: &'static callsite::Callsite,
+    pub callsite: &'static Callsite,
 
     /// Whether this metadata describes a span or event.
     ///
@@ -145,6 +145,7 @@ pub struct Meta<'a> {
     #[doc(hidden)]
     pub kind: Kind,
 }
+
 
 /// Indicates whether a set of [metadata] describes a [`Span`] or an [`Event`].
 ///
@@ -160,6 +161,14 @@ enum KindInner {
     Event,
 }
 
+/// Uniquely identifies a set of [metadata].
+///
+/// Two `Identifier`s are equal if they both refer to the same metadata.
+///
+/// [metadata]: ::Meta
+#[derive(Clone)]
+pub struct Identifier(&'static Callsite);
+
 // ===== impl Meta =====
 
 impl<'a> Meta<'a> {
@@ -173,8 +182,9 @@ impl<'a> Meta<'a> {
         file: Option<&'a str>,
         line: Option<u32>,
         field_names: &'static [&'static str],
-        callsite: &'static callsite::Callsite,
+        callsite: &'static Callsite,
     ) -> Self {
+        let id = Identifier::from_callsite(callsite);
         Self {
             name,
             target,
@@ -197,8 +207,9 @@ impl<'a> Meta<'a> {
         file: Option<&'a str>,
         line: Option<u32>,
         field_names: &'static [&'static str],
-        callsite: &'static callsite::Callsite,
+        callsite: &'static Callsite,
     ) -> Self {
+        let id = Identifier::from_callsite(callsite);
         Self {
             name: None,
             target,
@@ -276,12 +287,10 @@ impl<'a> Meta<'a> {
     pub fn line(&self) -> Option<u32> {
         self.line
     }
-}
 
-impl<'a> PartialEq for Meta<'a> {
-    #[inline]
-    fn eq(&self, other: &Meta<'a>) -> bool {
-        ::std::ptr::eq(self.callsite, other.callsite)
+    /// Returns an opaque `Identifier` that uniquely identifies this `Metadata`.
+    pub fn id(&self) -> Identifier {
+        Identifier::from_callsite(self.callsite)
     }
 }
 
@@ -309,4 +318,28 @@ impl Kind {
 
     /// The `Kind` for `Event` metadata.
     pub const EVENT: Self = Kind(KindInner::Event);
+}
+
+// ===== impl Identifier =====
+
+impl Identifier {
+    /// Returns an `Identifier` unique to the provided `Callsite`.
+    // TODO: can this just be public API?
+    pub(crate) fn from_callsite(callsite: &'static Callsite) -> Self {
+        Identifier(callsite)
+    }
+}
+
+impl PartialEq for Identifier {
+    fn eq(&self, other: &Identifier) -> bool {
+        ptr::eq(self.0, other.0)
+    }
+}
+
+impl Eq for Identifier {}
+
+impl fmt::Debug for Identifier {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.pad("Identifier(...)")
+    }
 }
