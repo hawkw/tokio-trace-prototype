@@ -39,17 +39,21 @@ macro_rules! callsite {
         impl callsite::Callsite for MyCallsite {
             #[inline]
             fn interest(&self) -> Interest {
-                Interest::from_usize(INTEREST.load(Ordering::Relaxed))
-                    .unwrap_or(Interest::SOMETIMES)
+                match INTEREST.load(Ordering::Relaxed) {
+                    0 => Interest::NEVER,
+                    2 => Interest::ALWAYS,
+                    _ => Interest::SOMETIMES,
+                }
             }
             fn add_interest(&self, interest: Interest) {
-                let current_interest = INTEREST.load(Ordering::Relaxed);
-                match Interest::from_usize(current_interest) {
-                    Some(current) if interest > current =>
-                        INTEREST.store(interest.as_usize(), Ordering::Relaxed),
-                    None =>
-                        INTEREST.store(interest.as_usize(), Ordering::Relaxed),
-                    _ => {}
+                let current_interest = self.interest();
+                if interest > current_interest {
+                    let interest = match interest {
+                        Interest::NEVER => 0,
+                        Interest::ALWAYS => 2,
+                        _ => 1,
+                    };
+                    INTEREST.store(interest, Ordering::Relaxed);
                 }
             }
             fn remove_interest(&self) {
