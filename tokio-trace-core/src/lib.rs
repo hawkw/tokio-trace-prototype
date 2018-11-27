@@ -119,7 +119,7 @@ pub use self::{
 /// [`Span`]: ::span::Span
 /// [`Event`]: ::Event
 /// [`Subscriber`]: ::Subscriber
-#[derive(Clone, Debug, Eq, Hash)]
+#[derive(Clone)]
 pub struct Meta<'a> {
     // TODO: The fields on this type are currently `pub` because it must be able
     // to be constructed statically by macros. However, when `const fn`s are
@@ -152,7 +152,12 @@ pub struct Meta<'a> {
 
     /// The names of the key-value fields attached to the described span or
     /// event.
-    pub field_names: &'a [&'a str],
+    pub field_names: &'static [&'static str],
+
+    /// A reference to the callsite that produced this metadata.
+    ///
+    /// This is used for the metadata equality comparison.
+    pub callsite: &'static callsite::Callsite,
 
     /// Whether this metadata escribes a [`Span`] or an [`Event`].
     ///
@@ -187,7 +192,8 @@ impl<'a> Meta<'a> {
         module_path: Option<&'a str>,
         file: Option<&'a str>,
         line: Option<u32>,
-        field_names: &'a [&'a str],
+        field_names: &'static [&'static str],
+        callsite: &'static callsite::Callsite,
     ) -> Self {
         Self {
             name,
@@ -197,6 +203,7 @@ impl<'a> Meta<'a> {
             file,
             line,
             field_names,
+            callsite,
             kind: MetaKind::SPAN,
         }
     }
@@ -209,7 +216,8 @@ impl<'a> Meta<'a> {
         module_path: Option<&'a str>,
         file: Option<&'a str>,
         line: Option<u32>,
-        field_names: &'a [&'a str],
+        field_names: &'static [&'static str],
+        callsite: &'static callsite::Callsite,
     ) -> Self {
         Self {
             name: None,
@@ -219,6 +227,7 @@ impl<'a> Meta<'a> {
             file,
             line,
             field_names,
+            callsite,
             kind: MetaKind::EVENT,
         }
     }
@@ -260,7 +269,7 @@ impl<'a> Meta<'a> {
 impl<'a> PartialEq for Meta<'a> {
     #[inline]
     fn eq(&self, other: &Meta<'a>) -> bool {
-        ::std::ptr::eq(self, other)
+        ::std::ptr::eq(self.callsite, other.callsite)
     }
 }
 
