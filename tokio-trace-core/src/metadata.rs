@@ -297,6 +297,21 @@ impl<'a> Meta<'a> {
     }
 }
 
+impl<'a> fmt::Debug for Meta<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Meta")
+            .field("name", &self.name)
+            .field("target", &self.target)
+            .field("level", &self.level)
+            .field("module_path", &self.module_path)
+            .field("file", &self.file)
+            .field("line", &self.line)
+            .field("field_names", &self.field_names)
+            .finish()
+    }
+}
+
+
 // ===== impl Kind =====
 
 impl Kind {
