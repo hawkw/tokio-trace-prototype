@@ -120,7 +120,7 @@ pub struct Meta<'a> {
     /// `Meta`s, use the `metadata!` macro or the `Meta::new_span` and
     /// `Meta::new_event` constructors instead!
     #[doc(hidden)]
-    pub field_names: &'static [&'static str],
+    pub fields: field::Fields,
 
     /// The callsite from which this metadata originates.
     ///
@@ -185,7 +185,7 @@ impl<'a> Meta<'a> {
         module_path: Option<&'a str>,
         file: Option<&'a str>,
         line: Option<u32>,
-        field_names: &'static [&'static str],
+        fields: field::Fields,
         callsite: &'static Callsite,
     ) -> Self {
         let id = Identifier::from_callsite(callsite);
@@ -196,7 +196,7 @@ impl<'a> Meta<'a> {
             module_path,
             file,
             line,
-            field_names,
+            fields,
             callsite,
             kind: Kind::SPAN,
         }
@@ -210,10 +210,9 @@ impl<'a> Meta<'a> {
         module_path: Option<&'a str>,
         file: Option<&'a str>,
         line: Option<u32>,
-        field_names: &'static [&'static str],
+        fields: field::Fields,
         callsite: &'static Callsite,
     ) -> Self {
-        let id = Identifier::from_callsite(callsite);
         Self {
             name: None,
             target,
@@ -221,7 +220,7 @@ impl<'a> Meta<'a> {
             module_path,
             file,
             line,
-            field_names,
+            fields,
             callsite,
             kind: Kind::EVENT,
         }
@@ -237,27 +236,9 @@ impl<'a> Meta<'a> {
         self.kind.is_span()
     }
 
-    /// Returns an iterator over the fields defined by this set of metadata.
-    pub fn fields(&'a self) -> impl Iterator<Item = field::Key<'a>> {
-        (0..self.field_names.len()).map(move |i| field::Key::new(i, self))
-    }
-
-    /// Returns a [`Key`](::field::Key) to the field corresponding to `name`, if
-    /// one exists, or `None` if no such field exists.
-    pub fn key_for<Q>(&'a self, name: &Q) -> Option<field::Key<'a>>
-    where
-        Q: Borrow<str>,
-    {
-        let name = &name.borrow();
-        self.field_names
-            .iter()
-            .position(|f| f == name)
-            .map(|i| field::Key::new(i, self))
-    }
-
-    /// Returns `true` if `self` contains a field for the given `key`.
-    pub fn contains_key(&self, key: &field::Key<'a>) -> bool {
-        key.metadata() == self && key.as_usize() <= self.field_names.len()
+    /// Returns the set of fields on the described span or event.
+    pub fn fields(&self) -> &field::Fields {
+        &self.fields
     }
 
     /// Returns the level of verbosity of the described span or event.
@@ -307,7 +288,7 @@ impl<'a> fmt::Debug for Meta<'a> {
             .field("module_path", &self.module_path)
             .field("file", &self.file)
             .field("line", &self.line)
-            .field("field_names", &self.field_names)
+            .field("field_names", &self.fields)
             .finish()
     }
 }

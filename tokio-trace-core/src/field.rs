@@ -27,10 +27,12 @@
 //! their field names, rather than printing them.
 //
 use std::{
+    borrow::Borrow,
     fmt,
     hash::{Hash, Hasher},
+    ops::Range,
 };
-use metadata::{Meta, Identifier};
+use {metadata, callsite::Callsite};
 
 /// An opaque key allowing _O_(1) access to a field in a `Span` or `Event`'s
 /// key-value data.
@@ -41,24 +43,38 @@ use metadata::{Meta, Identifier};
 /// Thus, when a subscriber observes a new span or event, it need only access a
 /// field by name _once_, and use the key for that name for all other accesses.
 #[derive(Debug, Clone)]
-pub struct Key<'a> {
+pub struct Key {
     i: usize,
-    metadata: &'a Meta<'a>,
+    fields: Fields,
 }
 
-// ===== impl Field =====
+/// A set of field names.
+#[derive(Clone)]
+pub struct Fields {
+    #[doc(hidden)]
+    pub names: &'static [&'static str],
+    #[doc(hidden)]
+    pub callsite: &'static Callsite,
+}
 
-impl<'a> Key<'a> {
-    pub(crate) fn new(i: usize, metadata: &'a Meta<'a>) -> Self {
-        Self { i, metadata }
+/// An iterator over a set of fields.
+pub struct Iter {
+    idxs: Range<usize>,
+    fields: Fields,
+}
+
+// ===== impl Key =====
+
+impl Key {
+    pub(crate) fn new<'a>(i: usize, metadata: &'a metadata::Meta<'a>) -> Self {
+        Self {
+            i,
+            fields: metadata.fields().clone(),
+        }
     }
 
-    pub(crate) fn metadata(&self) -> &Meta<'a> {
-        self.metadata
-    }
-
-    pub(crate) fn id(&self) -> Identifier {
-        self.metadata.id()
+    pub(crate) fn id(&self) -> metadata::Identifier {
+        self.fields.id()
     }
 
     /// Return a `usize` representing the index into an array whose indices are
@@ -69,56 +85,100 @@ impl<'a> Key<'a> {
 
     /// Returns a string representing the name of the field, or `None` if the
     /// field does not exist.
-    pub fn name(&self) -> Option<&'a str> {
-        self.metadata.field_names.get(self.i).map(|&n| n)
-    }
-
-    /// If `self` indexes the given `metadata`, returns a new key into that
-    /// metadata. Otherwise, returns `None`.
-    ///
-    /// This is essentially just a trick to tell the compiler that the lifetine
-    /// parameters of two references to a metadata are equal if they are the
-    /// same metadata (which can't be inferred when dealing with metadata with
-    /// generic lifetimes).
-    #[inline]
-    pub fn with_metadata<'b>(&self, metadata: &'b Meta<'b>) -> Option<Key<'b>> {
-        if self.id() == metadata.id() {
-            Some(Key {
-                i: self.i,
-                metadata,
-            })
-        } else {
-            None
-        }
+    pub fn name(&self) -> Option<&'static str> {
+        self.fields.names.get(self.i).map(|&n| n)
     }
 }
 
-impl<'a> fmt::Display for Key<'a> {
+impl fmt::Display for Key {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.pad(self.name().unwrap_or("???"))
     }
 }
 
-impl<'a> AsRef<str> for Key<'a> {
+impl AsRef<str> for Key {
     fn as_ref(&self) -> &str {
         self.name().unwrap_or("???")
     }
 }
 
-impl<'a> PartialEq for Key<'a> {
+impl PartialEq for Key {
     fn eq(&self, other: &Self) -> bool {
         self.id() == other.id() && self.i == other.i
     }
 }
 
-impl<'a> Eq for Key<'a> {}
+impl Eq for Key {}
 
-impl<'a> Hash for Key<'a> {
+impl Hash for Key {
     fn hash<H>(&self, state: &mut H)
     where
         H: Hasher,
     {
         self.id().hash(state);
         self.i.hash(state);
+    }
+}
+
+// ===== impl Fields =====
+
+impl Fields {
+    #[inline]
+    pub(crate) fn id(&self) -> metadata::Identifier {
+        metadata::Identifier::from_callsite(self.callsite)
+    }
+
+
+    /// Returns a [`Key`](::field::Key) to the field corresponding to `name`, if
+    /// one exists, or `None` if no such field exists.
+    pub fn key_for<Q>(&self, name: &Q) -> Option<Key>
+    where
+        Q: Borrow<str>,
+    {
+        let name = &name.borrow();
+        self.names.iter()
+            .position(|f| f == name)
+            .map(|i| Key {
+                i, fields: self.clone(),
+            })
+    }
+
+    /// Returns `true` if `self` contains a field for the given `key`.
+    pub fn contains_key(&self, key: &Key) -> bool {
+        key.id() == self.id() && key.as_usize() <= self.names.len()
+    }
+}
+
+
+impl<'a> IntoIterator for &'a Fields {
+    type IntoIter = Iter;
+    type Item = Key;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let idxs = 0..self.names.len();
+        Iter {
+            idxs,
+            fields: self.clone(),
+        }
+    }
+}
+
+
+impl fmt::Debug for Fields {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_set().entries(self).finish()
+    }
+}
+
+// ===== impl Iter =====
+
+impl Iterator for Iter {
+    type Item = Key;
+    fn next(&mut self) -> Option<Key> {
+        let i = self.idxs.next()?;
+        Some(Key {
+            i,
+            fields: self.fields.clone(),
+        })
     }
 }
