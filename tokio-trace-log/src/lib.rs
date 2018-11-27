@@ -42,9 +42,13 @@ use tokio_trace::{
 pub fn format_trace(record: &log::Record) -> io::Result<()> {
     let meta = record.as_trace();
     let k = meta.key_for(&"message").unwrap();
-    drop(tokio_trace::Event::new(subscriber::Interest::SOMETIMES, &meta, |event| {
-        event.message(&k, record.args().clone());
-    }));
+    drop(tokio_trace::Event::new(
+        subscriber::Interest::SOMETIMES,
+        &meta,
+        |event| {
+            event.message(&k, record.args().clone());
+        },
+    ));
     Ok(())
 }
 
