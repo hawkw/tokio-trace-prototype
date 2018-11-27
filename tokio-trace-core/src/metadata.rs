@@ -1,4 +1,4 @@
-use super::{callsite::Callsite, field, Level};
+use super::{callsite::Callsite, field};
 use std::{
     borrow::Borrow,
     fmt,
@@ -146,6 +146,9 @@ pub struct Meta<'a> {
     pub kind: Kind,
 }
 
+/// Describes the level of verbosity of a `Span` or `Event`.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
+pub struct Level(LevelInner);
 
 /// Indicates whether a set of [metadata] describes a [`Span`] or an [`Event`].
 ///
@@ -318,6 +321,57 @@ impl Kind {
 
     /// The `Kind` for `Event` metadata.
     pub const EVENT: Self = Kind(KindInner::Event);
+}
+
+
+// ===== impl Level =====
+
+impl Level {
+    /// The "error" level.
+    ///
+    /// Designates very serious errors.
+    pub const ERROR: Level = Level(LevelInner::Error);
+    /// The "warn" level.
+    ///
+    /// Designates hazardous situations.
+    pub const WARN: Level = Level(LevelInner::Warn);
+    /// The "info" level.
+    ///
+    /// Designates useful information.
+    pub const INFO: Level = Level(LevelInner::Info);
+    /// The "debug" level.
+    ///
+    /// Designates lower priority information.
+    pub const DEBUG: Level = Level(LevelInner::Debug);
+    /// The "trace" level.
+    ///
+    /// Designates very low priority, often extremely verbose, information.
+    pub const TRACE: Level = Level(LevelInner::Trace);
+}
+
+#[repr(usize)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
+enum LevelInner {
+    /// The "error" level.
+    ///
+    /// Designates very serious errors.
+    Error = 1, // This way these line up with the discriminants for LevelFilter below
+    /// The "warn" level.
+    ///
+    /// Designates hazardous situations.
+    Warn,
+    /// The "info" level.
+    ///
+    /// Designates useful information.
+    Info,
+    /// The "debug" level.
+    ///
+    /// Designates lower priority information.
+    Debug,
+    /// The "trace" level.
+    ///
+    /// Designates very low priority, often extremely verbose, information.
+    Trace,
 }
 
 // ===== impl Identifier =====
