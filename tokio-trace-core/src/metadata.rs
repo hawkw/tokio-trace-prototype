@@ -2,6 +2,7 @@ use super::{callsite::Callsite, field};
 use std::{
     borrow::Borrow,
     fmt,
+    hash::{Hash, Hasher},
     ptr,
 };
 
@@ -410,5 +411,14 @@ impl Eq for Identifier {}
 impl fmt::Debug for Identifier {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.pad("Identifier(...)")
+    }
+}
+
+impl Hash for Identifier {
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: Hasher,
+    {
+        (self.0 as *const Callsite).hash(state)
     }
 }
