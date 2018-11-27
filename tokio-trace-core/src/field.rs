@@ -26,8 +26,11 @@
 //! about. For example, we might record integers by incrementing counters for
 //! their field names, rather than printing them.
 //
-use std::fmt;
-use Meta;
+use std::{
+    fmt,
+    hash::{Hash, Hasher},
+};
+use metadata::{Meta, Identifier};
 
 /// An opaque key allowing _O_(1) access to a field in a `Span` or `Event`'s
 /// key-value data.
@@ -37,7 +40,7 @@ use Meta;
 /// field across all instances of a given span or event with the same metadata.
 /// Thus, when a subscriber observes a new span or event, it need only access a
 /// field by name _once_, and use the key for that name for all other accesses.
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone)]
 pub struct Key<'a> {
     i: usize,
     metadata: &'a Meta<'a>,
@@ -52,6 +55,10 @@ impl<'a> Key<'a> {
 
     pub(crate) fn metadata(&self) -> &Meta<'a> {
         self.metadata
+    }
+
+    pub(crate) fn id(&self) -> Identifier {
+        self.metadata.id()
     }
 
     /// Return a `usize` representing the index into an array whose indices are
@@ -75,7 +82,7 @@ impl<'a> Key<'a> {
     /// generic lifetimes).
     #[inline]
     pub fn with_metadata<'b>(&self, metadata: &'b Meta<'b>) -> Option<Key<'b>> {
-        if self.metadata == metadata {
+        if self.id() == metadata.id() {
             Some(Key {
                 i: self.i,
                 metadata,
@@ -95,5 +102,23 @@ impl<'a> fmt::Display for Key<'a> {
 impl<'a> AsRef<str> for Key<'a> {
     fn as_ref(&self) -> &str {
         self.name().unwrap_or("???")
+    }
+}
+
+impl<'a> PartialEq for Key<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        self.id() == other.id() && self.i == other.i
+    }
+}
+
+impl<'a> Eq for Key<'a> {}
+
+impl<'a> Hash for Key<'a> {
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: Hasher,
+    {
+        self.id().hash(state);
+        self.i.hash(state);
     }
 }
