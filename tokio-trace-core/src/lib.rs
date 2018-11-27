@@ -121,11 +121,16 @@ pub use self::{
 /// [`Subscriber`]: ::Subscriber
 #[derive(Clone)]
 pub struct Meta<'a> {
-    // TODO: The fields on this type are currently `pub` because it must be able
-    // to be constructed statically by macros. However, when `const fn`s are
-    // available on stable Rust, this will no longer be necessary. Thus, these
-    // fields should be made private when `const fn` is stable.
     /// If this metadata describes a span, the name of the span.
+    ///
+    /// **Warning**: The fields on this type are currently `pub` because it must be able
+    /// to be constructed statically by macros. However, when `const fn`s are
+    /// available on stable Rust, this will no longer be necessary. Thus, these
+    /// fields are *not* considered stable public API, and they may change
+    /// warning. Do not rely on any fields on `Meta`. When constructing new
+    /// `Meta`s, use the `metadata!` macro or the `Meta::new_span` and
+    /// `Meta::new_event` constructors instead!
+    #[doc(hidden)]
     pub name: Option<&'a str>,
 
     /// The part of the system that the span or event that this metadata
@@ -133,36 +138,105 @@ pub struct Meta<'a> {
     ///
     /// Typically, this is the module path, but alternate targets may be set
     /// when spans or events are constructed.
+    ///
+    /// **Warning**: The fields on this type are currently `pub` because it must be able
+    /// to be constructed statically by macros. However, when `const fn`s are
+    /// available on stable Rust, this will no longer be necessary. Thus, these
+    /// fields are *not* considered stable public API, and they may change
+    /// warning. Do not rely on any fields on `Meta`. When constructing new
+    /// `Meta`s, use the `metadata!` macro or the `Meta::new_span` and
+    /// `Meta::new_event` constructors instead!
+    #[doc(hidden)]
     pub target: &'a str,
 
     /// The level of verbosity of the described span or event.
+    ///
+    /// **Warning**: The fields on this type are currently `pub` because it must be able
+    /// to be constructed statically by macros. However, when `const fn`s are
+    /// available on stable Rust, this will no longer be necessary. Thus, these
+    /// fields are *not* considered stable public API, and they may change
+    /// warning. Do not rely on any fields on `Meta`. When constructing new
+    /// `Meta`s, use the `metadata!` macro or the `Meta::new_span` and
+    /// `Meta::new_event` constructors instead!
+    #[doc(hidden)]
     pub level: Level,
 
     /// The name of the Rust module where the span or event occurred, or `None`
     /// if this could not be determined.
+    ///
+    /// **Warning**: The fields on this type are currently `pub` because it must be able
+    /// to be constructed statically by macros. However, when `const fn`s are
+    /// available on stable Rust, this will no longer be necessary. Thus, these
+    /// fields are *not* considered stable public API, and they may change
+    /// warning. Do not rely on any fields on `Meta`. When constructing new
+    /// `Meta`s, use the `metadata!` macro or the `Meta::new_span` and
+    /// `Meta::new_event` constructors instead!
+    #[doc(hidden)]
     pub module_path: Option<&'a str>,
 
     /// The name of the source code file where the span or event occurred, or
     /// `None` if this could not be determined.
+    ///
+    /// **Warning**: The fields on this type are currently `pub` because it must be able
+    /// to be constructed statically by macros. However, when `const fn`s are
+    /// available on stable Rust, this will no longer be necessary. Thus, these
+    /// fields are *not* considered stable public API, and they may change
+    /// warning. Do not rely on any fields on `Meta`. When constructing new
+    /// `Meta`s, use the `metadata!` macro or the `Meta::new_span` and
+    /// `Meta::new_event` constructors instead!
+    #[doc(hidden)]
     pub file: Option<&'a str>,
 
     /// The line number in the source code file where the span or event
     /// occurred, or `None` if this could not be determined.
+    ///
+    /// **Warning**: The fields on this type are currently `pub` because it must be able
+    /// to be constructed statically by macros. However, when `const fn`s are
+    /// available on stable Rust, this will no longer be necessary. Thus, these
+    /// fields are *not* considered stable public API, and they may change
+    /// warning. Do not rely on any fields on `Meta`. When constructing new
+    /// `Meta`s, use the `metadata!` macro or the `Meta::new_span` and
+    /// `Meta::new_event` constructors instead!
+    #[doc(hidden)]
     pub line: Option<u32>,
 
     /// The names of the key-value fields attached to the described span or
     /// event.
+    ///
+    /// **Warning**: The fields on this type are currently `pub` because it must be able
+    /// to be constructed statically by macros. However, when `const fn`s are
+    /// available on stable Rust, this will no longer be necessary. Thus, these
+    /// fields are *not* considered stable public API, and they may change
+    /// warning. Do not rely on any fields on `Meta`. When constructing new
+    /// `Meta`s, use the `metadata!` macro or the `Meta::new_span` and
+    /// `Meta::new_event` constructors instead!
+    #[doc(hidden)]
     pub field_names: &'static [&'static str],
 
     /// A reference to the callsite that produced this metadata.
     ///
-    /// This is used for the metadata equality comparison.
+    /// This is used for implementing meta equality.
+    ///
+    /// **Warning**: The fields on this type are currently `pub` because it must be able
+    /// to be constructed statically by macros. However, when `const fn`s are
+    /// available on stable Rust, this will no longer be necessary. Thus, these
+    /// fields are *not* considered stable public API, and they may change
+    /// warning. Do not rely on any fields on `Meta`. When constructing new
+    /// `Meta`s, use the `metadata!` macro or the `Meta::new_span` and
+    /// `Meta::new_event` constructors instead!
+    #[doc(hidden)]
     pub callsite: &'static callsite::Callsite,
 
-    /// Whether this metadata escribes a [`Span`] or an [`Event`].
+    /// Whether this metadata describes a span or event.
     ///
-    /// [`Span`]: ::span::Span
-    /// [`Event`]: ::Event
+    /// **Warning**: The fields on this type are currently `pub` because it must be able
+    /// to be constructed statically by macros. However, when `const fn`s are
+    /// available on stable Rust, this will no longer be necessary. Thus, these
+    /// fields are *not* considered stable public API, and they may change
+    /// warning. Do not rely on any fields on `Meta`. When constructing new
+    /// `Meta`s, use the `metadata!` macro or the `Meta::new_span` and
+    /// `Meta::new_event` constructors instead!
+    #[doc(hidden)]
     pub kind: MetaKind,
 }
 
@@ -263,6 +337,38 @@ impl<'a> Meta<'a> {
     /// Returns `true` if `self` contains a field for the given `key`.
     pub fn contains_key(&self, key: &field::Key<'a>) -> bool {
         key.metadata() == self && key.as_usize() <= self.field_names.len()
+    }
+
+    /// Returns the level of verbosity of the described span or event.
+    pub fn level(&self) -> Level {
+        self.level
+    }
+
+    /// Returns a string describing the part of the system where the
+    /// span or event that this metadata describes occurred.
+    ///
+    /// Typically, this is the module path, but alternate targets may be
+    /// set when spans or events are constructed.
+    pub fn target(&self) -> &'a str {
+        self.target
+    }
+
+    /// Returns the path to the Rust module where the span or event occurred, or `None`
+    /// if the module path is unknown.
+    pub fn module_path(&self) -> Option<&'a str> {
+        self.module_path
+    }
+
+    /// Returns the name of the source code file where the span or event occurred, or
+    /// `None` if the file is unknown
+    pub fn file(&self) -> Option<&'a str> {
+        self.file
+    }
+
+    /// Returns the line number in the source code file where the span or event
+    /// occurred, or `None` if the line number is unknown.
+    pub fn line(&self) -> Option<u32> {
+        self.line
     }
 }
 
