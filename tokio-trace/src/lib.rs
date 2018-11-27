@@ -36,7 +36,7 @@ macro_rules! callsite {
         static INTEREST: AtomicUsize = ATOMIC_USIZE_INIT;
         static REGISTRATION: Once = Once::new();
         struct MyCallsite;
-        impl callsite::Callsite for MyCallsite {
+        impl MyCallsite {
             #[inline]
             fn interest(&self) -> Interest {
                 match INTEREST.load(Ordering::Relaxed) {
@@ -45,6 +45,8 @@ macro_rules! callsite {
                     _ => Interest::SOMETIMES,
                 }
             }
+        }
+        impl callsite::Callsite for MyCallsite {
             fn add_interest(&self, interest: Interest) {
                 let current_interest = self.interest();
                 if interest > current_interest {
@@ -107,7 +109,7 @@ macro_rules! span {
             // Depending on how many fields are generated, this may or may
             // not actually be used, but it doesn't make sense to repeat it.
             #[allow(unused_variables, unused_mut)]
-            Span::new(callsite, |span| {
+            Span::new(callsite.interest(), callsite.metadata(), |span| {
                 let mut keys = callsite.metadata().fields();
                 $(
                     let key = keys.next()
@@ -140,7 +142,7 @@ macro_rules! event {
             // Depending on how many fields are generated, this may or may
             // not actually be used, but it doesn't make sense to repeat it.
             #[allow(unused_variables, unused_mut)]
-            Event::new(callsite, |event| {
+            Event::new(callsite.interest(), callsite.metadata(), |event| {
                 let mut keys = callsite.metadata().fields();
                 event.message(
                     &keys.next().expect("event metadata should define a key for the message"),
