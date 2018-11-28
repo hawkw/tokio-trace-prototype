@@ -32,7 +32,7 @@ use std::{
     hash::{Hash, Hasher},
     ops::Range,
 };
-use {callsite::Callsite, metadata};
+use {callsite::{self, Callsite}};
 
 /// An opaque key allowing _O_(1) access to a field in a `Span` or `Event`'s
 /// key-value data.
@@ -68,7 +68,8 @@ pub struct Iter {
 impl Key {
     /// Returns an [`Identifier`](::metadata::Identifier) that uniquely
     /// identifies the callsite that defines the field this key refers to.
-    pub fn id(&self) -> metadata::Identifier {
+    #[inline]
+    pub fn id(&self) -> callsite::Identifier {
         self.fields.id()
     }
 
@@ -118,9 +119,8 @@ impl Hash for Key {
 // ===== impl Fields =====
 
 impl Fields {
-    #[inline]
-    pub(crate) fn id(&self) -> metadata::Identifier {
-        metadata::Identifier::from_callsite(self.callsite)
+    pub(crate) fn id(&self) -> callsite::Identifier {
+        self.callsite.id()
     }
 
     /// Returns a [`Key`](::field::Key) to the field corresponding to `name`, if

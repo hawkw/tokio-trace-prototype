@@ -1,10 +1,6 @@
 //! Metadata describing trace data.
-use super::{callsite::Callsite, field};
-use std::{
-    fmt,
-    hash::{Hash, Hasher},
-    ptr,
-};
+use super::{callsite::{self, Callsite}, field};
+use std::fmt;
 
 /// Metadata describing a [`Span`] or [`Event`].
 ///
@@ -153,14 +149,6 @@ enum KindInner {
     Event,
 }
 
-/// Uniquely identifies a set of [metadata].
-///
-/// Two `Identifier`s are equal if they both refer to the same metadata.
-///
-/// [metadata]: ::Meta
-#[derive(Clone)]
-pub struct Identifier(&'static Callsite);
-
 // ===== impl Meta =====
 
 impl<'a> Meta<'a> {
@@ -267,7 +255,7 @@ impl<'a> Meta<'a> {
     /// Returns an opaque `Identifier` that uniquely identifies the callsite
     /// this `Metadata` originated from.
     #[inline]
-    pub fn id(&self) -> Identifier {
+    pub fn id(&self) -> callsite::Identifier {
         self.fields.id()
     }
 }
@@ -360,37 +348,4 @@ enum LevelInner {
     ///
     /// Designates very low priority, often extremely verbose, information.
     Trace,
-}
-
-// ===== impl Identifier =====
-
-impl Identifier {
-    /// Returns an `Identifier` unique to the provided `Callsite`.
-    // TODO: can this just be public API?
-    pub(crate) fn from_callsite(callsite: &'static Callsite) -> Self {
-        Identifier(callsite)
-    }
-}
-
-impl PartialEq for Identifier {
-    fn eq(&self, other: &Identifier) -> bool {
-        ptr::eq(self.0, other.0)
-    }
-}
-
-impl Eq for Identifier {}
-
-impl fmt::Debug for Identifier {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.pad("Identifier(...)")
-    }
-}
-
-impl Hash for Identifier {
-    fn hash<H>(&self, state: &mut H)
-    where
-        H: Hasher,
-    {
-        (self.0 as *const Callsite).hash(state)
-    }
 }
