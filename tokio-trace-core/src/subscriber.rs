@@ -611,12 +611,7 @@ mod test_support {
                 } = span_or_event
                 {
                     let name = span.name;
-                    println!(
-                        "clone_span: {}; id={:?}; refs={:?};",
-                        name,
-                        id,
-                        *refs
-                    );
+                    println!("clone_span: {}; id={:?}; refs={:?};", name, id, *refs);
                     *refs += 1;
                     name
                 } else {
@@ -649,12 +644,7 @@ mod test_support {
                         ref mut refs,
                     } => {
                         let name = span.name;
-                        println!(
-                            "drop_span: {}; id={:?}; refs={:?};",
-                            name,
-                            id,
-                            *refs
-                        );
+                        println!("drop_span: {}; id={:?}; refs={:?};", name, id, *refs);
                         *refs -= 1;
                         name
                     }

@@ -273,11 +273,9 @@ impl SpanLineBuilder {
         settings: &TraceLoggerBuilder,
     ) -> Self {
         let mut log_line = String::new();
-        write!(&mut log_line, "{}", meta.name)
-            .expect("write to string shouldn't fail");
+        write!(&mut log_line, "{}", meta.name).expect("write to string shouldn't fail");
         if settings.log_ids {
-            write!(&mut log_line, " span={:?}; ", id)
-                .expect("write to string shouldn't fail");
+            write!(&mut log_line, " span={:?}; ", id).expect("write to string shouldn't fail");
         }
         Self {
             parent,
