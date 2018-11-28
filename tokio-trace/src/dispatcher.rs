@@ -33,16 +33,25 @@ pub(crate) fn with_current<T, F>(f: F) -> T
 where
     F: FnOnce(&Dispatch) -> T,
 {
-    // If we try to access the current dispatcher while it's being
-    // dropped, `LocalKey::with` would panic, causing a double panic.
-    // However, we can't use `try_with` as we still need to invoke `f`,
-    // which would be captured by the closure.
-    if thread::panicking() {
-        // It's better to fail to collect instrumentation than cause a
-        // SIGSEGV.
-        return f(&Dispatch::none());
-    }
-    CURRENT_DISPATCH.with(|current| f(&*current.borrow()))
+    let mut f = Some(f);
+
+    CURRENT_DISPATCH.try_with(|current| {
+        // Since `f` is a `FnOnce`, we have to move it to call it. We know the
+        // `unwrap_or_else` only happens if the closure passed to `try_with`
+        // *isn't* executed, but the compiler doesn't know this, so the weird
+        // option dance is unfortunately necessary.
+        let f = match f.take() {
+            Some(f) => f,
+            _ => unreachable!(),
+        };
+        f(&*current.borrow())
+    }).unwrap_or_else(|_| {
+        let f = match f.take() {
+            Some(f) => f,
+            _ => unreachable!(),
+        };
+        f(&Dispatch::none())
+    })
 }
 
 #[cfg(test)]
