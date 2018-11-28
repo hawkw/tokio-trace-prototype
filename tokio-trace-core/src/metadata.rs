@@ -298,7 +298,6 @@ impl<'a> fmt::Debug for Meta<'a> {
     }
 }
 
-
 // ===== impl Kind =====
 
 impl Kind {
@@ -324,7 +323,6 @@ impl Kind {
     /// The `Kind` for `Event` metadata.
     pub const EVENT: Self = Kind(KindInner::Event);
 }
-
 
 // ===== impl Level =====
 

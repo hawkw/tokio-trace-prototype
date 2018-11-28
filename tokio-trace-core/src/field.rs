@@ -32,7 +32,7 @@ use std::{
     hash::{Hash, Hasher},
     ops::Range,
 };
-use {metadata, callsite::Callsite};
+use {callsite::Callsite, metadata};
 
 /// An opaque key allowing _O_(1) access to a field in a `Span` or `Event`'s
 /// key-value data.
@@ -123,7 +123,6 @@ impl Fields {
         metadata::Identifier::from_callsite(self.callsite)
     }
 
-
     /// Returns a [`Key`](::field::Key) to the field corresponding to `name`, if
     /// one exists, or `None` if no such field exists.
     pub fn key_for<Q>(&self, name: &Q) -> Option<Key>
@@ -131,11 +130,10 @@ impl Fields {
         Q: Borrow<str>,
     {
         let name = &name.borrow();
-        self.names.iter()
-            .position(|f| f == name)
-            .map(|i| Key {
-                i, fields: self.clone(),
-            })
+        self.names.iter().position(|f| f == name).map(|i| Key {
+            i,
+            fields: self.clone(),
+        })
     }
 
     /// Returns `true` if `self` contains a field for the given `key`.
@@ -153,7 +151,6 @@ impl Fields {
     }
 }
 
-
 impl<'a> IntoIterator for &'a Fields {
     type IntoIter = Iter;
     type Item = Key;
@@ -162,7 +159,6 @@ impl<'a> IntoIterator for &'a Fields {
         self.iter()
     }
 }
-
 
 impl fmt::Debug for Fields {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

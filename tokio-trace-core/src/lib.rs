@@ -89,9 +89,9 @@ pub use self::{
     callsite::Callsite,
     dispatcher::Dispatch,
     field::Key,
+    metadata::{Level, Meta},
     span::Id,
     subscriber::{Interest, Subscriber},
-    metadata::{Meta, Level},
 };
 
 mod sealed {

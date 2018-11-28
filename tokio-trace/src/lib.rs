@@ -246,7 +246,7 @@ pub use self::{
     subscriber::Subscriber,
     tokio_trace_core::{
         callsite::{self, Callsite},
-        Level, Meta, metadata,
+        metadata, Level, Meta,
     },
 };
 

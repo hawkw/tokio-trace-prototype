@@ -33,8 +33,8 @@ use std::{
     },
 };
 use tokio_trace::{
-    field,
     callsite::Callsite,
+    field,
     subscriber::{self, Subscriber},
     Id, Meta,
 };
