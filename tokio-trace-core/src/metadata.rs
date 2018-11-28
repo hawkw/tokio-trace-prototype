@@ -185,10 +185,9 @@ impl<'a> Meta<'a> {
         module_path: Option<&'a str>,
         file: Option<&'a str>,
         line: Option<u32>,
-        fields: field::Fields,
+        field_names: &'static [&'static str],
         callsite: &'static Callsite,
     ) -> Self {
-        let id = Identifier::from_callsite(callsite);
         Self {
             name,
             target,
@@ -196,7 +195,10 @@ impl<'a> Meta<'a> {
             module_path,
             file,
             line,
-            fields,
+            fields: field::Fields {
+                names: field_names,
+                callsite,
+            },
             callsite,
             kind: Kind::SPAN,
         }
@@ -204,13 +206,13 @@ impl<'a> Meta<'a> {
 
     /// Construct new metadata for an event, with a target, level, field names,
     /// and optional source code location.
-    pub fn new_id(
+    pub fn new_event(
         target: &'a str,
         level: Level,
         module_path: Option<&'a str>,
         file: Option<&'a str>,
         line: Option<u32>,
-        fields: field::Fields,
+        field_names: &'static [&'static str],
         callsite: &'static Callsite,
     ) -> Self {
         Self {
@@ -220,7 +222,10 @@ impl<'a> Meta<'a> {
             module_path,
             file,
             line,
-            fields,
+            fields: field::Fields {
+                names: field_names,
+                callsite,
+            },
             callsite,
             kind: Kind::EVENT,
         }
