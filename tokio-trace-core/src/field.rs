@@ -66,13 +66,8 @@ pub struct Iter {
 // ===== impl Key =====
 
 impl Key {
-    pub(crate) fn new<'a>(i: usize, metadata: &'a metadata::Meta<'a>) -> Self {
-        Self {
-            i,
-            fields: metadata.fields().clone(),
-        }
-    }
-
+    /// Returns an [`Identifier`](::metadata::Identifier) that uniquely
+    /// identifies the callsite that defines the field this key refers to.
     pub fn id(&self) -> metadata::Identifier {
         self.fields.id()
     }

@@ -1,6 +1,6 @@
+//! Metadata describing trace data.
 use super::{callsite::Callsite, field};
 use std::{
-    borrow::Borrow,
     fmt,
     hash::{Hash, Hasher},
     ptr,
