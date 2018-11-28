@@ -1,6 +1,6 @@
 pub use tokio_trace_core::dispatcher::*;
 
-use std::{cell::RefCell, thread};
+use std::cell::RefCell;
 
 thread_local! {
     static CURRENT_DISPATCH: RefCell<Dispatch> = RefCell::new(Dispatch::none());
@@ -27,30 +27,13 @@ pub fn with_default<T>(dispatcher: Dispatch, f: impl FnOnce() -> T) -> T {
     result
 }
 
-pub(crate) fn with_current<T, F>(f: F) -> T
+pub(crate) fn with_current<T, F>(mut f: F) -> T
 where
-    F: FnOnce(&Dispatch) -> T,
+    F: FnMut(&Dispatch) -> T,
 {
-    let mut f = Some(f);
-
     CURRENT_DISPATCH
-        .try_with(|current| {
-            // Since `f` is a `FnOnce`, we have to move it to call it. We know the
-            // `unwrap_or_else` only happens if the closure passed to `try_with`
-            // *isn't* executed, but the compiler doesn't know this, so the weird
-            // option dance is unfortunately necessary.
-            let f = match f.take() {
-                Some(f) => f,
-                _ => unreachable!(),
-            };
-            f(&*current.borrow())
-        }).unwrap_or_else(|_| {
-            let f = match f.take() {
-                Some(f) => f,
-                _ => unreachable!(),
-            };
-            f(&Dispatch::none())
-        })
+        .try_with(|current| f(&*current.borrow()))
+        .unwrap_or_else(|_| f(&Dispatch::none()))
 }
 
 #[cfg(test)]
