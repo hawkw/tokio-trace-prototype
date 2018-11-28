@@ -147,19 +147,24 @@ impl Fields {
     pub fn contains_key(&self, key: &Key) -> bool {
         key.id() == self.id() && key.as_usize() <= self.names.len()
     }
+
+    /// Returns an iterator over the `Key`s to this set of `Fields`.
+    pub fn iter(&self) -> Iter {
+        let idxs = 0..self.names.len();
+        Iter {
+            idxs,
+            fields: self.clone(),
+        }
+    }
 }
 
 
 impl<'a> IntoIterator for &'a Fields {
     type IntoIter = Iter;
     type Item = Key;
-
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        let idxs = 0..self.names.len();
-        Iter {
-            idxs,
-            fields: self.clone(),
-        }
+        self.iter()
     }
 }
 
