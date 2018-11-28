@@ -26,13 +26,13 @@
 //! about. For example, we might record integers by incrementing counters for
 //! their field names, rather than printing them.
 //
+use callsite::{self, Callsite};
 use std::{
     borrow::Borrow,
     fmt,
     hash::{Hash, Hasher},
     ops::Range,
 };
-use {callsite::{self, Callsite}};
 
 /// An opaque key allowing _O_(1) access to a field in a `Span` or `Event`'s
 /// key-value data.

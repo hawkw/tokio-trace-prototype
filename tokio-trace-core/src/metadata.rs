@@ -1,5 +1,8 @@
 //! Metadata describing trace data.
-use super::{callsite::{self, Callsite}, field};
+use super::{
+    callsite::{self, Callsite},
+    field,
+};
 use std::fmt;
 
 /// Metadata describing a [`Span`].
