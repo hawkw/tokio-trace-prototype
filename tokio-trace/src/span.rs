@@ -336,46 +336,8 @@ impl Span {
         Q: field::AsKey,
         V: field::Value,
     {
-        value.record(field, self);
-        self
-    }
-
-    /// Record a signed 64-bit integer value.
-    pub fn record_value_i64(&mut self, field: &field::Key, value: i64) -> &Self {
-        if let Some(ref inner) = self.inner {
-            inner.record_value_i64(field, value);
-        }
-        self
-    }
-
-    /// Record an umsigned 64-bit integer value.
-    pub fn record_value_u64(&self, field: &field::Key, value: u64) -> &Self {
-        if let Some(ref inner) = self.inner {
-            inner.record_value_u64(field, value);
-        }
-        self
-    }
-
-    /// Record a boolean value.
-    pub fn record_value_bool(&self, field: &field::Key, value: bool) -> &Self {
-        if let Some(ref inner) = self.inner {
-            inner.record_value_bool(field, value);
-        }
-        self
-    }
-
-    /// Record a string value.
-    pub fn record_value_str(&self, field: &field::Key, value: &str) -> &Self {
-        if let Some(ref inner) = self.inner {
-            inner.record_value_str(field, value);
-        }
-        self
-    }
-
-    /// Record a precompiled set of format arguments.
-    pub fn record_value_fmt(&self, field: &field::Key, value: fmt::Arguments) -> &Self {
-        if let Some(ref inner) = self.inner {
-            inner.record_value_fmt(field, value);
+        if let Some(ref mut inner) = self.inner {
+            value.record(field, inner);
         }
         self
     }
@@ -556,7 +518,9 @@ impl<'a> Event<'a> {
         Q: field::AsKey,
         V: field::Value,
     {
-        value.record(field, self);
+        if let Some(ref mut inner) = self.inner {
+            value.record(field, inner);
+        }
         self
     }
 
@@ -631,38 +595,28 @@ impl<'a> Inner<'a> {
     }
 
     /// Record a signed 64-bit integer value.
-    pub(crate) fn record_value_i64(&self, field: &field::Key, value: i64) {
-        if self.meta.fields().contains_key(field) {
-            self.subscriber.record_i64(&self.id, field, value)
-        }
+    fn record_value_i64(&self, field: &field::Key, value: i64) {
+        self.subscriber.record_i64(&self.id, field, value)
     }
 
-    /// Record an umsigned 64-bit integer value.
-    pub(crate) fn record_value_u64(&self, field: &field::Key, value: u64) {
-        if self.meta.fields().contains_key(field) {
-            self.subscriber.record_u64(&self.id, field, value)
-        }
+    /// Record an unsigned 64-bit integer value.
+    fn record_value_u64(&self, field: &field::Key, value: u64) {
+        self.subscriber.record_u64(&self.id, field, value)
     }
 
     /// Record a boolean value.
-    pub(crate) fn record_value_bool(&self, field: &field::Key, value: bool) {
-        if self.meta.fields().contains_key(field) {
-            self.subscriber.record_bool(&self.id, field, value)
-        }
+    fn record_value_bool(&self, field: &field::Key, value: bool) {
+        self.subscriber.record_bool(&self.id, field, value)
     }
 
     /// Record a string value.
-    pub(crate) fn record_value_str(&self, field: &field::Key, value: &str) {
-        if self.meta.fields().contains_key(field) {
-            self.subscriber.record_str(&self.id, field, value)
-        }
+    fn record_value_str(&self, field: &field::Key, value: &str) {
+        self.subscriber.record_str(&self.id, field, value)
     }
 
     /// Record a precompiled set of format arguments value.
-    pub(crate) fn record_value_fmt(&self, field: &field::Key, value: fmt::Arguments) {
-        if self.meta.fields().contains_key(field) {
-            self.subscriber.record_fmt(&self.id, field, value)
-        }
+    fn record_value_fmt(&self, field: &field::Key, value: fmt::Arguments) {
+        self.subscriber.record_fmt(&self.id, field, value)
     }
 
     fn new(id: Id, subscriber: &Dispatch, meta: &'a Meta<'a>) -> Self {
@@ -741,15 +695,13 @@ impl Entered {
     }
 }
 
-impl ::sealed::Sealed for Span {}
-
-impl field::Record for Span {
+impl<'a> field::Record for Inner<'a> {
     #[inline]
     fn record_i64<Q: ?Sized>(&mut self, field: &Q, value: i64)
     where
         Q: field::AsKey,
     {
-        if let Some(key) = self.metadata().and_then(|meta| field.as_key(meta)) {
+        if let Some(key) = field.as_key(self.metadata()) {
             self.record_value_i64(&key, value);
         }
     }
@@ -759,7 +711,7 @@ impl field::Record for Span {
     where
         Q: field::AsKey,
     {
-        if let Some(key) = self.metadata().and_then(|meta| field.as_key(meta)) {
+        if let Some(key) = field.as_key(self.metadata()) {
             self.record_value_u64(&key, value);
         }
     }
@@ -769,7 +721,7 @@ impl field::Record for Span {
     where
         Q: field::AsKey,
     {
-        if let Some(key) = self.metadata().and_then(|meta| field.as_key(meta)) {
+        if let Some(key) = field.as_key(self.metadata()) {
             self.record_value_bool(&key, value);
         }
     }
@@ -779,7 +731,7 @@ impl field::Record for Span {
     where
         Q: field::AsKey,
     {
-        if let Some(key) = self.metadata().and_then(|meta| field.as_key(meta)) {
+        if let Some(key) = field.as_key(self.metadata()) {
             self.record_value_str(&key, value);
         }
     }
@@ -789,59 +741,7 @@ impl field::Record for Span {
     where
         Q: field::AsKey,
     {
-        if let Some(key) = self.metadata().and_then(|meta| field.as_key(meta)) {
-            self.record_value_fmt(&key, value);
-        }
-    }
-}
-
-impl<'a> field::Record for Event<'a> {
-    #[inline]
-    fn record_i64<Q: ?Sized>(&mut self, field: &Q, value: i64)
-    where
-        Q: field::AsKey,
-    {
-        if let Some(key) = self.metadata().and_then(|meta| field.as_key(meta)) {
-            self.record_value_i64(&key, value);
-        }
-    }
-
-    #[inline]
-    fn record_u64<Q: ?Sized>(&mut self, field: &Q, value: u64)
-    where
-        Q: field::AsKey,
-    {
-        if let Some(key) = self.metadata().and_then(|meta| field.as_key(meta)) {
-            self.record_value_u64(&key, value);
-        }
-    }
-
-    #[inline]
-    fn record_bool<Q: ?Sized>(&mut self, field: &Q, value: bool)
-    where
-        Q: field::AsKey,
-    {
-        if let Some(key) = self.metadata().and_then(|meta| field.as_key(meta)) {
-            self.record_value_bool(&key, value);
-        }
-    }
-
-    #[inline]
-    fn record_str<Q: ?Sized>(&mut self, field: &Q, value: &str)
-    where
-        Q: field::AsKey,
-    {
-        if let Some(key) = self.metadata().and_then(|meta| field.as_key(meta)) {
-            self.record_value_str(&key, value);
-        }
-    }
-
-    #[inline]
-    fn record_fmt<Q: ?Sized>(&mut self, field: &Q, value: fmt::Arguments)
-    where
-        Q: field::AsKey,
-    {
-        if let Some(key) = self.metadata().and_then(|meta| field.as_key(meta)) {
+        if let Some(key) = field.as_key(self.metadata()) {
             self.record_value_fmt(&key, value);
         }
     }
