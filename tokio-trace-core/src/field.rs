@@ -73,7 +73,7 @@ impl Key {
         }
     }
 
-    pub(crate) fn id(&self) -> metadata::Identifier {
+    pub fn id(&self) -> metadata::Identifier {
         self.fields.id()
     }
 

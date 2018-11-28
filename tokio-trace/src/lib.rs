@@ -12,7 +12,7 @@ macro_rules! callsite {
             file: Some(file!()),
             line: Some(line!()),
             field_names: &[ $(stringify!($field_name)),* ],
-            kind: $crate::MetaKind::SPAN,
+            kind: $crate::metadata::Kind::SPAN,
         })
     });
     (event: $lvl:expr, $( $field_name:ident ),*) =>
@@ -26,7 +26,7 @@ macro_rules! callsite {
             file: Some(file!()),
             line: Some(line!()),
             field_names: &[ "message", $(stringify!($field_name)),* ],
-            kind: $crate::MetaKind::EVENT,
+            kind: $crate::metadata::Kind::EVENT,
         })
     });
     (@ $meta:expr ) => ({
@@ -232,7 +232,7 @@ pub use self::{
     subscriber::Subscriber,
     tokio_trace_core::{
         callsite::{self, Callsite},
-        Level, Meta, MetaKind,
+        Level, Meta, metadata,
     },
 };
 

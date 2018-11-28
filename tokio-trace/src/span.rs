@@ -310,13 +310,13 @@ impl Span {
 
     /// Returns a [`Key`](::field::Key) for the field with the given `name`, if
     /// one exists,
-    pub fn key_for<Q>(&self, name: &Q) -> Option<field::Key<'static>>
+    pub fn key_for<Q>(&self, name: &Q) -> Option<field::Key>
     where
         Q: Borrow<str>,
     {
         self.inner
             .as_ref()
-            .and_then(|inner| inner.meta.key_for(name))
+            .and_then(|inner| inner.meta.fields().key_for(name))
     }
     /// Record a signed 64-bit integer value.
     pub fn record_value_i64(&mut self, field: &field::Key, value: i64) -> &Self {
@@ -508,13 +508,13 @@ impl<'a> Event<'a> {
 
     /// Returns a [`Key`](::field::Key) for the field with the given `name`, if
     /// one exists,
-    pub fn key_for<Q>(&self, name: &Q) -> Option<field::Key<'a>>
+    pub fn key_for<Q>(&self, name: &Q) -> Option<field::Key>
     where
         Q: Borrow<str>,
     {
         self.inner
             .as_ref()
-            .and_then(|inner| inner.meta.key_for(name))
+            .and_then(|inner| inner.meta.fields().key_for(name))
     }
 
     /// Returns `true` if this span was disabled by the subscriber and does not
@@ -600,35 +600,35 @@ impl<'a> Inner<'a> {
 
     /// Record a signed 64-bit integer value.
     pub(crate) fn record_value_i64(&self, field: &field::Key, value: i64) {
-        if self.meta.contains_key(field) {
+        if self.meta.fields().contains_key(field) {
             self.subscriber.record_i64(&self.id, field, value)
         }
     }
 
     /// Record an umsigned 64-bit integer value.
     pub(crate) fn record_value_u64(&self, field: &field::Key, value: u64) {
-        if self.meta.contains_key(field) {
+        if self.meta.fields().contains_key(field) {
             self.subscriber.record_u64(&self.id, field, value)
         }
     }
 
     /// Record a boolean value.
     pub(crate) fn record_value_bool(&self, field: &field::Key, value: bool) {
-        if self.meta.contains_key(field) {
+        if self.meta.fields().contains_key(field) {
             self.subscriber.record_bool(&self.id, field, value)
         }
     }
 
     /// Record a string value.
     pub(crate) fn record_value_str(&self, field: &field::Key, value: &str) {
-        if self.meta.contains_key(field) {
+        if self.meta.fields().contains_key(field) {
             self.subscriber.record_str(&self.id, field, value)
         }
     }
 
     /// Record a precompiled set of format arguments value.
     pub(crate) fn record_value_fmt(&self, field: &field::Key, value: fmt::Arguments) {
-        if self.meta.contains_key(field) {
+        if self.meta.fields().contains_key(field) {
             self.subscriber.record_fmt(&self.id, field, value)
         }
     }
