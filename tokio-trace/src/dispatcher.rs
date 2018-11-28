@@ -17,15 +17,16 @@ thread_local! {
 /// [`Subscriber`]: ::Subscriber
 /// [`Event`]: ::Event
 pub fn with_default<T>(dispatcher: Dispatch, f: impl FnOnce() -> T) -> T {
-    if thread::panicking() {
-        return f();
+    let prior = CURRENT_DISPATCH.try_with(|current| {
+        current.replace(dispatcher)
+    });
+    let result = f();
+    if let Ok(prior) = prior {
+        let _ = CURRENT_DISPATCH.try_with(|current| {
+            *current.borrow_mut() = prior;
+        });
     }
-    CURRENT_DISPATCH.with(|current| {
-        let prior = current.replace(dispatcher);
-        let result = f();
-        *current.borrow_mut() = prior;
-        result
-    })
+    result
 }
 
 pub(crate) fn with_current<T, F>(f: F) -> T
