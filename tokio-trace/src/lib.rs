@@ -33,7 +33,6 @@ macro_rules! callsite {
         use std::sync::{Once, atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering}};
         use $crate::{callsite, Meta, subscriber::{Interest}, field::Fields};
         struct MyCallsite;
-        static FIELDS: &'static [&'static str] = $field_names;
         static META: Meta<'static> = $crate::Meta {
             name: $name,
             target: $target,
@@ -42,7 +41,7 @@ macro_rules! callsite {
             file: Some(file!()),
             line: Some(line!()),
             fields: Fields {
-                names: FIELDS,
+                names: $field_names,
                 callsite: &MyCallsite,
             },
             kind: $kind,
