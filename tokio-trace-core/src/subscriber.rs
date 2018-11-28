@@ -194,6 +194,14 @@ pub trait Subscriber {
     /// do nothing.
     fn record_fmt(&self, span: &Span, field: &field::Key, value: fmt::Arguments);
 
+    /// Indicates that a value was recorded for the field with the given name,
+    /// but the subscriber did not implement a `record` function for that type.
+    ///
+    /// By default, this does nothing. However, the subscriber may override it
+    /// to handle the unknown value in some way (e.g., by logging an error
+    /// message, etc.).
+    fn record_unknown(&self, span: &Id, field: &field::Key) {}
+
     /// Adds an indication that `span` follows from the span with the id
     /// `follows`.
     ///
