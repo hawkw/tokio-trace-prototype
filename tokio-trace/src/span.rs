@@ -406,6 +406,7 @@ impl fmt::Debug for Span {
 }
 
 // ===== impl Event =====
+
 impl<'a> Event<'a> {
     /// Constructs a new `Span` originating from the given [`Callsite`].
     ///
@@ -446,46 +447,6 @@ impl<'a> Event<'a> {
     pub fn message(&mut self, key: &field::Key, message: fmt::Arguments) -> &mut Self {
         if let Some(ref mut inner) = self.inner {
             inner.subscriber.record_fmt(&inner.id, key, message);
-        }
-        self
-    }
-
-    /// Record a signed 64-bit integer value.
-    pub fn record_value_i64(&mut self, field: &field::Key, value: i64) -> &Self {
-        if let Some(ref inner) = self.inner {
-            inner.record_value_i64(field, value);
-        }
-        self
-    }
-
-    /// Record an umsigned 64-bit integer value.
-    pub fn record_value_u64(&self, field: &field::Key, value: u64) -> &Self {
-        if let Some(ref inner) = self.inner {
-            inner.record_value_u64(field, value);
-        }
-        self
-    }
-
-    /// Record a boolean value.
-    pub fn record_value_bool(&self, field: &field::Key, value: bool) -> &Self {
-        if let Some(ref inner) = self.inner {
-            inner.record_value_bool(field, value);
-        }
-        self
-    }
-
-    /// Record a string value.
-    pub fn record_value_str(&self, field: &field::Key, value: &str) -> &Self {
-        if let Some(ref inner) = self.inner {
-            inner.record_value_str(field, value);
-        }
-        self
-    }
-
-    /// Record a precompiled set of format arguments.
-    pub fn record_value_fmt(&self, field: &field::Key, value: fmt::Arguments) -> &Self {
-        if let Some(ref inner) = self.inner {
-            inner.record_value_fmt(field, value);
         }
         self
     }
@@ -562,7 +523,7 @@ impl<'a> Event<'a> {
     }
 }
 
-// ===== impl Enter =====
+// ===== impl Inner =====
 
 impl<'a> Inner<'a> {
     /// Indicates that the span with the given ID has an indirect causal
@@ -629,27 +590,6 @@ impl<'a> Inner<'a> {
     }
 }
 
-impl Enter {
-    /// Indicates that this handle will not be reused to enter the span again.
-    ///
-    /// After calling `close`, the `Entered` guard returned by `self.enter()`
-    /// will _drop_ this handle when it is exited.
-    fn close(&mut self) {
-        self.closed = true;
-    }
-
-    /// Enters the span, returning a guard that may be used to exit the span and
-    /// re-enter the prior span.
-    ///
-    /// This is used internally to implement `Span::enter`. It may be used for
-    /// writing custom span handles, but should generally not be called directly
-    /// when entering a span.
-    fn enter(self) -> Entered {
-        self.subscriber.enter(&self.id);
-        Entered { inner: self }
-    }
-}
-
 impl<'a> cmp::PartialEq for Inner<'a> {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
@@ -675,22 +615,6 @@ impl<'a> Clone for Inner<'a> {
             subscriber: self.subscriber.clone(),
             closed: self.closed,
             meta: self.meta,
-        }
-    }
-}
-
-impl Entered {
-    /// Exit the `Entered` guard, returning an `Enter` handle that may be used
-    /// to re-enter the span, or `None` if the span closed while performing the
-    /// exit.
-    fn exit(self) -> Option<Enter> {
-        self.inner.subscriber.exit(&self.inner.id);
-        if self.inner.closed {
-            // Dropping `inner` will allow it to perform the closure if
-            // able.
-            None
-        } else {
-            Some(self.inner)
         }
     }
 }
@@ -743,6 +667,46 @@ impl<'a> field::Record for Inner<'a> {
     {
         if let Some(key) = field.as_key(self.metadata()) {
             self.record_value_fmt(&key, value);
+        }
+    }
+}
+
+// ===== impl Enter =====
+
+impl Enter {
+    /// Indicates that this handle will not be reused to enter the span again.
+    ///
+    /// After calling `close`, the `Entered` guard returned by `self.enter()`
+    /// will _drop_ this handle when it is exited.
+    fn close(&mut self) {
+        self.closed = true;
+    }
+
+    /// Enters the span, returning a guard that may be used to exit the span and
+    /// re-enter the prior span.
+    ///
+    /// This is used internally to implement `Span::enter`. It may be used for
+    /// writing custom span handles, but should generally not be called directly
+    /// when entering a span.
+    fn enter(self) -> Entered {
+        self.subscriber.enter(&self.id);
+        Entered { inner: self }
+    }
+}
+
+// ===== impl Entered =====
+impl Entered {
+    /// Exit the `Entered` guard, returning an `Enter` handle that may be used
+    /// to re-enter the span, or `None` if the span closed while performing the
+    /// exit.
+    fn exit(self) -> Option<Enter> {
+        self.inner.subscriber.exit(&self.inner.id);
+        if self.inner.closed {
+            // Dropping `inner` will allow it to perform the closure if
+            // able.
+            None
+        } else {
+            Some(self.inner)
         }
     }
 }
