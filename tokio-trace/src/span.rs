@@ -318,6 +318,28 @@ impl Span {
             .as_ref()
             .and_then(|inner| inner.meta.fields().key_for(name))
     }
+
+    /// Returns true if this `Span` has a field for the given
+    /// [`Key`](::field::Key) or field name.
+    pub fn has_field_for<Q: ?Sized>(&self, field: &Q) -> bool
+    where
+        Q: field::AsKey,
+    {
+        self.metadata()
+            .and_then(|meta| field.as_key(meta))
+            .is_some()
+    }
+
+    /// Records that the field described by `field` has the value `value`.
+    pub fn record<Q: ?Sized, V: ?Sized>(&mut self, field: &Q, value: &V) -> &mut Self
+    where
+        Q: field::AsKey,
+        V: field::Value,
+    {
+        value.record(field, self);
+        self
+    }
+
     /// Record a signed 64-bit integer value.
     pub fn record_value_i64(&mut self, field: &field::Key, value: i64) -> &Self {
         if let Some(ref inner) = self.inner {
@@ -517,6 +539,27 @@ impl<'a> Event<'a> {
             .and_then(|inner| inner.meta.fields().key_for(name))
     }
 
+    /// Returns true if this `Event` has a field for the given
+    /// [`Key`](::field::Key) or field name.
+    pub fn has_field<Q: ?Sized>(&self, field: &Q) -> bool
+    where
+        Q: field::AsKey,
+    {
+        self.metadata()
+            .and_then(|meta| field.as_key(meta))
+            .is_some()
+    }
+
+    /// Records that the field described by `field` has the value `value`.
+    pub fn record<Q: ?Sized, V: ?Sized>(&mut self, field: &Q, value: &V) -> &mut Self
+    where
+        Q: field::AsKey,
+        V: field::Value,
+    {
+        value.record(field, self);
+        self
+    }
+
     /// Returns `true` if this span was disabled by the subscriber and does not
     /// exist.
     pub fn is_disabled(&self) -> bool {
@@ -553,17 +596,6 @@ impl<'a> Event<'a> {
     pub fn metadata(&self) -> Option<&'a Meta<'a>> {
         self.inner.as_ref().map(|inner| inner.metadata())
     }
-}
-
-pub trait SpanExt: field::Record + ::sealed::Sealed {
-    fn record<Q: ?Sized, V: ?Sized>(&mut self, field: &Q, value: &V) -> &mut Self
-    where
-        Q: field::AsKey,
-        V: field::Value;
-
-    fn has_field_for<Q: ?Sized>(&self, field: &Q) -> bool
-    where
-        Q: field::AsKey;
 }
 
 // ===== impl Enter =====
@@ -711,26 +743,6 @@ impl Entered {
 
 impl ::sealed::Sealed for Span {}
 
-impl SpanExt for Span {
-    fn has_field_for<Q: ?Sized>(&self, field: &Q) -> bool
-    where
-        Q: field::AsKey,
-    {
-        self.metadata()
-            .and_then(|meta| field.as_key(meta))
-            .is_some()
-    }
-
-    fn record<Q: ?Sized, V: ?Sized>(&mut self, field: &Q, value: &V) -> &mut Self
-    where
-        Q: field::AsKey,
-        V: field::Value,
-    {
-        value.record(field, self);
-        self
-    }
-}
-
 impl field::Record for Span {
     #[inline]
     fn record_i64<Q: ?Sized>(&mut self, field: &Q, value: i64)
@@ -832,28 +844,6 @@ impl<'a> field::Record for Event<'a> {
         if let Some(key) = self.metadata().and_then(|meta| field.as_key(meta)) {
             self.record_value_fmt(&key, value);
         }
-    }
-}
-
-impl<'a> ::sealed::Sealed for Event<'a> {}
-
-impl<'a> SpanExt for Event<'a> {
-    fn has_field_for<Q: ?Sized>(&self, field: &Q) -> bool
-    where
-        Q: field::AsKey,
-    {
-        self.metadata()
-            .and_then(|meta| field.as_key(meta))
-            .is_some()
-    }
-
-    fn record<Q: ?Sized, V: ?Sized>(&mut self, field: &Q, value: &V) -> &mut Self
-    where
-        Q: field::AsKey,
-        V: field::Value,
-    {
-        value.record(field, self);
-        self
     }
 }
 
