@@ -56,7 +56,8 @@ pub struct Identifier(&'static Callsite);
 
 /// Register a new `Callsite` with the global registry.
 ///
-/// This should be called once per callsite after the callsite has been constructed.
+/// This should be called once per callsite after the callsite has been
+/// constructed.
 pub fn register(callsite: &'static Callsite) {
     let mut registry = REGISTRY.lock().unwrap();
     let meta = callsite.metadata();

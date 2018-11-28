@@ -48,11 +48,26 @@ pub struct Key {
     fields: Fields,
 }
 
-/// A set of field names.
+/// Describes the fields present on a span.
+// TODO: When `const fn` is stable, make this type's fields private.
 #[derive(Clone)]
 pub struct Fields {
+    /// The names of each field on the described span.
+    ///
+    /// **Warning**: The fields on this type are currently `pub` because it must be able
+    /// to be constructed statically by macros. However, when `const fn`s are
+    /// available on stable Rust, this will no longer be necessary. Thus, these
+    /// fields are *not* considered stable public API, and they may change
+    /// warning. Do not rely on any fields on `Fields`!
     #[doc(hidden)]
     pub names: &'static [&'static str],
+    /// The callsite where the described span originates.
+    ///
+    /// **Warning**: The fields on this type are currently `pub` because it must be able
+    /// to be constructed statically by macros. However, when `const fn`s are
+    /// available on stable Rust, this will no longer be necessary. Thus, these
+    /// fields are *not* considered stable public API, and they may change
+    /// warning. Do not rely on any fields on `Fields`!
     #[doc(hidden)]
     pub callsite: &'static Callsite,
 }
