@@ -45,7 +45,6 @@ macro_rules! callsite {
                 names: FIELDS,
                 callsite: &MyCallsite,
             },
-            callsite: &MyCallsite,
             kind: $kind,
         };
         static INTEREST: AtomicUsize = ATOMIC_USIZE_INIT;

@@ -94,7 +94,6 @@ impl<'a> AsTrace for log::Record<'a> {
                         names: &["message"],
                         callsite: &LogCallsite,
                     },
-                    callsite: &LogCallsite,
                     kind: tokio_trace::metadata::Kind::EVENT,
                 };
                 &EMPTY_META

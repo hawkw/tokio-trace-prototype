@@ -122,18 +122,6 @@ pub struct Meta<'a> {
     #[doc(hidden)]
     pub fields: field::Fields,
 
-    /// The callsite from which this metadata originates.
-    ///
-    /// **Warning**: The fields on this type are currently `pub` because it must be able
-    /// to be constructed statically by macros. However, when `const fn`s are
-    /// available on stable Rust, this will no longer be necessary. Thus, these
-    /// fields are *not* considered stable public API, and they may change
-    /// warning. Do not rely on any fields on `Meta`. When constructing new
-    /// `Meta`s, use the `metadata!` macro or the `Meta::new_span` and
-    /// `Meta::new_event` constructors instead!
-    #[doc(hidden)]
-    pub callsite: &'static Callsite,
-
     /// Whether this metadata describes a span or event.
     ///
     /// **Warning**: The fields on this type are currently `pub` because it must be able
@@ -199,7 +187,6 @@ impl<'a> Meta<'a> {
                 names: field_names,
                 callsite,
             },
-            callsite,
             kind: Kind::SPAN,
         }
     }
@@ -226,7 +213,6 @@ impl<'a> Meta<'a> {
                 names: field_names,
                 callsite,
             },
-            callsite,
             kind: Kind::EVENT,
         }
     }
@@ -278,9 +264,11 @@ impl<'a> Meta<'a> {
         self.line
     }
 
-    /// Returns an opaque `Identifier` that uniquely identifies this `Metadata`.
+    /// Returns an opaque `Identifier` that uniquely identifies the callsite
+    /// this `Metadata` originated from.
+    #[inline]
     pub fn id(&self) -> Identifier {
-        Identifier::from_callsite(self.callsite)
+        self.fields.id()
     }
 }
 
