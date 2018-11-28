@@ -17,9 +17,7 @@ thread_local! {
 /// [`Subscriber`]: ::Subscriber
 /// [`Event`]: ::Event
 pub fn with_default<T>(dispatcher: Dispatch, f: impl FnOnce() -> T) -> T {
-    let prior = CURRENT_DISPATCH.try_with(|current| {
-        current.replace(dispatcher)
-    });
+    let prior = CURRENT_DISPATCH.try_with(|current| current.replace(dispatcher));
     let result = f();
     if let Ok(prior) = prior {
         let _ = CURRENT_DISPATCH.try_with(|current| {
@@ -35,23 +33,24 @@ where
 {
     let mut f = Some(f);
 
-    CURRENT_DISPATCH.try_with(|current| {
-        // Since `f` is a `FnOnce`, we have to move it to call it. We know the
-        // `unwrap_or_else` only happens if the closure passed to `try_with`
-        // *isn't* executed, but the compiler doesn't know this, so the weird
-        // option dance is unfortunately necessary.
-        let f = match f.take() {
-            Some(f) => f,
-            _ => unreachable!(),
-        };
-        f(&*current.borrow())
-    }).unwrap_or_else(|_| {
-        let f = match f.take() {
-            Some(f) => f,
-            _ => unreachable!(),
-        };
-        f(&Dispatch::none())
-    })
+    CURRENT_DISPATCH
+        .try_with(|current| {
+            // Since `f` is a `FnOnce`, we have to move it to call it. We know the
+            // `unwrap_or_else` only happens if the closure passed to `try_with`
+            // *isn't* executed, but the compiler doesn't know this, so the weird
+            // option dance is unfortunately necessary.
+            let f = match f.take() {
+                Some(f) => f,
+                _ => unreachable!(),
+            };
+            f(&*current.borrow())
+        }).unwrap_or_else(|_| {
+            let f = match f.take() {
+                Some(f) => f,
+                _ => unreachable!(),
+            };
+            f(&Dispatch::none())
+        })
 }
 
 #[cfg(test)]
