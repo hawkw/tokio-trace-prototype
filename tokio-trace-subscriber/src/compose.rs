@@ -106,6 +106,10 @@ where
         unimplemented!()
     }
 
+    fn record_unknown(&self, span: &Id, field: &field::Key) {
+        unimplemented!()
+    }
+
     fn add_follows_from(&self, span: &Id, follows: Id) {
         self.registry.add_follows_from(span, follows)
     }

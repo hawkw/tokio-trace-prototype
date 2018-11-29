@@ -19,6 +19,7 @@
 //! `log` crate is desired, either the `log` crate should not be used to
 //! implement this logging, or an additional layer of filtering will be
 //! required to avoid infinitely converting between `Event` and `log::Record`.
+#[macro_use]
 extern crate log;
 extern crate tokio_trace;
 extern crate tokio_trace_subscriber;
@@ -420,6 +421,20 @@ impl Subscriber for TraceLogger {
                 eprintln!("error formatting event");
             }
         }
+    }
+
+    fn record_unknown(&self, span: &Id, field: &field::Key) {
+        if let Some(span) = self.in_progress.lock().unwrap().spans.get(span) {
+            warn!(
+                "span {:?} attempted to record an unknown value type for field '{}'",
+                span.meta.name(), field.name().unwrap_or("???")
+            );
+            return;
+        }
+        warn!(
+            "event {:?} attempted to record an unknown value type for field '{}'",
+            span, field.name().unwrap_or("???")
+        );
     }
 
     fn add_follows_from(&self, span: &Id, follows: Id) {

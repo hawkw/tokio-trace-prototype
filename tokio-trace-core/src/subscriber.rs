@@ -527,6 +527,14 @@ mod test_support {
             // TODO: it would be nice to be able to expect field values...
         }
 
+        fn record_unknown(&self, id: &Span, field: &field::Key) {
+            if let Some(span) = self.spans.lock().unwrap().get(id) {
+                panic!("Span \"{}\" recorded unknown value for field {:?}", span.name(), field.name());
+            } else {
+                panic!("{:?} recorded unknown value for field {:?}", id, field.name());
+            }
+        }
+
         fn add_follows_from(&self, _span: &Span, _follows: Span) {
             // TODO: it should be possible to expect spans to follow from other spans
         }

@@ -91,6 +91,11 @@ impl Subscriber for Dispatch {
     }
 
     #[inline]
+    fn record_unknown(&self, span: &Span, field: &field::Key) {
+        self.subscriber.record_unknown(span, field)
+    }
+
+    #[inline]
     fn add_follows_from(&self, span: &Span, follows: Span) {
         self.subscriber.add_follows_from(span, follows)
     }
@@ -128,6 +133,7 @@ impl Subscriber for NoSubscriber {
     }
 
     fn record_fmt(&self, _span: &Span, _key: &field::Key, _value: fmt::Arguments) {}
+    fn record_unknown(&self, _span: &Span, _key: &field::Key) {}
 
     fn add_follows_from(&self, _span: &Span, _follows: Span) {}
 
