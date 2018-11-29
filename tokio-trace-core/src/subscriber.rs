@@ -200,7 +200,7 @@ pub trait Subscriber {
     /// By default, this does nothing. However, the subscriber may override it
     /// to handle the unknown value in some way (e.g., by logging an error
     /// message, etc.).
-    fn record_unknown(&self, span: &Id, field: &field::Key);
+    fn record_unknown(&self, span: &Span, field: &field::Key);
 
     /// Adds an indication that `span` follows from the span with the id
     /// `follows`.
