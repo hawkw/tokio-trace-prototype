@@ -1,5 +1,5 @@
 //! Subscribers collect and record trace data.
-use {field, Span, Meta};
+use {field, Meta, Span};
 
 use std::fmt;
 
@@ -359,7 +359,7 @@ mod test_support {
 
     use super::*;
     use span::MockSpan;
-    use {field, Span, Meta};
+    use {field, Meta, Span};
 
     use std::{
         collections::{HashMap, VecDeque},

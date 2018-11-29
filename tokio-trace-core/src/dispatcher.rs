@@ -1,7 +1,7 @@
 use {
     callsite, field,
     subscriber::{self, Subscriber},
-    Span, Meta,
+    Meta, Span,
 };
 
 use std::{
