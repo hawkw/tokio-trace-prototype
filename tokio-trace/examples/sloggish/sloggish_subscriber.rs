@@ -195,7 +195,7 @@ impl Subscriber for SloggishSubscriber {
         }
     }
 
-    fn record_unknown(&self, _id: &tokio_trace::Id, _field: &tokio_trace::field::Key,) {
+    fn record_unknown(&self, _id: &tokio_trace::Id, _field: &tokio_trace::field::Key) {
         // When recording a field of a type we don't care about, do nothing.
     }
 

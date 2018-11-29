@@ -427,13 +427,15 @@ impl Subscriber for TraceLogger {
         if let Some(span) = self.in_progress.lock().unwrap().spans.get(span) {
             warn!(
                 "span {:?} attempted to record an unknown value type for field '{}'",
-                span.meta.name(), field.name().unwrap_or("???")
+                span.meta.name(),
+                field.name().unwrap_or("???")
             );
             return;
         }
         warn!(
             "event {:?} attempted to record an unknown value type for field '{}'",
-            span, field.name().unwrap_or("???")
+            span,
+            field.name().unwrap_or("???")
         );
     }
 

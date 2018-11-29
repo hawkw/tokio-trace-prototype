@@ -529,9 +529,17 @@ mod test_support {
 
         fn record_unknown(&self, id: &Span, field: &field::Key) {
             if let Some(span) = self.spans.lock().unwrap().get(id) {
-                panic!("Span \"{}\" recorded unknown value for field {:?}", span.name(), field.name());
+                panic!(
+                    "Span \"{}\" recorded unknown value for field {:?}",
+                    span.name(),
+                    field.name()
+                );
             } else {
-                panic!("{:?} recorded unknown value for field {:?}", id, field.name());
+                panic!(
+                    "{:?} recorded unknown value for field {:?}",
+                    id,
+                    field.name()
+                );
             }
         }
 
