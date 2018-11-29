@@ -148,7 +148,7 @@ pub struct Level(LevelInner);
 /// [metadata]: ::Meta
 /// [`Span`]: ::span::Span
 /// [`Event`]: ::Event
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct Kind(KindInner);
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
