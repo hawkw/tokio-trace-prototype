@@ -137,7 +137,7 @@ impl Clone for Key {
             fields: Fields {
                 names: self.fields.names,
                 callsite: self.fields.callsite,
-            }
+            },
         }
     }
 }
@@ -161,7 +161,7 @@ impl Fields {
             fields: Fields {
                 names: self.names,
                 callsite: self.callsite,
-            }
+            },
         })
     }
 
@@ -178,7 +178,7 @@ impl Fields {
             fields: Fields {
                 names: self.names,
                 callsite: self.callsite,
-            }
+            },
         }
     }
 }
@@ -209,7 +209,7 @@ impl Iterator for Iter {
             fields: Fields {
                 names: self.fields.names,
                 callsite: self.fields.callsite,
-            }
+            },
         })
     }
 }
