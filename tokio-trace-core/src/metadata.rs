@@ -31,7 +31,6 @@ use std::fmt;
 /// [`Meta::id()`]: ::metadata::Meta::id
 /// [callsite identifier]: ::callsite::Identifier
 // TODO: When `const fn` is stable, make this type's fields private.
-#[derive(Clone)]
 pub struct Meta<'a> {
     /// The name of the span described by this metadata.
     ///
