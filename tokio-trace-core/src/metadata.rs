@@ -7,7 +7,7 @@ use std::fmt;
 
 /// Metadata describing a [`Span`].
 ///
-/// This includes the source code location where the span or event occurred, the
+/// This includes the source code location where the span occurred, the
 /// names of its fields, et cetera.
 ///
 /// Metadata is used by [`Subscriber`]s when filtering spans and events, and it
@@ -16,9 +16,9 @@ use std::fmt;
 /// When created by the `event!` or `span!` macro, the metadata describing a
 /// particular event or span is constructed statically and exists as a single
 /// static instance. Thus, the overhead of creating the metadata is
-/// _significantly_ lower than that of creating the actual span or event.
+/// _significantly_ lower than that of creating the actual span.
 /// Therefore, filtering is based on metadata, rather than  on the constructed
-/// span or event.
+/// span.
 ///
 /// **Note**: Although instances of `Meta` cannot be compared directly, they
 /// provide a method [`Meta::id()`] which returns an an opaque [callsite
@@ -44,7 +44,7 @@ pub struct Meta<'a> {
     #[doc(hidden)]
     pub name: &'a str,
 
-    /// The part of the system that the span or event that this metadata
+    /// The part of the system that the span that this metadata
     /// describes occurred in.
     ///
     /// Typically, this is the module path, but alternate targets may be set
@@ -60,7 +60,7 @@ pub struct Meta<'a> {
     #[doc(hidden)]
     pub target: &'a str,
 
-    /// The level of verbosity of the described span or event.
+    /// The level of verbosity of the described span.
     ///
     /// **Warning**: The fields on this type are currently `pub` because it must
     /// be able to be constructed statically by macros. However, when `const
@@ -72,7 +72,7 @@ pub struct Meta<'a> {
     #[doc(hidden)]
     pub level: Level,
 
-    /// The name of the Rust module where the span or event occurred, or `None`
+    /// The name of the Rust module where the span occurred, or `None`
     /// if this could not be determined.
     ///
     /// **Warning**: The fields on this type are currently `pub` because it must
@@ -85,7 +85,7 @@ pub struct Meta<'a> {
     #[doc(hidden)]
     pub module_path: Option<&'a str>,
 
-    /// The name of the source code file where the span or event occurred, or
+    /// The name of the source code file where the span occurred, or
     /// `None` if this could not be determined.
     ///
     /// **Warning**: The fields on this type are currently `pub` because it must
@@ -98,7 +98,7 @@ pub struct Meta<'a> {
     #[doc(hidden)]
     pub file: Option<&'a str>,
 
-    /// The line number in the source code file where the span or event
+    /// The line number in the source code file where the span
     /// occurred, or `None` if this could not be determined.
     ///
     /// **Warning**: The fields on this type are currently `pub` because it must
@@ -127,15 +127,9 @@ pub struct Meta<'a> {
     pub fields: field::Fields,
 }
 
-/// Describes the level of verbosity of a `Span` or `Event`.
+/// Describes the level of verbosity of a `Span`.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Level(LevelInner);
-
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-enum KindInner {
-    Span,
-    Event,
-}
 
 // ===== impl Meta =====
 
@@ -166,12 +160,12 @@ impl<'a> Meta<'a> {
         }
     }
 
-    /// Returns the set of fields on the described span or event.
+    /// Returns the set of fields on the described span.
     pub fn fields(&self) -> &field::Fields {
         &self.fields
     }
 
-    /// Returns the level of verbosity of the described span or event.
+    /// Returns the level of verbosity of the described span.
     pub fn level(&self) -> &Level {
         &self.level
     }
@@ -190,19 +184,19 @@ impl<'a> Meta<'a> {
         self.target
     }
 
-    /// Returns the path to the Rust module where the span or event occurred, or
+    /// Returns the path to the Rust module where the span occurred, or
     /// `None` if the module path is unknown.
     pub fn module_path(&self) -> Option<&'a str> {
         self.module_path
     }
 
-    /// Returns the name of the source code file where the span or event
+    /// Returns the name of the source code file where the span
     /// occurred, or `None` if the file is unknown
     pub fn file(&self) -> Option<&'a str> {
         self.file
     }
 
-    /// Returns the line number in the source code file where the span or event
+    /// Returns the line number in the source code file where the span
     /// occurred, or `None` if the line number is unknown.
     pub fn line(&self) -> Option<u32> {
         self.line
