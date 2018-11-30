@@ -287,7 +287,12 @@ impl SpanLineBuilder {
     }
 
     fn record(&mut self, key: &field::Key, value: &fmt::Debug) -> fmt::Result {
-        write!(&mut self.fields, "{}={:?}; ", key.name().unwrap_or("???"), value)
+        write!(
+            &mut self.fields,
+            "{}={:?}; ",
+            key.name().unwrap_or("???"),
+            value
+        )
     }
 
     fn finish(self) {
@@ -342,7 +347,12 @@ impl EventLineBuilder {
         if key.name() == Some("message") {
             write!(&mut self.message, "{:?}", value)
         } else {
-            write!(&mut self.log_line, "{}={:?}; ", key.name().unwrap_or("???"), value)
+            write!(
+                &mut self.log_line,
+                "{}={:?}; ",
+                key.name().unwrap_or("???"),
+                value
+            )
         }
     }
 

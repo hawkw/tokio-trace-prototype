@@ -1,6 +1,6 @@
+use std::fmt;
 use tokio_trace::{field, subscriber::Subscriber, Id, Meta};
 use {filter::NoFilter, observe::NoObserver, Filter, Observe, RegisterSpan};
-use std::fmt;
 
 #[derive(Debug, Clone)]
 pub struct Composed<F, O, R> {
