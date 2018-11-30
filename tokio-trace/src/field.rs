@@ -162,7 +162,7 @@ impl AsKey for Key {
 impl<'a> AsKey for &'a Key {
     #[inline]
     fn as_key(&self, metadata: &Meta) -> Option<Key> {
-        if self.callsite() == metadata.callsite()  {
+        if self.callsite() == metadata.callsite() {
             Some((*self).clone())
         } else {
             None

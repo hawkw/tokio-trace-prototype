@@ -12,7 +12,7 @@ macro_rules! metadata {
         level: $level:expr,
         fields: $field:expr,
         callsite: $callsite:expr
-    ) => (
+    ) => {
         metadata! {
             name: $name,
             target: $target,
@@ -20,7 +20,7 @@ macro_rules! metadata {
             fields: $fields,
             callsite: $callsite,
         }
-    );
+    };
     (
         name: $name:expr,
         target: $target:expr,
@@ -38,9 +38,9 @@ macro_rules! metadata {
             fields: $crate::field::Fields {
                 names: $fields,
                 callsite: $crate::callsite::Identifier($callsite),
-            }
+            },
         }
-    }
+    };
 }
 
 pub mod callsite;
