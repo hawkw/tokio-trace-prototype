@@ -155,7 +155,7 @@ impl<'a> Meta<'a> {
             line,
             fields: field::Fields {
                 names: field_names,
-                callsite,
+                callsite: callsite::Identifier(callsite),
             },
         }
     }

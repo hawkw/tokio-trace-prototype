@@ -52,7 +52,7 @@ pub trait Callsite: Sync {
 ///
 /// Two `Identifier`s are equal if they both refer to the same callsite.
 #[derive(Clone)]
-pub struct Identifier(&'static Callsite);
+pub struct Identifier(pub &'static Callsite);
 
 /// Register a new `Callsite` with the global registry.
 ///

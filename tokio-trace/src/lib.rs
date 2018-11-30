@@ -72,6 +72,7 @@
 //! [`exit`]: subscriber/trait.Subscriber.html#tymethod.exit
 //! [`enabled`]: subscriber/trait.Subscriber.html#tymethod.enabled
 //! [metadata]: struct.Meta.html
+#[macro_use]
 extern crate tokio_trace_core;
 
 /// Constructs a new static callsite for a span or event.
@@ -102,19 +103,14 @@ macro_rules! callsite {
         fields: $field_names:expr
     ) => ({
         use std::sync::{Once, atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering}};
-        use $crate::{callsite, Meta, subscriber::{Interest}, field::Fields};
+        use $crate::{callsite, Meta, subscriber::{Interest}};
         struct MyCallsite;
-        static META: Meta<'static> = $crate::Meta {
+        static META: Meta<'static> = metadata! {
             name: $name,
             target: $target,
             level: $lvl,
-            module_path: Some(module_path!()),
-            file: Some(file!()),
-            line: Some(line!()),
-            fields: Fields {
-                names: $field_names,
-                callsite: &MyCallsite,
-            },
+            fields: $field_names,
+            callsite: &MyCallsite,
         };
         static INTEREST: AtomicUsize = ATOMIC_USIZE_INIT;
         static REGISTRATION: Once = Once::new();

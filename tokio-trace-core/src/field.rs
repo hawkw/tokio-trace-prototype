@@ -68,7 +68,7 @@ pub struct Fields {
     /// fields are *not* considered stable public API, and they may change
     /// warning. Do not rely on any fields on `Fields`!
     #[doc(hidden)]
-    pub callsite: &'static Callsite,
+    pub callsite: callsite::Identifier,
 }
 
 /// An iterator over a set of fields.
@@ -130,7 +130,7 @@ impl Clone for Key {
             i: self.i,
             fields: Fields {
                 names: self.fields.names,
-                callsite: self.fields.callsite,
+                callsite: self.fields.id(),
             },
         }
     }
@@ -140,7 +140,7 @@ impl Clone for Key {
 
 impl Fields {
     pub(crate) fn id(&self) -> callsite::Identifier {
-        self.callsite.id()
+        callsite::Identifier(self.callsite.0)
     }
 
     /// Returns a [`Key`](::field::Key) to the field corresponding to `name`, if
@@ -154,7 +154,7 @@ impl Fields {
             i,
             fields: Fields {
                 names: self.names,
-                callsite: self.callsite,
+                callsite: self.id(),
             },
         })
     }
@@ -171,7 +171,7 @@ impl Fields {
             idxs,
             fields: Fields {
                 names: self.names,
-                callsite: self.callsite,
+                callsite: self.id(),
             },
         }
     }
@@ -202,7 +202,7 @@ impl Iterator for Iter {
             i,
             fields: Fields {
                 names: self.fields.names,
-                callsite: self.fields.callsite,
+                callsite: self.fields.id(),
             },
         })
     }
