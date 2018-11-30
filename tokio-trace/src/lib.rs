@@ -8,7 +8,6 @@ macro_rules! callsite {
             name: $name,
             target: module_path!(),
             level: $crate::Level::TRACE,
-            kind: $crate::metadata::Kind::SPAN,
             fields: &[ $(stringify!($field_name)),* ]
         )
     });
@@ -19,7 +18,6 @@ macro_rules! callsite {
             name: concat!("event at ", file!(), ":", line!()),
             target: $target,
             level: $lvl,
-            kind: $crate::metadata::Kind::EVENT,
             fields: &[ "message", $(stringify!($field_name)),* ]
         )
     });
@@ -27,7 +25,6 @@ macro_rules! callsite {
         name: $name:expr,
         target: $target:expr,
         level: $lvl:expr,
-        kind: $kind:expr,
         fields: $field_names:expr
     ) => ({
         use std::sync::{Once, atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering}};
@@ -44,7 +41,6 @@ macro_rules! callsite {
                 names: $field_names,
                 callsite: &MyCallsite,
             },
-            kind: $kind,
         };
         static INTEREST: AtomicUsize = ATOMIC_USIZE_INIT;
         static REGISTRATION: Once = Once::new();

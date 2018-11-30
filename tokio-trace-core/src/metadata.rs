@@ -125,31 +125,11 @@ pub struct Meta<'a> {
     /// `Meta::new_event` constructors instead!
     #[doc(hidden)]
     pub fields: field::Fields,
-
-    /// Whether this metadata describes a span or event.
-    ///
-    /// **Warning**: The fields on this type are currently `pub` because it must
-    /// be able to be constructed statically by macros. However, when `const
-    /// fn`s are available on stable Rust, this will no longer be necessary.
-    /// Thus, these fields are *not* considered stable public API, and they may
-    /// change warning. Do not rely on any fields on `Meta`. When constructing
-    /// new `Meta`s, use the `metadata!` macro or the `Meta::new_span` and
-    /// `Meta::new_event` constructors instead!
-    #[doc(hidden)]
-    pub kind: Kind,
 }
 
 /// Describes the level of verbosity of a `Span` or `Event`.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Level(LevelInner);
-
-/// Indicates whether a set of [metadata] describes a [`Span`] or an [`Event`].
-///
-/// [metadata]: ::Meta
-/// [`Span`]: ::span::Span
-/// [`Event`]: ::Event
-#[derive(Clone, Debug)]
-pub struct Kind(KindInner);
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 enum KindInner {
@@ -162,7 +142,7 @@ enum KindInner {
 impl<'a> Meta<'a> {
     /// Construct new metadata for a span, with a name, target, level, field
     /// names, and optional source code location.
-    pub fn new_span(
+    pub fn new(
         name: &'a str,
         target: &'a str,
         level: Level,
@@ -183,45 +163,7 @@ impl<'a> Meta<'a> {
                 names: field_names,
                 callsite,
             },
-            kind: Kind::SPAN,
         }
-    }
-
-    /// Construct new metadata for an event, with a target, level, field names,
-    /// and optional source code location.
-    pub fn new_event(
-        name: &'a str,
-        target: &'a str,
-        level: Level,
-        module_path: Option<&'a str>,
-        file: Option<&'a str>,
-        line: Option<u32>,
-        field_names: &'static [&'static str],
-        callsite: &'static Callsite,
-    ) -> Self {
-        Self {
-            name,
-            target,
-            level,
-            module_path,
-            file,
-            line,
-            fields: field::Fields {
-                names: field_names,
-                callsite,
-            },
-            kind: Kind::EVENT,
-        }
-    }
-
-    /// Returns true if this metadata corresponds to an event.
-    pub fn is_event(&self) -> bool {
-        self.kind.is_event()
-    }
-
-    /// Returns true if this metadata corresponds to a span.
-    pub fn is_span(&self) -> bool {
-        self.kind.is_span()
     }
 
     /// Returns the set of fields on the described span or event.
@@ -286,32 +228,6 @@ impl<'a> fmt::Debug for Meta<'a> {
             .field("field_names", &self.fields)
             .finish()
     }
-}
-
-// ===== impl Kind =====
-
-impl Kind {
-    /// Returns `true` if this metadata corresponds to a `Span`.
-    pub fn is_span(&self) -> bool {
-        match self {
-            Kind(KindInner::Span) => true,
-            _ => false,
-        }
-    }
-
-    /// Returns `true` if this metadata corresponds to an `Event`.
-    pub fn is_event(&self) -> bool {
-        match self {
-            Kind(KindInner::Event) => true,
-            _ => false,
-        }
-    }
-
-    /// The `Kind` for `Span` metadata.
-    pub const SPAN: Self = Kind(KindInner::Span);
-
-    /// The `Kind` for `Event` metadata.
-    pub const EVENT: Self = Kind(KindInner::Event);
 }
 
 // ===== impl Level =====
