@@ -96,19 +96,12 @@ pub fn reset_registry() {
 
 impl Callsite + 'static {
     /// Returns an `Identifier` unique to this `Callsite`.
-    pub(crate) fn id(&'static self) -> Identifier {
-        Identifier::from_callsite(self)
+    pub fn id(&'static self) -> Identifier {
+        Identifier(self)
     }
 }
 
 // ===== impl Identifier =====
-
-impl Identifier {
-    /// Returns an `Identifier` unique to the provided `Callsite`.
-    pub(crate) fn from_callsite(callsite: &'static Callsite) -> Self {
-        Identifier(callsite)
-    }
-}
 
 impl PartialEq for Identifier {
     fn eq(&self, other: &Identifier) -> bool {
