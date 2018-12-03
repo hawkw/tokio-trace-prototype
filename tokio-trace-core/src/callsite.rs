@@ -105,14 +105,16 @@ pub fn reset_registry() {
 
 // ===== impl Callsite =====
 
+// TODO: when `const fn` is stable, we should add this and deprecate the
+// `identify_callsite!` macro.
+/*
 impl Callsite + 'static {
     /// Returns an `Identifier` unique to this `Callsite`.
-    ///
-    // TODO: when `const fn` is stable, this should be a `const fn`.
-    pub fn id(&'static self) -> Identifier {
+    pub const fn id(&'static self) -> Identifier {
         Identifier(self)
     }
 }
+*/
 
 // ===== impl Identifier =====
 
