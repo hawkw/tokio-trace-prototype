@@ -118,14 +118,17 @@ macro_rules! callsite {
         fields: $field_names:expr
     ) => ({
         use std::sync::{Once, atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering}};
-        use $crate::{*, subscriber::Interest};
+        use $crate::{callsite, Meta, subscriber::Interest};
         struct MyCallsite;
-        static META: Meta<'static> = metadata! {
-            name: $name,
-            target: $target,
-            level: $lvl,
-            fields: $field_names,
-            callsite: &MyCallsite,
+        static META: Meta<'static> = {
+            use $crate::*;
+            metadata! {
+                name: $name,
+                target: $target,
+                level: $lvl,
+                fields: $field_names,
+                callsite: &MyCallsite,
+            }
         };
         static INTEREST: AtomicUsize = ATOMIC_USIZE_INIT;
         static REGISTRATION: Once = Once::new();
@@ -205,7 +208,8 @@ macro_rules! span {
     ($name:expr, $($k:ident $( = $val:expr )* ) ,*) => {
         {
             #[allow(unused_imports)]
-            use $crate::{*, callsite::Callsite, field::{Value, AsKey}};
+            use $crate::{callsite, field::{Value, AsKey}, Span};
+            use $crate::callsite::Callsite;
             let callsite = callsite! { span: $name, $( $k ),* };
             // Depending on how many fields are generated, this may or may
             // not actually be used, but it doesn't make sense to repeat it.

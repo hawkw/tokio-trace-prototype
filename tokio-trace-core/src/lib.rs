@@ -49,7 +49,6 @@ macro_rules! metadata {
         callsite: $callsite:expr,
     ) => {
         {
-            use $crate::*;
             metadata::Meta {
                 name: $name,
                 target: $target,
