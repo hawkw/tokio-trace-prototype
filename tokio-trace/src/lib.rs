@@ -72,8 +72,23 @@
 //! [`exit`]: subscriber/trait.Subscriber.html#tymethod.exit
 //! [`enabled`]: subscriber/trait.Subscriber.html#tymethod.enabled
 //! [metadata]: struct.Meta.html
-#[macro_use]
 extern crate tokio_trace_core;
+
+// Somehow this `use` statement is necessary for us to re-export the `core`
+// macros on Rust 1.26.0. I'm not sure how this makes it work, but it does.
+#[allow(unused_imports)]
+use tokio_trace_core::*;
+
+pub use self::{
+    dispatcher::Dispatch,
+    field::Value,
+    span::{Event, Id, Span},
+    subscriber::Subscriber,
+    tokio_trace_core::{
+        callsite::{self, Callsite},
+        metadata, Level, Meta,
+    },
+};
 
 /// Constructs a new static callsite for a span or event.
 #[macro_export]
@@ -103,7 +118,7 @@ macro_rules! callsite {
         fields: $field_names:expr
     ) => ({
         use std::sync::{Once, atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering}};
-        use $crate::{callsite, Meta, subscriber::{Interest}};
+        use $crate::{*, subscriber::Interest};
         struct MyCallsite;
         static META: Meta<'static> = metadata! {
             name: $name,
@@ -190,7 +205,7 @@ macro_rules! span {
     ($name:expr, $($k:ident $( = $val:expr )* ) ,*) => {
         {
             #[allow(unused_imports)]
-            use $crate::{callsite, callsite::Callsite, Span, field::{Value, AsKey}};
+            use $crate::{*, callsite::Callsite, field::{Value, AsKey}};
             let callsite = callsite! { span: $name, $( $k ),* };
             // Depending on how many fields are generated, this may or may
             // not actually be used, but it doesn't make sense to repeat it.
@@ -310,17 +325,6 @@ pub mod dispatcher;
 pub mod field;
 pub mod span;
 pub mod subscriber;
-
-pub use self::{
-    dispatcher::Dispatch,
-    field::Value,
-    span::{Event, Id, Span},
-    subscriber::Subscriber,
-    tokio_trace_core::{
-        callsite::{self, Callsite},
-        metadata, Level, Meta,
-    },
-};
 
 mod sealed {
     pub trait Sealed {}
