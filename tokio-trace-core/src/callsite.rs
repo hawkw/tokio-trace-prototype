@@ -61,7 +61,8 @@ pub struct Identifier(
     /// constructing new `Identifier`s, use the `identify_callsite!` macro or
     /// the `Callsite::id` function instead.
     // TODO: When `Callsite::id` is a const fn, this need no longer be `pub`.
-    #[doc(hidden)] pub &'static Callsite
+    #[doc(hidden)]
+    pub &'static Callsite,
 );
 
 /// Register a new `Callsite` with the global registry.
