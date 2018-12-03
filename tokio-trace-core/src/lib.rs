@@ -14,7 +14,9 @@ extern crate lazy_static;
 /// [`Callsite::id`]: ::callsite::Callsite::id
 #[macro_export]
 macro_rules! identify_callsite {
-    ($callsite:expr) => ($crate::callsite::Identifier($callsite))
+    ($callsite:expr) => {
+        $crate::callsite::Identifier($callsite)
+    };
 }
 
 /// Statically constructs a set of span [metadata].
@@ -48,19 +50,17 @@ macro_rules! metadata {
         fields: $fields:expr,
         callsite: $callsite:expr,
     ) => {
-        {
-            metadata::Meta {
-                name: $name,
-                target: $target,
-                level: $level,
-                file: Some(file!()),
-                line: Some(line!()),
-                module_path: Some(module_path!()),
-                fields: field::Fields {
-                    names: $fields,
-                    callsite: identify_callsite!($callsite),
-                },
-            }
+        metadata::Meta {
+            name: $name,
+            target: $target,
+            level: $level,
+            file: Some(file!()),
+            line: Some(line!()),
+            module_path: Some(module_path!()),
+            fields: field::Fields {
+                names: $fields,
+                callsite: identify_callsite!($callsite),
+            },
         }
     };
 }
