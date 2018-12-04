@@ -143,8 +143,8 @@ impl FieldSet {
         callsite::Identifier(self.callsite.0)
     }
 
-    /// Returns a [`Field`](::field::Field) to the field corresponding to `name`, if
-    /// one exists, or `None` if no such field exists.
+    /// Returns the [`Field`](::field::Field) named `name`, or `None` if no such
+    /// field exists.
     pub fn key_for<Q>(&self, name: &Q) -> Option<Field>
     where
         Q: Borrow<str>,
@@ -159,12 +159,12 @@ impl FieldSet {
         })
     }
 
-    /// Returns `true` if `self` contains a field for the given `key`.
-    pub fn contains_key(&self, key: &Field) -> bool {
-        key.callsite() == self.callsite() && key.i <= self.names.len()
+    /// Returns `true` if `self` contains the given `field`.
+    pub fn contains_key(&self, field: &Field) -> bool {
+        field.callsite() == self.callsite() && field.i <= self.names.len()
     }
 
-    /// Returns an iterator over the `Field`s to this set of `FieldSet`.
+    /// Returns an iterator over the `Field`s in this `FieldSet`.
     pub fn iter(&self) -> Iter {
         let idxs = 0..self.names.len();
         Iter {
