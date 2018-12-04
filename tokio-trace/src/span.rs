@@ -311,9 +311,9 @@ impl Span {
         }
     }
 
-    /// Returns a [`Key`](::field::Key) for the field with the given `name`, if
+    /// Returns a [`Field`](::field::Field) for the field with the given `name`, if
     /// one exists,
-    pub fn key_for<Q>(&self, name: &Q) -> Option<field::Key>
+    pub fn key_for<Q>(&self, name: &Q) -> Option<field::Field>
     where
         Q: Borrow<str>,
     {
@@ -323,10 +323,10 @@ impl Span {
     }
 
     /// Returns true if this `Span` has a field for the given
-    /// [`Key`](::field::Key) or field name.
+    /// [`Field`](::field::Field) or field name.
     pub fn has_field_for<Q: ?Sized>(&self, field: &Q) -> bool
     where
-        Q: field::AsKey,
+        Q: field::AsField,
     {
         self.metadata()
             .and_then(|meta| field.as_key(meta))
@@ -336,7 +336,7 @@ impl Span {
     /// Records that the field described by `field` has the value `value`.
     pub fn record<Q: ?Sized, V: ?Sized>(&mut self, field: &Q, value: &V) -> &mut Self
     where
-        Q: field::AsKey,
+        Q: field::AsField,
         V: field::Value,
     {
         if let Some(ref mut inner) = self.inner {
@@ -449,16 +449,16 @@ impl<'a> Event<'a> {
     }
 
     /// Adds a formattable message describing the event that occurred.
-    pub fn message(&mut self, key: &field::Key, message: fmt::Arguments) -> &mut Self {
+    pub fn message(&mut self, key: &field::Field, message: fmt::Arguments) -> &mut Self {
         if let Some(ref mut inner) = self.inner {
             inner.subscriber.record_debug(&inner.id, key, &message);
         }
         self
     }
 
-    /// Returns a [`Key`](::field::Key) for the field with the given `name`, if
+    /// Returns a [`Field`](::field::Field) for the field with the given `name`, if
     /// one exists,
-    pub fn key_for<Q>(&self, name: &Q) -> Option<field::Key>
+    pub fn key_for<Q>(&self, name: &Q) -> Option<field::Field>
     where
         Q: Borrow<str>,
     {
@@ -468,10 +468,10 @@ impl<'a> Event<'a> {
     }
 
     /// Returns true if this `Event` has a field for the given
-    /// [`Key`](::field::Key) or field name.
+    /// [`Field`](::field::Field) or field name.
     pub fn has_field<Q: ?Sized>(&self, field: &Q) -> bool
     where
-        Q: field::AsKey,
+        Q: field::AsField,
     {
         self.metadata()
             .and_then(|meta| field.as_key(meta))
@@ -481,7 +481,7 @@ impl<'a> Event<'a> {
     /// Records that the field described by `field` has the value `value`.
     pub fn record<Q: ?Sized, V: ?Sized>(&mut self, field: &Q, value: &V) -> &mut Self
     where
-        Q: field::AsKey,
+        Q: field::AsField,
         V: field::Value,
     {
         if let Some(ref mut inner) = self.inner {
@@ -561,27 +561,27 @@ impl<'a> Inner<'a> {
     }
 
     /// Record a signed 64-bit integer value.
-    fn record_value_i64(&self, field: &field::Key, value: i64) {
+    fn record_value_i64(&self, field: &field::Field, value: i64) {
         self.subscriber.record_i64(&self.id, field, value)
     }
 
     /// Record an unsigned 64-bit integer value.
-    fn record_value_u64(&self, field: &field::Key, value: u64) {
+    fn record_value_u64(&self, field: &field::Field, value: u64) {
         self.subscriber.record_u64(&self.id, field, value)
     }
 
     /// Record a boolean value.
-    fn record_value_bool(&self, field: &field::Key, value: bool) {
+    fn record_value_bool(&self, field: &field::Field, value: bool) {
         self.subscriber.record_bool(&self.id, field, value)
     }
 
     /// Record a string value.
-    fn record_value_str(&self, field: &field::Key, value: &str) {
+    fn record_value_str(&self, field: &field::Field, value: &str) {
         self.subscriber.record_str(&self.id, field, value)
     }
 
     /// Record a value implementing `fmt::Debug`.
-    fn record_value_debug(&self, field: &field::Key, value: &fmt::Debug) {
+    fn record_value_debug(&self, field: &field::Field, value: &fmt::Debug) {
         self.subscriber.record_debug(&self.id, field, value)
     }
 
@@ -628,7 +628,7 @@ impl<'a> field::Record for Inner<'a> {
     #[inline]
     fn record_i64<Q: ?Sized>(&mut self, field: &Q, value: i64)
     where
-        Q: field::AsKey,
+        Q: field::AsField,
     {
         if let Some(key) = field.as_key(self.metadata()) {
             self.record_value_i64(&key, value);
@@ -638,7 +638,7 @@ impl<'a> field::Record for Inner<'a> {
     #[inline]
     fn record_u64<Q: ?Sized>(&mut self, field: &Q, value: u64)
     where
-        Q: field::AsKey,
+        Q: field::AsField,
     {
         if let Some(key) = field.as_key(self.metadata()) {
             self.record_value_u64(&key, value);
@@ -648,7 +648,7 @@ impl<'a> field::Record for Inner<'a> {
     #[inline]
     fn record_bool<Q: ?Sized>(&mut self, field: &Q, value: bool)
     where
-        Q: field::AsKey,
+        Q: field::AsField,
     {
         if let Some(key) = field.as_key(self.metadata()) {
             self.record_value_bool(&key, value);
@@ -658,7 +658,7 @@ impl<'a> field::Record for Inner<'a> {
     #[inline]
     fn record_str<Q: ?Sized>(&mut self, field: &Q, value: &str)
     where
-        Q: field::AsKey,
+        Q: field::AsField,
     {
         if let Some(key) = field.as_key(self.metadata()) {
             self.record_value_str(&key, value);
@@ -668,7 +668,7 @@ impl<'a> field::Record for Inner<'a> {
     #[inline]
     fn record_debug<Q: ?Sized>(&mut self, field: &Q, value: &fmt::Debug)
     where
-        Q: field::AsKey,
+        Q: field::AsField,
     {
         if let Some(key) = field.as_key(self.metadata()) {
             self.record_value_debug(&key, value);

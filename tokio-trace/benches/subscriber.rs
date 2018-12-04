@@ -17,7 +17,7 @@ impl tokio_trace::Subscriber for EnabledSubscriber {
         Id::from_u64(0)
     }
 
-    fn record_fmt(&self, span: &Id, field: &field::Key, value: ::std::fmt::Arguments) {
+    fn record_fmt(&self, span: &Id, field: &field::Field, value: ::std::fmt::Arguments) {
         let _ = (span, field, value);
     }
 
@@ -56,7 +56,7 @@ impl tokio_trace::Subscriber for Record {
         Id::from_u64(0)
     }
 
-    fn record_fmt(&self, _span: &Id, _field: &field::Key, value: ::std::fmt::Arguments) {
+    fn record_fmt(&self, _span: &Id, _field: &field::Field, value: ::std::fmt::Arguments) {
         let _ = ::std::fmt::format(value);
     }
 

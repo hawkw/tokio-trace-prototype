@@ -76,7 +76,7 @@ impl Span {
         }
     }
 
-    fn record(&mut self, key: &tokio_trace::field::Key, value: fmt::Arguments) {
+    fn record(&mut self, key: &tokio_trace::field::Field, value: fmt::Arguments) {
         // TODO: shouldn't have to alloc the key...
         let k = key.name().unwrap_or("???").to_owned();
         let v = fmt::format(value);
@@ -94,7 +94,7 @@ impl Event {
         }
     }
 
-    fn record(&mut self, key: &tokio_trace::field::Key, value: fmt::Arguments) {
+    fn record(&mut self, key: &tokio_trace::field::Field, value: fmt::Arguments) {
         if key.name() == Some("message") {
             self.message = fmt::format(value);
             return;
@@ -183,7 +183,7 @@ impl Subscriber for SloggishSubscriber {
     fn record_debug(
         &self,
         span: &tokio_trace::Id,
-        name: &tokio_trace::field::Key,
+        name: &tokio_trace::field::Field,
         value: &fmt::Debug,
     ) {
         if let Some(event) = self.events.lock().expect("mutex poisoned!").get_mut(span) {

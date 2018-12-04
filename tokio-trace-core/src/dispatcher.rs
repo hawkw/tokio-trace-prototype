@@ -66,27 +66,27 @@ impl Subscriber for Dispatch {
     }
 
     #[inline]
-    fn record_i64(&self, span: &Span, field: &field::Key, value: i64) {
+    fn record_i64(&self, span: &Span, field: &field::Field, value: i64) {
         self.subscriber.record_i64(span, field, value)
     }
 
     #[inline]
-    fn record_u64(&self, span: &Span, field: &field::Key, value: u64) {
+    fn record_u64(&self, span: &Span, field: &field::Field, value: u64) {
         self.subscriber.record_u64(span, field, value)
     }
 
     #[inline]
-    fn record_bool(&self, span: &Span, field: &field::Key, value: bool) {
+    fn record_bool(&self, span: &Span, field: &field::Field, value: bool) {
         self.subscriber.record_bool(span, field, value)
     }
 
     #[inline]
-    fn record_str(&self, span: &Span, field: &field::Key, value: &str) {
+    fn record_str(&self, span: &Span, field: &field::Field, value: &str) {
         self.subscriber.record_str(span, field, value)
     }
 
     #[inline]
-    fn record_debug(&self, span: &Span, field: &field::Key, value: &fmt::Debug) {
+    fn record_debug(&self, span: &Span, field: &field::Field, value: &fmt::Debug) {
         self.subscriber.record_debug(span, field, value)
     }
 
@@ -127,7 +127,7 @@ impl Subscriber for NoSubscriber {
         Span::from_u64(0)
     }
 
-    fn record_debug(&self, _span: &Span, _field: &field::Key, _value: &fmt::Debug) {}
+    fn record_debug(&self, _span: &Span, _field: &field::Field, _value: &fmt::Debug) {}
 
     fn add_follows_from(&self, _span: &Span, _follows: Span) {}
 

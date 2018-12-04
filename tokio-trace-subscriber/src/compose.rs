@@ -103,7 +103,7 @@ where
         self.registry.new_id(meta)
     }
 
-    fn record_debug(&self, _span: &Id, _name: &field::Key, _value: &fmt::Debug) {
+    fn record_debug(&self, _span: &Id, _name: &field::Field, _value: &fmt::Debug) {
         unimplemented!()
     }
 

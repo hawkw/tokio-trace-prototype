@@ -285,7 +285,7 @@ impl SpanLineBuilder {
         }
     }
 
-    fn record(&mut self, key: &field::Key, value: &fmt::Debug) -> fmt::Result {
+    fn record(&mut self, key: &field::Field, value: &fmt::Debug) -> fmt::Result {
         write!(
             &mut self.fields,
             "{}={:?}; ",
@@ -342,7 +342,7 @@ impl EventLineBuilder {
         }
     }
 
-    fn record(&mut self, key: &field::Key, value: &fmt::Debug) -> fmt::Result {
+    fn record(&mut self, key: &field::Field, value: &fmt::Debug) -> fmt::Result {
         if key.name() == Some("message") {
             write!(&mut self.message, "{:?}", value)
         } else {
@@ -412,7 +412,7 @@ impl Subscriber for TraceLogger {
         id
     }
 
-    fn record_debug(&self, span: &Id, key: &field::Key, value: &fmt::Debug) {
+    fn record_debug(&self, span: &Id, key: &field::Field, value: &fmt::Debug) {
         let mut in_progress = self.in_progress.lock().unwrap();
         if let Some(span) = in_progress.spans.get_mut(span) {
             if let Err(_e) = span.record(key, value) {

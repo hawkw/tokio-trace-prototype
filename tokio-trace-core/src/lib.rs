@@ -75,7 +75,7 @@ pub mod subscriber;
 pub use self::{
     callsite::Callsite,
     dispatcher::Dispatch,
-    field::Key,
+    field::Field,
     metadata::{Level, Meta},
     span::Span,
     subscriber::{Interest, Subscriber},

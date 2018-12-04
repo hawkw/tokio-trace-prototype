@@ -43,7 +43,7 @@ use std::{
 /// subscriber observes a new span, it need only access a field by name _once_,
 /// and use the key for that name for all other accesses.
 #[derive(Debug)]
-pub struct Key {
+pub struct Field {
     i: usize,
     fields: Fields,
 }
@@ -77,9 +77,9 @@ pub struct Iter {
     fields: Fields,
 }
 
-// ===== impl Key =====
+// ===== impl Field =====
 
-impl Key {
+impl Field {
     /// Returns an [`Identifier`](::metadata::Identifier) that uniquely
     /// identifies the callsite that defines the field this key refers to.
     #[inline]
@@ -94,27 +94,27 @@ impl Key {
     }
 }
 
-impl fmt::Display for Key {
+impl fmt::Display for Field {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.pad(self.name().unwrap_or("???"))
     }
 }
 
-impl AsRef<str> for Key {
+impl AsRef<str> for Field {
     fn as_ref(&self) -> &str {
         self.name().unwrap_or("???")
     }
 }
 
-impl PartialEq for Key {
+impl PartialEq for Field {
     fn eq(&self, other: &Self) -> bool {
         self.callsite() == other.callsite() && self.i == other.i
     }
 }
 
-impl Eq for Key {}
+impl Eq for Field {}
 
-impl Hash for Key {
+impl Hash for Field {
     fn hash<H>(&self, state: &mut H)
     where
         H: Hasher,
@@ -124,9 +124,9 @@ impl Hash for Key {
     }
 }
 
-impl Clone for Key {
+impl Clone for Field {
     fn clone(&self) -> Self {
-        Key {
+        Field {
             i: self.i,
             fields: Fields {
                 names: self.fields.names,
@@ -143,14 +143,14 @@ impl Fields {
         callsite::Identifier(self.callsite.0)
     }
 
-    /// Returns a [`Key`](::field::Key) to the field corresponding to `name`, if
+    /// Returns a [`Field`](::field::Field) to the field corresponding to `name`, if
     /// one exists, or `None` if no such field exists.
-    pub fn key_for<Q>(&self, name: &Q) -> Option<Key>
+    pub fn key_for<Q>(&self, name: &Q) -> Option<Field>
     where
         Q: Borrow<str>,
     {
         let name = &name.borrow();
-        self.names.iter().position(|f| f == name).map(|i| Key {
+        self.names.iter().position(|f| f == name).map(|i| Field {
             i,
             fields: Fields {
                 names: self.names,
@@ -160,11 +160,11 @@ impl Fields {
     }
 
     /// Returns `true` if `self` contains a field for the given `key`.
-    pub fn contains_key(&self, key: &Key) -> bool {
+    pub fn contains_key(&self, key: &Field) -> bool {
         key.callsite() == self.callsite() && key.i <= self.names.len()
     }
 
-    /// Returns an iterator over the `Key`s to this set of `Fields`.
+    /// Returns an iterator over the `Field`s to this set of `Fields`.
     pub fn iter(&self) -> Iter {
         let idxs = 0..self.names.len();
         Iter {
@@ -179,7 +179,7 @@ impl Fields {
 
 impl<'a> IntoIterator for &'a Fields {
     type IntoIter = Iter;
-    type Item = Key;
+    type Item = Field;
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
@@ -195,10 +195,10 @@ impl fmt::Debug for Fields {
 // ===== impl Iter =====
 
 impl Iterator for Iter {
-    type Item = Key;
-    fn next(&mut self) -> Option<Key> {
+    type Item = Field;
+    fn next(&mut self) -> Option<Field> {
         let i = self.idxs.next()?;
-        Some(Key {
+        Some(Field {
             i,
             fields: Fields {
                 names: self.fields.names,

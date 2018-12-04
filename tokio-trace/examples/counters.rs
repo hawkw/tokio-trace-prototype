@@ -51,7 +51,7 @@ impl Subscriber for CounterSubscriber {
         // unimplemented
     }
 
-    fn record_i64(&self, _id: &Id, field: &field::Key, value: i64) {
+    fn record_i64(&self, _id: &Id, field: &field::Field, value: i64) {
         let registry = self.counters.0.read().unwrap();
         if let Some(counter) = field.name().and_then(|name| registry.get(name)) {
             if value > 0 {
@@ -62,14 +62,14 @@ impl Subscriber for CounterSubscriber {
         };
     }
 
-    fn record_u64(&self, _id: &Id, field: &field::Key, value: u64) {
+    fn record_u64(&self, _id: &Id, field: &field::Field, value: u64) {
         let registry = self.counters.0.read().unwrap();
         if let Some(counter) = field.name().and_then(|name| registry.get(name)) {
             counter.fetch_add(value as usize, Ordering::Release);
         };
     }
 
-    fn record_debug(&self, _id: &Id, _field: &field::Key, _value: &::std::fmt::Debug) {}
+    fn record_debug(&self, _id: &Id, _field: &field::Field, _value: &::std::fmt::Debug) {}
 
     fn enabled(&self, metadata: &Meta) -> bool {
         metadata

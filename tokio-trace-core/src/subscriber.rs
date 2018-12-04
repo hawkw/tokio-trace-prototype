@@ -147,7 +147,7 @@ pub trait Subscriber {
     /// If recording the field is invalid (i.e. the span ID doesn't exist, the
     /// field has already been recorded, and so on), the subscriber may silently
     /// do nothing.
-    fn record_i64(&self, span: &Span, field: &field::Key, value: i64) {
+    fn record_i64(&self, span: &Span, field: &field::Field, value: i64) {
         self.record_debug(span, field, &value)
     }
 
@@ -160,7 +160,7 @@ pub trait Subscriber {
     /// If recording the field is invalid (i.e. the span ID doesn't exist, the
     /// field has already been recorded, and so on), the subscriber may silently
     /// do nothing.
-    fn record_u64(&self, span: &Span, field: &field::Key, value: u64) {
+    fn record_u64(&self, span: &Span, field: &field::Field, value: u64) {
         self.record_debug(span, field, &value)
     }
 
@@ -173,7 +173,7 @@ pub trait Subscriber {
     /// If recording the field is invalid (i.e. the span ID doesn't exist, the
     /// field has already been recorded, and so on), the subscriber may silently
     /// do nothing.
-    fn record_bool(&self, span: &Span, field: &field::Key, value: bool) {
+    fn record_bool(&self, span: &Span, field: &field::Field, value: bool) {
         self.record_debug(span, field, &value)
     }
 
@@ -186,7 +186,7 @@ pub trait Subscriber {
     /// If recording the field is invalid (i.e. the span ID doesn't exist, the
     /// field has already been recorded, and so on), the subscriber may silently
     /// do nothing.
-    fn record_str(&self, span: &Span, field: &field::Key, value: &str) {
+    fn record_str(&self, span: &Span, field: &field::Field, value: &str) {
         self.record_debug(span, field, &value)
     }
 
@@ -195,7 +195,7 @@ pub trait Subscriber {
     /// If recording the field is invalid (i.e. the span ID doesn't exist, the
     /// field has already been recorded, and so on), the subscriber may silently
     /// do nothing.
-    fn record_debug(&self, span: &Span, field: &field::Key, value: &fmt::Debug);
+    fn record_debug(&self, span: &Span, field: &field::Field, value: &fmt::Debug);
 
     /// Adds an indication that `span` follows from the span with the id
     /// `follows`.
@@ -511,7 +511,7 @@ mod test_support {
             (self.filter)(meta)
         }
 
-        fn record_debug(&self, span: &Span, field: &field::Key, value: &fmt::Debug) {
+        fn record_debug(&self, span: &Span, field: &field::Field, value: &fmt::Debug) {
             // TODO: it would be nice to be able to expect field values...
         }
 
