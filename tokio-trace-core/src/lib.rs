@@ -57,7 +57,7 @@ macro_rules! metadata {
             file: Some(file!()),
             line: Some(line!()),
             module_path: Some(module_path!()),
-            fields: field::Fields {
+            fields: field::FieldSet {
                 names: $fields,
                 callsite: identify_callsite!($callsite),
             },

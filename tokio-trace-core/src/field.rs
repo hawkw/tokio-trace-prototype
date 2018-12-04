@@ -45,19 +45,19 @@ use std::{
 #[derive(Debug)]
 pub struct Field {
     i: usize,
-    fields: Fields,
+    fields: FieldSet,
 }
 
 /// Describes the fields present on a span.
 // TODO: When `const fn` is stable, make this type's fields private.
-pub struct Fields {
+pub struct FieldSet {
     /// The names of each field on the described span.
     ///
     /// **Warning**: The fields on this type are currently `pub` because it must be able
     /// to be constructed statically by macros. However, when `const fn`s are
     /// available on stable Rust, this will no longer be necessary. Thus, these
     /// fields are *not* considered stable public API, and they may change
-    /// warning. Do not rely on any fields on `Fields`!
+    /// warning. Do not rely on any fields on `FieldSet`!
     #[doc(hidden)]
     pub names: &'static [&'static str],
     /// The callsite where the described span originates.
@@ -66,7 +66,7 @@ pub struct Fields {
     /// to be constructed statically by macros. However, when `const fn`s are
     /// available on stable Rust, this will no longer be necessary. Thus, these
     /// fields are *not* considered stable public API, and they may change
-    /// warning. Do not rely on any fields on `Fields`!
+    /// warning. Do not rely on any fields on `FieldSet`!
     #[doc(hidden)]
     pub callsite: callsite::Identifier,
 }
@@ -74,7 +74,7 @@ pub struct Fields {
 /// An iterator over a set of fields.
 pub struct Iter {
     idxs: Range<usize>,
-    fields: Fields,
+    fields: FieldSet,
 }
 
 // ===== impl Field =====
@@ -128,7 +128,7 @@ impl Clone for Field {
     fn clone(&self) -> Self {
         Field {
             i: self.i,
-            fields: Fields {
+            fields: FieldSet {
                 names: self.fields.names,
                 callsite: self.fields.callsite(),
             },
@@ -136,9 +136,9 @@ impl Clone for Field {
     }
 }
 
-// ===== impl Fields =====
+// ===== impl FieldSet =====
 
-impl Fields {
+impl FieldSet {
     pub(crate) fn callsite(&self) -> callsite::Identifier {
         callsite::Identifier(self.callsite.0)
     }
@@ -152,7 +152,7 @@ impl Fields {
         let name = &name.borrow();
         self.names.iter().position(|f| f == name).map(|i| Field {
             i,
-            fields: Fields {
+            fields: FieldSet {
                 names: self.names,
                 callsite: self.callsite(),
             },
@@ -164,12 +164,12 @@ impl Fields {
         key.callsite() == self.callsite() && key.i <= self.names.len()
     }
 
-    /// Returns an iterator over the `Field`s to this set of `Fields`.
+    /// Returns an iterator over the `Field`s to this set of `FieldSet`.
     pub fn iter(&self) -> Iter {
         let idxs = 0..self.names.len();
         Iter {
             idxs,
-            fields: Fields {
+            fields: FieldSet {
                 names: self.names,
                 callsite: self.callsite(),
             },
@@ -177,7 +177,7 @@ impl Fields {
     }
 }
 
-impl<'a> IntoIterator for &'a Fields {
+impl<'a> IntoIterator for &'a FieldSet {
     type IntoIter = Iter;
     type Item = Field;
     #[inline]
@@ -186,7 +186,7 @@ impl<'a> IntoIterator for &'a Fields {
     }
 }
 
-impl fmt::Debug for Fields {
+impl fmt::Debug for FieldSet {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_set().entries(self).finish()
     }
@@ -200,7 +200,7 @@ impl Iterator for Iter {
         let i = self.idxs.next()?;
         Some(Field {
             i,
-            fields: Fields {
+            fields: FieldSet {
                 names: self.fields.names,
                 callsite: self.fields.callsite(),
             },

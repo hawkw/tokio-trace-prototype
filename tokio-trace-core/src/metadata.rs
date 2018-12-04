@@ -124,7 +124,7 @@ pub struct Meta<'a> {
     /// `Meta`s, use the `metadata!` macro or the `Meta::new_span` and
     /// `Meta::new_event` constructors instead!
     #[doc(hidden)]
-    pub fields: field::Fields,
+    pub fields: field::FieldSet,
 }
 
 /// Describes the level of verbosity of a `Span`.
@@ -153,7 +153,7 @@ impl<'a> Meta<'a> {
             module_path,
             file,
             line,
-            fields: field::Fields {
+            fields: field::FieldSet {
                 names: field_names,
                 callsite: callsite::Identifier(callsite),
             },
@@ -161,7 +161,7 @@ impl<'a> Meta<'a> {
     }
 
     /// Returns the set of fields on the described span.
-    pub fn fields(&self) -> &field::Fields {
+    pub fn fields(&self) -> &field::FieldSet {
         &self.fields
     }
 
