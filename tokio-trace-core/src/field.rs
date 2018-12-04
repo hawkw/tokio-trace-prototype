@@ -145,7 +145,7 @@ impl FieldSet {
 
     /// Returns the [`Field`](::field::Field) named `name`, or `None` if no such
     /// field exists.
-    pub fn key_for<Q>(&self, name: &Q) -> Option<Field>
+    pub fn field_named<Q>(&self, name: &Q) -> Option<Field>
     where
         Q: Borrow<str>,
     {
@@ -160,7 +160,13 @@ impl FieldSet {
     }
 
     /// Returns `true` if `self` contains the given `field`.
-    pub fn contains_key(&self, field: &Field) -> bool {
+    ///
+    /// **Note**: If `field` shares a name with a field in this `FieldSet`, but
+    /// was created by a `FieldSet` with a different callsite, this `FieldSet`
+    /// does _not_ contain it. This is so that if two separate span callsites
+    /// define a field named "foo", the `Field` corresponding to "foo" for each
+    /// of those callsites are not equivalent.
+    pub fn contains(&self, field: &Field) -> bool {
         field.callsite() == self.callsite() && field.i <= self.names.len()
     }
 

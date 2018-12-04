@@ -42,7 +42,7 @@ use tokio_trace::{
 /// Format a log record as a trace event in the current span.
 pub fn format_trace(record: &log::Record) -> io::Result<()> {
     let meta = record.as_trace();
-    let k = meta.fields().key_for(&"message").unwrap();
+    let k = meta.fields().field_named(&"message").unwrap();
     drop(tokio_trace::Event::new(
         subscriber::Interest::SOMETIMES,
         &meta,
