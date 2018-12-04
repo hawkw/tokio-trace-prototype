@@ -13,9 +13,9 @@ use Meta;
 pub trait AsField {
     /// Attempts to convert `&self` into a `Field` with the specified `metadata`.
     ///
-    /// If `metadata` defines a key corresponding to this field, then the key is
-    /// returned. Otherwise, this function returns `None`.
-    fn as_key(&self, metadata: &Meta) -> Option<Field>;
+    /// If `metadata` defines this field, then the field is returned. Otherwise,
+    /// this returns `None`.
+    fn as_field(&self, metadata: &Meta) -> Option<Field>;
 }
 
 pub trait Record {
@@ -134,7 +134,7 @@ macro_rules! impl_value {
 
 impl AsField for Field {
     #[inline]
-    fn as_key(&self, metadata: &Meta) -> Option<Field> {
+    fn as_field(&self, metadata: &Meta) -> Option<Field> {
         if self.callsite() == metadata.callsite() {
             Some(self.clone())
         } else {
@@ -145,7 +145,7 @@ impl AsField for Field {
 
 impl<'a> AsField for &'a Field {
     #[inline]
-    fn as_key(&self, metadata: &Meta) -> Option<Field> {
+    fn as_field(&self, metadata: &Meta) -> Option<Field> {
         if self.callsite() == metadata.callsite() {
             Some((*self).clone())
         } else {
@@ -156,7 +156,7 @@ impl<'a> AsField for &'a Field {
 
 impl AsField for str {
     #[inline]
-    fn as_key(&self, metadata: &Meta) -> Option<Field> {
+    fn as_field(&self, metadata: &Meta) -> Option<Field> {
         metadata.fields().field_named(&self)
     }
 }

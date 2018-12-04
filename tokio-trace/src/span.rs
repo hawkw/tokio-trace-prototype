@@ -329,7 +329,7 @@ impl Span {
         Q: field::AsField,
     {
         self.metadata()
-            .and_then(|meta| field.as_key(meta))
+            .and_then(|meta| field.as_field(meta))
             .is_some()
     }
 
@@ -474,7 +474,7 @@ impl<'a> Event<'a> {
         Q: field::AsField,
     {
         self.metadata()
-            .and_then(|meta| field.as_key(meta))
+            .and_then(|meta| field.as_field(meta))
             .is_some()
     }
 
@@ -630,7 +630,7 @@ impl<'a> field::Record for Inner<'a> {
     where
         Q: field::AsField,
     {
-        if let Some(key) = field.as_key(self.metadata()) {
+        if let Some(key) = field.as_field(self.metadata()) {
             self.record_value_i64(&key, value);
         }
     }
@@ -640,7 +640,7 @@ impl<'a> field::Record for Inner<'a> {
     where
         Q: field::AsField,
     {
-        if let Some(key) = field.as_key(self.metadata()) {
+        if let Some(key) = field.as_field(self.metadata()) {
             self.record_value_u64(&key, value);
         }
     }
@@ -650,7 +650,7 @@ impl<'a> field::Record for Inner<'a> {
     where
         Q: field::AsField,
     {
-        if let Some(key) = field.as_key(self.metadata()) {
+        if let Some(key) = field.as_field(self.metadata()) {
             self.record_value_bool(&key, value);
         }
     }
@@ -660,7 +660,7 @@ impl<'a> field::Record for Inner<'a> {
     where
         Q: field::AsField,
     {
-        if let Some(key) = field.as_key(self.metadata()) {
+        if let Some(key) = field.as_field(self.metadata()) {
             self.record_value_str(&key, value);
         }
     }
@@ -670,7 +670,7 @@ impl<'a> field::Record for Inner<'a> {
     where
         Q: field::AsField,
     {
-        if let Some(key) = field.as_key(self.metadata()) {
+        if let Some(key) = field.as_field(self.metadata()) {
             self.record_value_debug(&key, value);
         }
     }
