@@ -90,7 +90,7 @@ impl<'a> AsTrace for log::Record<'a> {
                     module_path: None,
                     file: None,
                     line: None,
-                    fields: field::Fields {
+                    fields: field::FieldSet {
                         names: &["message"],
                         callsite: callsite::Identifier(&LogCallsite),
                     },
