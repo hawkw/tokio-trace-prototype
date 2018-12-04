@@ -7,8 +7,8 @@ use std::fmt;
 
 /// Metadata describing a [`Span`].
 ///
-/// This includes the source code location where the span occurred, the
-/// names of its fields, et cetera.
+/// This includes the source code location where the span occurred, the names of
+/// its fields, et cetera.
 ///
 /// Metadata is used by [`Subscriber`]s when filtering spans and events, and it
 /// may also be used as part of their data payload.
@@ -16,14 +16,13 @@ use std::fmt;
 /// When created by the `event!` or `span!` macro, the metadata describing a
 /// particular event or span is constructed statically and exists as a single
 /// static instance. Thus, the overhead of creating the metadata is
-/// _significantly_ lower than that of creating the actual span.
-/// Therefore, filtering is based on metadata, rather than  on the constructed
-/// span.
+/// _significantly_ lower than that of creating the actual span. Therefore,
+/// filtering is based on metadata, rather than  on the constructed span.
 ///
 /// **Note**: Although instances of `Metadata` cannot be compared directly, they
 /// provide a method [`Metadata::id()`] which returns an an opaque [callsite
 /// identifier] which uniquely identifies the callsite where the metadata
-/// originated. This can be used for determining if two `Metadata`s correspond to
+/// originated. This can be used for determining if two Metadata correspond to
 /// the same callsite.
 ///
 /// [`Span`]: ::span::Span
@@ -38,14 +37,14 @@ pub struct Metadata<'a> {
     /// be able to be constructed statically by macros. However, when `const
     /// fn`s are available on stable Rust, this will no longer be necessary.
     /// Thus, these fields are *not* considered stable public API, and they may
-    /// change warning. Do not rely on any fields on `Metadata`. When constructing
-    /// new `Metadata`s, use the `metadata!` macro or the `Metadata::new_span` and
-    /// `Metadata::new_event` constructors instead!
+    /// change warning. Do not rely on any fields on `Metadata`. When
+    /// constructing new `Metadata`, use the `metadata!` macro or the
+    /// `Metadata::new` constructor instead!
     #[doc(hidden)]
     pub name: &'a str,
 
-    /// The part of the system that the span that this metadata
-    /// describes occurred in.
+    /// The part of the system that the span that this metadata describes
+    /// occurred in.
     ///
     /// Typically, this is the module path, but alternate targets may be set
     /// when spans or events are constructed.
@@ -54,9 +53,9 @@ pub struct Metadata<'a> {
     /// be able to be constructed statically by macros. However, when `const
     /// fn`s are available on stable Rust, this will no longer be necessary.
     /// Thus, these fields are *not* considered stable public API, and they may
-    /// change warning. Do not rely on any fields on `Metadata`. When constructing
-    /// new `Metadata`s, use the `metadata!` macro or the `Metadata::new_span` and
-    /// `Metadata::new_event` constructors instead!
+    /// change warning. Do not rely on any fields on `Metadata`. When
+    /// constructing new `Metadata`, use the `metadata!` macro or the
+    /// `Metadata::new` constructor instead!
     #[doc(hidden)]
     pub target: &'a str,
 
@@ -66,48 +65,48 @@ pub struct Metadata<'a> {
     /// be able to be constructed statically by macros. However, when `const
     /// fn`s are available on stable Rust, this will no longer be necessary.
     /// Thus, these fields are *not* considered stable public API, and they may
-    /// change warning. Do not rely on any fields on `Metadata`. When constructing
-    /// new `Metadata`s, use the `metadata!` macro or the `Metadata::new_span` and
-    /// `Metadata::new_event` constructors instead!
+    /// change warning. Do not rely on any fields on `Metadata`. When
+    /// constructing new `Metadata`, use the `metadata!` macro or the
+    /// `Metadata::new` constructor instead!
     #[doc(hidden)]
     pub level: Level,
 
-    /// The name of the Rust module where the span occurred, or `None`
-    /// if this could not be determined.
+    /// The name of the Rust module where the span occurred, or `None` if this
+    /// could not be determined.
     ///
     /// **Warning**: The fields on this type are currently `pub` because it must
     /// be able to be constructed statically by macros. However, when `const
     /// fn`s are available on stable Rust, this will no longer be necessary.
     /// Thus, these fields are *not* considered stable public API, and they may
-    /// change warning. Do not rely on any fields on `Metadata`. When constructing
-    /// new `Metadata`s, use the `metadata!` macro or the `Metadata::new_span` and
-    /// `Metadata::new_event` constructors instead!
+    /// change warning. Do not rely on any fields on `Metadata`. When
+    /// constructing new `Metadata`, use the `metadata!` macro or the
+    /// `Metadata::new` constructor instead!
     #[doc(hidden)]
     pub module_path: Option<&'a str>,
 
-    /// The name of the source code file where the span occurred, or
+    /// The name of the source code file where the span occurred, or `None` if
+    /// this could not be determined.
+    ///
+    /// **Warning**: The fields on this type are currently `pub` because it must
+    /// be able to be constructed statically by macros. However, when `const
+    /// fn`s are available on stable Rust, this will no longer be necessary.
+    /// Thus, these fields are *not* considered stable public API, and they may
+    /// change warning. Do not rely on any fields on `Metadata`. When
+    /// constructing new `Metadata`, use the `metadata!` macro or the
+    /// `Metadata::new` constructor instead!
+    #[doc(hidden)]
+    pub file: Option<&'a str>,
+
+    /// The line number in the source code file where the span occurred, or
     /// `None` if this could not be determined.
     ///
     /// **Warning**: The fields on this type are currently `pub` because it must
     /// be able to be constructed statically by macros. However, when `const
     /// fn`s are available on stable Rust, this will no longer be necessary.
     /// Thus, these fields are *not* considered stable public API, and they may
-    /// change warning. Do not rely on any fields on `Metadata`. When constructing
-    /// new `Metadata`s, use the `metadata!` macro or the `Metadata::new_span` and
-    /// `Metadata::new_event` constructors instead!
-    #[doc(hidden)]
-    pub file: Option<&'a str>,
-
-    /// The line number in the source code file where the span
-    /// occurred, or `None` if this could not be determined.
-    ///
-    /// **Warning**: The fields on this type are currently `pub` because it must
-    /// be able to be constructed statically by macros. However, when `const
-    /// fn`s are available on stable Rust, this will no longer be necessary.
-    /// Thus, these fields are *not* considered stable public API, and they may
-    /// change warning. Do not rely on any fields on `Metadata`. When constructing
-    /// new `Metadata`s, use the `metadata!` macro or the `Metadata::new_span` and
-    /// `Metadata::new_event` constructors instead!
+    /// change warning. Do not rely on any fields on `Metadata`. When
+    /// constructing new `Metadata`, use the `metadata!` macro or the
+    /// `Metadata::new` constructor instead!
     #[doc(hidden)]
     pub line: Option<u32>,
 
@@ -118,11 +117,9 @@ pub struct Metadata<'a> {
     /// be able to be constructed statically by macros. However, when `const
     /// fn`s are available on stable Rust, this will no longer be necessary.
     /// Thus, these fields are *not* considered stable public API, and they may
-    /// change warning. Do not rely on any fields on `Metadata`. When constructing
-    /// new
-    ///
-    /// `Metadata`s, use the `metadata!` macro or the `Metadata::new_span` and
-    /// `Metadata::new_event` constructors instead!
+    /// change warning. Do not rely on any fields on `Metadata`. When
+    /// constructing new `Metadata`, use the `metadata!` macro or the
+    /// `Metadata::new` constructor instead!
     #[doc(hidden)]
     pub fields: field::FieldSet,
 }

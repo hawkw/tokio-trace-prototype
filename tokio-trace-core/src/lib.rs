@@ -19,7 +19,7 @@ macro_rules! identify_callsite {
     };
 }
 
-/// Statically constructs a set of span [metadata].
+/// Statically constructs new span [metadata].
 ///
 /// This may be used in contexts, such as static initializers, where the
 /// [`Metadata::new`] function is not currently usable.
