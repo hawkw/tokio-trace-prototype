@@ -4,7 +4,7 @@ extern crate tokio_trace;
 use tokio_trace::{
     field, span,
     subscriber::{self, Subscriber},
-    Id, Meta,
+    Id, Metadata,
 };
 
 use std::{
@@ -24,7 +24,7 @@ struct CounterSubscriber {
 }
 
 impl Subscriber for CounterSubscriber {
-    fn register_callsite(&self, meta: &tokio_trace::Meta) -> subscriber::Interest {
+    fn register_callsite(&self, meta: &tokio_trace::Metadata) -> subscriber::Interest {
         let mut interest = subscriber::Interest::NEVER;
         for key in meta.fields() {
             if let Some(name) = key.name() {
@@ -42,7 +42,7 @@ impl Subscriber for CounterSubscriber {
         interest
     }
 
-    fn new_span(&self, _new_span: &Meta) -> Id {
+    fn new_span(&self, _new_span: &Metadata) -> Id {
         let id = self.ids.fetch_add(1, Ordering::SeqCst);
         Id::from_u64(id as u64)
     }
@@ -71,7 +71,7 @@ impl Subscriber for CounterSubscriber {
 
     fn record_debug(&self, _id: &Id, _field: &field::Field, _value: &::std::fmt::Debug) {}
 
-    fn enabled(&self, metadata: &Meta) -> bool {
+    fn enabled(&self, metadata: &Metadata) -> bool {
         metadata
             .fields()
             .iter()

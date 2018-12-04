@@ -150,7 +150,7 @@ use {
     dispatcher::{self, Dispatch},
     field,
     subscriber::{Interest, Subscriber},
-    Meta,
+    Metadata,
 };
 
 /// A handle representing a span, with the capability to enter the span if it
@@ -216,7 +216,7 @@ pub(crate) struct Inner<'a> {
     /// possible.
     closed: bool,
 
-    meta: &'a Meta<'a>,
+    meta: &'a Metadata<'a>,
 }
 
 /// When an `Inner` corresponds to a `Span` rather than an `Event`, it can be
@@ -256,7 +256,7 @@ impl Span {
     /// [field values]: ::span::Span::record
     /// [`follows_from` annotations]: ::span::Span::follows_from
     #[inline]
-    pub fn new<F>(interest: Interest, meta: &'static Meta<'static>, if_enabled: F) -> Span
+    pub fn new<F>(interest: Interest, meta: &'static Metadata<'static>, if_enabled: F) -> Span
     where
         F: FnOnce(&mut Span),
     {
@@ -391,8 +391,8 @@ impl Span {
         self.inner.as_ref().map(Enter::id)
     }
 
-    /// Returns this span's `Meta`, if it is enabled.
-    pub fn metadata(&self) -> Option<&'static Meta<'static>> {
+    /// Returns this span's `Metadata`, if it is enabled.
+    pub fn metadata(&self) -> Option<&'static Metadata<'static>> {
         self.inner.as_ref().map(|inner| inner.metadata())
     }
 }
@@ -427,7 +427,7 @@ impl<'a> Event<'a> {
     /// [field values]: ::span::Span::record
     /// [`follows_from` annotations]: ::span::Span::follows_from
     #[inline]
-    pub fn new<F>(interest: Interest, meta: &'a Meta<'a>, if_enabled: F) -> Self
+    pub fn new<F>(interest: Interest, meta: &'a Metadata<'a>, if_enabled: F) -> Self
     where
         F: FnOnce(&mut Self),
     {
@@ -522,8 +522,8 @@ impl<'a> Event<'a> {
         self.inner.as_ref().map(Enter::id)
     }
 
-    /// Returns this span's `Meta`, if it is enabled.
-    pub fn metadata(&self) -> Option<&'a Meta<'a>> {
+    /// Returns this span's `Metadata`, if it is enabled.
+    pub fn metadata(&self) -> Option<&'a Metadata<'a>> {
         self.inner.as_ref().map(|inner| inner.metadata())
     }
 }
@@ -556,7 +556,7 @@ impl<'a> Inner<'a> {
     }
 
     /// Returns the span's metadata.
-    fn metadata(&self) -> &'a Meta<'a> {
+    fn metadata(&self) -> &'a Metadata<'a> {
         self.meta
     }
 
@@ -585,7 +585,7 @@ impl<'a> Inner<'a> {
         self.subscriber.record_debug(&self.id, field, value)
     }
 
-    fn new(id: Id, subscriber: &Dispatch, meta: &'a Meta<'a>) -> Self {
+    fn new(id: Id, subscriber: &Dispatch, meta: &'a Metadata<'a>) -> Self {
         Self {
             id,
             subscriber: subscriber.clone(),

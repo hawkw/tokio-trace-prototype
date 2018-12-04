@@ -1,7 +1,7 @@
 pub use tokio_trace_core::field::*;
 
 use std::fmt;
-use Meta;
+use Metadata;
 
 /// Trait implemented to allow a type to be used as a field key.
 ///
@@ -15,7 +15,7 @@ pub trait AsField {
     ///
     /// If `metadata` defines this field, then the field is returned. Otherwise,
     /// this returns `None`.
-    fn as_field(&self, metadata: &Meta) -> Option<Field>;
+    fn as_field(&self, metadata: &Metadata) -> Option<Field>;
 }
 
 pub trait Record {
@@ -134,7 +134,7 @@ macro_rules! impl_value {
 
 impl AsField for Field {
     #[inline]
-    fn as_field(&self, metadata: &Meta) -> Option<Field> {
+    fn as_field(&self, metadata: &Metadata) -> Option<Field> {
         if self.callsite() == metadata.callsite() {
             Some(self.clone())
         } else {
@@ -145,7 +145,7 @@ impl AsField for Field {
 
 impl<'a> AsField for &'a Field {
     #[inline]
-    fn as_field(&self, metadata: &Meta) -> Option<Field> {
+    fn as_field(&self, metadata: &Metadata) -> Option<Field> {
         if self.callsite() == metadata.callsite() {
             Some((*self).clone())
         } else {
@@ -156,7 +156,7 @@ impl<'a> AsField for &'a Field {
 
 impl AsField for str {
     #[inline]
-    fn as_field(&self, metadata: &Meta) -> Option<Field> {
+    fn as_field(&self, metadata: &Metadata) -> Option<Field> {
         metadata.fields().field_named(&self)
     }
 }

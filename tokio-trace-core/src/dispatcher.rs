@@ -1,7 +1,7 @@
 use {
     callsite, field,
     subscriber::{self, Subscriber},
-    Meta, Span,
+    Metadata, Span,
 };
 
 use std::{
@@ -51,17 +51,17 @@ impl fmt::Debug for Dispatch {
 
 impl Subscriber for Dispatch {
     #[inline]
-    fn register_callsite(&self, metadata: &Meta) -> subscriber::Interest {
+    fn register_callsite(&self, metadata: &Metadata) -> subscriber::Interest {
         self.subscriber.register_callsite(metadata)
     }
 
     #[inline]
-    fn new_static(&self, metadata: &'static Meta<'static>) -> Span {
+    fn new_static(&self, metadata: &'static Metadata<'static>) -> Span {
         self.subscriber.new_static(metadata)
     }
 
     #[inline]
-    fn new_span(&self, metadata: &Meta) -> Span {
+    fn new_span(&self, metadata: &Metadata) -> Span {
         self.subscriber.new_span(metadata)
     }
 
@@ -96,7 +96,7 @@ impl Subscriber for Dispatch {
     }
 
     #[inline]
-    fn enabled(&self, metadata: &Meta) -> bool {
+    fn enabled(&self, metadata: &Metadata) -> bool {
         self.subscriber.enabled(metadata)
     }
 
@@ -123,7 +123,7 @@ impl Subscriber for Dispatch {
 
 struct NoSubscriber;
 impl Subscriber for NoSubscriber {
-    fn new_span(&self, _meta: &Meta) -> Span {
+    fn new_span(&self, _meta: &Metadata) -> Span {
         Span::from_u64(0)
     }
 
@@ -131,7 +131,7 @@ impl Subscriber for NoSubscriber {
 
     fn add_follows_from(&self, _span: &Span, _follows: Span) {}
 
-    fn enabled(&self, _metadata: &Meta) -> bool {
+    fn enabled(&self, _metadata: &Metadata) -> bool {
         false
     }
 
@@ -140,7 +140,7 @@ impl Subscriber for NoSubscriber {
 }
 
 impl Registrar {
-    pub(crate) fn try_register(&self, metadata: &Meta) -> Option<subscriber::Interest> {
+    pub(crate) fn try_register(&self, metadata: &Metadata) -> Option<subscriber::Interest> {
         self.0.upgrade().map(|s| s.register_callsite(metadata))
     }
 }

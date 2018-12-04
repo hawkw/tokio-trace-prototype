@@ -22,10 +22,10 @@ macro_rules! identify_callsite {
 /// Statically constructs a set of span [metadata].
 ///
 /// This may be used in contexts, such as static initializers, where the
-/// [`Meta::new`] function is not currently usable.
+/// [`Metadata::new`] function is not currently usable.
 ///
-/// [metadata]: ::metadata::Meta
-/// [`Meta::new`]: ::metadata::Meta::new
+/// [metadata]: ::metadata::Metadata
+/// [`Metadata::new`]: ::metadata::Metadata::new
 #[macro_export]
 macro_rules! metadata {
     (
@@ -50,7 +50,7 @@ macro_rules! metadata {
         fields: $fields:expr,
         callsite: $callsite:expr,
     ) => {
-        metadata::Meta {
+        metadata::Metadata {
             name: $name,
             target: $target,
             level: $level,
@@ -76,7 +76,7 @@ pub use self::{
     callsite::Callsite,
     dispatcher::Dispatch,
     field::Field,
-    metadata::{Level, Meta},
+    metadata::{Level, Metadata},
     span::Span,
     subscriber::{Interest, Subscriber},
 };
