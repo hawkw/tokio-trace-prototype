@@ -324,7 +324,7 @@ impl Span {
 
     /// Returns true if this `Span` has a field for the given
     /// [`Field`](::field::Field) or field name.
-    pub fn has_field_for<Q: ?Sized>(&self, field: &Q) -> bool
+    pub fn has_field<Q: ?Sized>(&self, field: &Q) -> bool
     where
         Q: field::AsField,
     {
