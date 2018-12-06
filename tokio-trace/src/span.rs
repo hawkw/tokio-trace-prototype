@@ -270,7 +270,7 @@ impl Span {
                     is_closed: false,
                 };
             }
-            let id = dispatch.new_static(meta);
+            let id = dispatch.new_span(meta);
             let inner = Some(Enter::new(id, dispatch, meta));
             Self {
                 inner,
