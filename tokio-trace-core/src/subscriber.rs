@@ -490,11 +490,19 @@ mod test_support {
         fn new_span(&self, meta: &Metadata) -> Span {
             let id = self.ids.fetch_add(1, Ordering::SeqCst);
             let id = Span::from_u64(id as u64);
-            println!("new_span: name={:?}; target={:?}; id={:?};", meta.name(), meta.target(), id);
-            self.spans
-                .lock()
-                .unwrap()
-                .insert(id.clone(), SpanState { name: meta.name(), refs: 1 });
+            println!(
+                "new_span: name={:?}; target={:?}; id={:?};",
+                meta.name(),
+                meta.target(),
+                id
+            );
+            self.spans.lock().unwrap().insert(
+                id.clone(),
+                SpanState {
+                    name: meta.name(),
+                    refs: 1,
+                },
+            );
             id
         }
 
@@ -549,24 +557,20 @@ mod test_support {
                     "expected to enter {}, but exited span {:?} instead",
                     expected_span, span.name
                 ),
-               Some(Expect::Exit(ref expected_span)) => {
+                Some(Expect::Exit(ref expected_span)) => {
                     if let Some(name) = expected_span.name {
                         assert_eq!(name, span.name);
                     }
                     // TODO: expect fields
                 }
-               Some(Expect::CloneSpan(ref expected_span)) => {
-                    panic!(
-                        "expected to clone {}, but exited span {:?} instead",
-                        expected_span, span.name
-                    )
-                }
-                Some(Expect::DropSpan(ref expected_span)) => {
-                    panic!(
-                        "expected to drop {}, but exited span {:?} instead",
-                        expected_span, span.name
-                    )
-                }
+                Some(Expect::CloneSpan(ref expected_span)) => panic!(
+                    "expected to clone {}, but exited span {:?} instead",
+                    expected_span, span.name
+                ),
+                Some(Expect::DropSpan(ref expected_span)) => panic!(
+                    "expected to drop {}, but exited span {:?} instead",
+                    expected_span, span.name
+                ),
                 Some(Expect::Nothing) => panic!(
                     "expected nothing else to happen, but exited span {:?}",
                     span.name,

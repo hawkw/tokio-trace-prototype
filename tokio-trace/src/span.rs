@@ -774,7 +774,7 @@ mod tests {
     fn handles_to_different_spans_with_the_same_metadata_are_not_equal() {
         // Every time time this function is called, it will return a _new
         // instance_ of a span with the same metadata, name, and fields.
-        fn make_span() -> Span<'static>{
+        fn make_span() -> Span<'static> {
             span!("foo", bar = 1u64, baz = false)
         }
 

@@ -329,7 +329,10 @@ impl SpanLineBuilder {
                     .module_path(self.module_path.as_ref().map(String::as_ref))
                     .file(self.file.as_ref().map(String::as_ref))
                     .line(self.line)
-                    .args(format_args!("{}{}{}{}", self.log_line, before_current, current_span, self.fields))
+                    .args(format_args!(
+                        "{}{}{}{}",
+                        self.log_line, before_current, current_span, self.fields
+                    ))
                     .build(),
             );
         }
@@ -403,7 +406,8 @@ impl Subscriber for TraceLogger {
                                 .args(format_args!(
                                     "enter {}; in={:?}; {}",
                                     span.name, current_id, current_fields
-                                )).build(),
+                                ))
+                                .build(),
                         );
                     } else {
                         logger.log(
@@ -438,7 +442,7 @@ impl Subscriber for TraceLogger {
                             .file(span.file.as_ref().map(String::as_ref))
                             .line(span.line)
                             .args(format_args!("exit {}", span.name))
-                            .build()
+                            .build(),
                     );
                 }
             }
