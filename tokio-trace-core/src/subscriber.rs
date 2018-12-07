@@ -490,7 +490,7 @@ mod test_support {
         fn new_span(&self, meta: &Metadata) -> Span {
             let id = self.ids.fetch_add(1, Ordering::SeqCst);
             let id = Span::from_u64(id as u64);
-            println!("new_span: name={:?}; target={:?}; id={:?};", id, meta.name(), meta.target());
+            println!("new_span: name={:?}; target={:?}; id={:?};", meta.name(), meta.target(), id);
             self.spans
                 .lock()
                 .unwrap()
@@ -602,6 +602,9 @@ mod test_support {
             let name = if let Ok(mut spans) = self.spans.try_lock() {
                 spans.get_mut(&id).map(|span| {
                     let name = span.name;
+                    if name.contains("event") {
+                        is_event = true;
+                    }
                     println!("drop_span: {}; id={:?}; refs={:?};", name, id, span.refs);
                     span.refs -= 1;
                     name
