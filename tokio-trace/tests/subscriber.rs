@@ -1,4 +1,3 @@
-
 #[macro_use]
 extern crate tokio_trace;
 mod support;

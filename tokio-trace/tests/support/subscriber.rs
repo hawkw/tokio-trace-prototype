@@ -1,6 +1,5 @@
 #![allow(missing_docs)]
 use super::span::MockSpan;
-use ::tokio_trace::{field, Metadata, Id, Subscriber};
 use std::{
     collections::{HashMap, VecDeque},
     fmt,
@@ -9,6 +8,7 @@ use std::{
         Arc, Mutex,
     },
 };
+use tokio_trace::{field, Id, Metadata, Subscriber};
 
 #[derive(Debug, Eq, PartialEq)]
 struct ExpectEvent {

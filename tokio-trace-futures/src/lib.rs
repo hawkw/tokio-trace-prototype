@@ -127,10 +127,7 @@ pub mod test_support;
 mod tests {
     extern crate tokio;
 
-    use super::{
-        *,
-        test_support::*,
-    };
+    use super::{test_support::*, *};
     use futures::{future, stream, task};
     use tokio_trace::Dispatch;
 

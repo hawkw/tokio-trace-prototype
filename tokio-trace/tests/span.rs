@@ -1,11 +1,10 @@
-
 #[macro_use]
 extern crate tokio_trace;
 mod support;
 
 use self::support::*;
-use tokio_trace::{dispatcher, Dispatch, Span};
 use std::thread;
+use tokio_trace::{dispatcher, Dispatch, Span};
 
 #[test]
 fn closed_handle_dropped_when_used() {
