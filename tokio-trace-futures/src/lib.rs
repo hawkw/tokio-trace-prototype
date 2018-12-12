@@ -6,6 +6,7 @@ use futures::{Async, Future, Poll, Sink, StartSend, Stream};
 use tokio_trace::{dispatcher, Dispatch, Span, Subscriber};
 
 pub mod executor;
+pub mod prelude;
 
 // TODO: seal?
 pub trait Instrument: Sized {
