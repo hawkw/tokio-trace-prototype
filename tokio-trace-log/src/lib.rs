@@ -43,10 +43,7 @@ use tokio_trace::{
 pub fn format_trace(record: &log::Record) -> io::Result<()> {
     let meta = record.as_trace();
     let k = meta.fields().field_named(&"message").unwrap();
-    let mut event = tokio_trace::Event::new(
-        subscriber::Interest::SOMETIMES,
-        &meta,
-    );
+    let mut event = tokio_trace::Event::new(subscriber::Interest::SOMETIMES, &meta);
     if !event.is_disabled() {
         event.message(&k, record.args().clone());
     }
