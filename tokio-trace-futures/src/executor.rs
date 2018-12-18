@@ -8,7 +8,7 @@ use {Instrument, Instrumented, WithDispatch};
 #[cfg(feature = "with-tokio")]
 use tokio::{
     executor::{Executor as TokioExecutor, SpawnError},
-    runtime::{Runtime, TaskExecutor, current_thread},
+    runtime::{current_thread, Runtime, TaskExecutor},
 };
 
 pub trait InstrumentExecutor<'a, F>
@@ -71,7 +71,7 @@ where
 {
     fn spawn(
         &mut self,
-        future: Box<Future<Error = (), Item = ()> + 'static + Send>
+        future: Box<Future<Error = (), Item = ()> + 'static + Send>,
     ) -> Result<(), SpawnError> {
         // TODO: get rid of double box somehow?
         let future = Box::new(future.instrument((self.mk_span)()));
@@ -228,7 +228,7 @@ where
 {
     fn spawn(
         &mut self,
-        future: Box<Future<Error = (), Item = ()> + 'static + Send>
+        future: Box<Future<Error = (), Item = ()> + 'static + Send>,
     ) -> Result<(), SpawnError> {
         // TODO: get rid of double box?
         let future = Box::new(self.with_dispatch(future));
@@ -297,7 +297,6 @@ impl WithDispatch<Runtime> {
 
 #[cfg(feature = "with-tokio")]
 impl WithDispatch<current_thread::Runtime> {
-
     /// Spawn a future onto the single-threaded Tokio runtime, in the context
     /// of this `WithDispatch`'s trace dispatcher.
     ///
