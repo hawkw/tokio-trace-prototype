@@ -108,7 +108,7 @@ macro_rules! callsite {
             name: concat!("event at ", file!(), ":", line!()),
             target: $target,
             level: $lvl,
-            fields: &[ "message", $(stringify!($field_name)),* ]
+            fields: &[ $(stringify!($field_name)),* ]
         )
     });
     (@
@@ -240,7 +240,7 @@ macro_rules! event {
     // (target: $target:expr, $lvl:expr, { $( $k:ident $( = $val:expr )* ),* }, $fmt:expr ) => (
     //     event!(target: $target, $lvl, { $($k $( = $val)* ),* }, $fmt, )
     // );
-    (target: $target:expr, $lvl:expr, { $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => ({
+    (target: $target:expr, $lvl:expr, $( $k:ident $( = $val:expr )* ),+ ) => ({
         {
             #[allow(unused_imports)]
             use $crate::{callsite, Id, Subscriber, Event, field::{Value, AsField}};
@@ -256,9 +256,6 @@ macro_rules! event {
             #[allow(unused_variables, unused_mut)] {
                 if !event.is_disabled() {
                     let mut keys = callsite.metadata().fields().into_iter();
-                    let msg_key = keys.next()
-                        .expect("event metadata should define a key for the message");
-                    event.message(&msg_key, format_args!( $($arg)+ ));
                     $(
                         let key = keys.next()
                             .expect(concat!("metadata should define a key for '", stringify!($k), "'"));
@@ -269,67 +266,120 @@ macro_rules! event {
             event
         }
     });
+    (target: $target:expr, $lvl:expr, { $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => ({
+        event!(
+            target: $target,
+            $lvl,
+            message = $crate::field::display(format_args!( $($arg)+ )),
+            $($k $( = $val)* ),*
+        )
+    });
+    ( $lvl:expr, {}, $($arg:tt)+ ) => (
+        event!(target: module_path!(), $lvl, message = $crate::field::display(format_args!( $($arg)+ ),))
+    );
     ( $lvl:expr, { $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => (
         event!(target: module_path!(), $lvl, { $($k $( = $val)* ),* }, $($arg)+)
     );
+    ( $lvl:expr, $( $k:ident $( = $val:expr )* ),+ ) => (
+        event!(target: module_path!(), $lvl, $($k $( = $val)* ),+ )
+    );
     ( $lvl:expr, $($arg:tt)+ ) => (
-        event!(target: module_path!(), $lvl, { }, $($arg)+)
+        event!(
+            target: module_path!(),
+            $lvl,
+            message = $crate::field::display(format_args!( $($arg)+ )),
+        )
     );
     (@ record: $ev:expr, $k:expr, $i:expr, $val:expr) => (
         $ev.record($i, &$val);
     );
-    (@ record: $ev:expr, $k:expr, $i:expr,) => (
+    (@ record: $ev:expr, $k:expr, $i:expr,) => ( {}
         // skip
     );
 }
 
 #[macro_export]
 macro_rules! trace {
+    ( $( $k:ident $( = $val:expr )* ),* ) => (
+        event!(target: module_path!(), $crate::Level::TRACE, $($k $( = $val)* ),* )
+    );
     ({ $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => (
         event!(target: module_path!(), $crate::Level::TRACE, { $($k $( = $val)* ),* }, $($arg)+)
     );
     ( $($arg:tt)+ ) => (
-        drop(event!(target: module_path!(), $crate::Level::TRACE, {}, $($arg)+));
+        drop(event!(
+            target: module_path!(),
+            $crate::Level::TRACE,
+            message = $crate::field::display(format_args!( $($arg)+ ))
+        ));
     );
 }
 
 #[macro_export]
 macro_rules! debug {
+    ( $( $k:ident $( = $val:expr )* ),* ) => (
+        event!(target: module_path!(), $crate::Level::DEBUG, $($k $( = $val)* ),* )
+    );
     ({ $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => (
         event!(target: module_path!(), $crate::Level::DEBUG, { $($k $( = $val)* ),* }, $($arg)+)
     );
     ( $($arg:tt)+ ) => (
-        drop(event!(target: module_path!(), $crate::Level::DEBUG, {}, $($arg)+));
+        drop(event!(
+            target: module_path!(),
+            $crate::Level::DEBUG,
+            message = $crate::field::display(format_args!( $($arg)+ ))
+        ));
     );
 }
 
 #[macro_export]
 macro_rules! info {
+    ( $( $k:ident $( = $val:expr )* ),* ) => (
+        event!(target: module_path!(), $crate::Level::INFO, $($k $( = $val)* ),* )
+    );
     ({ $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => (
         event!(target: module_path!(), $crate::Level::INFO, { $($k $( = $val)* ),* }, $($arg)+)
     );
     ( $($arg:tt)+ ) => (
-        drop(event!(target: module_path!(), $crate::Level::INFO, {}, $($arg)+));
+        drop(event!(
+            target: module_path!(),
+            $crate::Level::INFO,
+            message = $crate::field::display(format_args!( $($arg)+ ))
+        ));
     );
 }
 
 #[macro_export]
 macro_rules! warn {
+    ( $( $k:ident $( = $val:expr )* ),* ) => (
+        event!(target: module_path!(), $crate::Level::WARN, $($k $( = $val)* ),* )
+    );
     ({ $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => (
         event!(target: module_path!(), $crate::Level::WARN, { $($k $( = $val)* ),* }, $($arg)+)
     );
     ( $($arg:tt)+ ) => (
-        drop(event!(target: module_path!(), $crate::Level::WARN, {}, $($arg)+));
+        drop(event!(
+            target: module_path!(),
+            $crate::Level::WARN,
+            message = $crate::field::display(format_args!( $($arg)+ ))
+        ));
     );
 }
 
 #[macro_export]
 macro_rules! error {
+    ( $( $k:ident $( = $val:expr )* ),* ) => (
+        event!(target: module_path!(), $crate::Level::ERROR, $($k $( = $val)* ),* )
+    );
     ({ $( $k:ident $( = $val:expr )* ),* }, $($arg:tt)+ ) => (
         event!(target: module_path!(), $crate::Level::ERROR, { $($k $( = $val)* ),* }, $($arg)+)
     );
     ( $($arg:tt)+ ) => (
-        drop(event!(target: module_path!(), $crate::Level::ERROR, {}, $($arg)+));
+        drop(event!(
+            target: module_path!(),
+            $crate::Level::ERROR,
+            message = $crate::field::display(format_args!( $($arg)+ ))
+        ));
     );
 }
 
